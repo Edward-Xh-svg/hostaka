@@ -354,4 +354,187 @@ app.delete('/api/groups/:id', requireAuth, async (req, res) => {
 });
 
 app.post('/api/groups/:id/members', requireAuth, async (req, res) => {
-  try
+  try {
+    const m = await q.isMember(req.params.id, req.user.id);
+    if (!m || m.role === 'member') return res.status(403).json({ error:'غير مسموح' });
+    const { user_id, role } = req.body||{};
+    await q.addGroupMember(req.params.id, user_id, role||'member');
+    res.json({ success:true });
+  } catch(e) { res.status(500).json({ error:'خطأ' }); }
+});
+
+app.delete('/api/groups/:id/members/:uid', requireAuth, async (req, res) => {
+  try {
+    const m = await q.isMember(req.params.id, req.user.id);
+    const isSelf = req.params.uid == req.user.id;
+    if (!isSelf && (!m || m.role === 'member')) return res.status(403).json({ error:'غير مسموح' });
+    await q.removeGroupMember(req.params.id, req.params.uid);
+    res.json({ success:true });
+  } catch(e) { res.status(500).json({ error:'خطأ' }); }
+});
+
+app.put('/api/groups/:id/members/:uid/role', requireAuth, async (req, res) => {
+  try {
+    const m = await q.isMember(req.params.id, req.user.id);
+    if (!m || m.role !== 'admin') return res.status(403).json({ error:'فقط admin' });
+    const { role } = req.body||{};
+    await q.updateMemberRole(req.params.id, req.params.uid, role||'member');
+    res.json({ success:true });
+  } catch(e) { res.status(500).json({ error:'خطأ' }); }
+});
+
+app.put('/api/groups/:id/members/:uid/nickname', requireAuth, async (req, res) => {
+  try {
+    const { nickname } = req.body||{};
+    await q.updateMemberNick(req.params.id, req.params.uid, nickname||'');
+    res.json({ success:true });
+  } catch(e) { res.status(500).json({ error:'خطأ' }); }
+});
+
+// Group Messages
+app.get('/api/groups/:id/messages', requireAuth, async (req, res) => {
+  try {
+    const m = await q.isMember(req.params.id, req.user.id);
+    if (!m) return res.status(403).json({ error:'لست عضواً' });
+    res.json(await q.getGroupMessages(req.params.id));
+  } catch(e) { res.status(500).json({ error:'خطأ' }); }
+});
+
+app.post('/api/groups/:id/messages', requireAuth, async (req, res) => {
+  try {
+    const m = await q.isMember(req.params.id, req.user.id);
+    if (!m) return res.status(403).json({ error:'لست عضواً' });
+    const { content, image } = req.body||{};
+    if (!content?.trim() && !image) return res.status(400).json({ error:'الرسالة فارغة' });
+    const user = await q.getUserById(req.user.id);
+    await q.sendGroupMessage(req.params.id, user.id, user.display_name||user.username, user.avatar||'', content?.trim()||'', image||'');
+    res.json({ success:true });
+  } catch(e) { res.status(500).json({ error:'خطأ' }); }
+});
+
+app.post('/api/groups/:gid/messages/:mid/react', requireAuth, async (req, res) => {
+  try {
+    const { emoji } = req.body||{};
+    const existing = await q.getUserGroupMsgReaction(req.params.mid, req.user.id);
+    if (existing && existing.emoji === emoji) await q.removeGroupMsgReaction(req.params.mid, req.user.id);
+    else await q.addGroupMsgReaction(req.params.mid, req.user.id, emoji||'heart');
+    const reactions = await q.getGroupMsgReactions(req.params.mid);
+    const userReaction = await q.getUserGroupMsgReaction(req.params.mid, req.user.id);
+    res.json({ success:true, reactions, userReaction: userReaction?.emoji||null });
+  } catch(e) { res.status(500).json({ error:'خطأ' }); }
+});
+
+// ==================== Message Reactions ====================
+app.post('/api/messages/react/:id', requireAuth, async (req, res) => {
+  try {
+    const { emoji } = req.body||{};
+    const existing = await q.getUserMsgReaction(req.params.id, req.user.id);
+    if (existing && existing.emoji === emoji) {
+      await q.removeMsgReaction(req.params.id, req.user.id);
+    } else {
+      await q.addMsgReaction(req.params.id, req.user.id, emoji||'heart');
+    }
+    const reactions = await q.getMsgReactions(req.params.id);
+    const userReaction = await q.getUserMsgReaction(req.params.id, req.user.id);
+    res.json({ success:true, reactions, userReaction: userReaction?.emoji||null });
+  } catch(e) { res.status(500).json({ error:'خطأ' }); }
+});
+
+// ==================== User Profile Posts ====================
+app.get('/api/user/:username/posts', async (req, res) => {
+  try {
+    const user = await q.getPublicProfile(req.params.username);
+    if (!user) return res.status(404).json({ error:'المستخدم غير موجود' });
+    const posts = await q.getUserPosts(user.id);
+    res.json(posts);
+  } catch(e) { res.status(500).json({ error:'خطأ' }); }
+});
+
+// ==================== Verification ====================
+app.post('/api/verify/request', requireAuth, async (req, res) => {
+  try {
+    const { reason } = req.body || {};
+    // تحقق إذا كان لديه طلب pending مسبق
+    const existing = await q.getUserVerification(req.user.id);
+    if (existing?.status === 'pending') return res.status(400).json({ error: 'لديك طلب توثيق قيد الانتظار' });
+    const user = await q.getUserById(req.user.id);
+    if (user?.verified) return res.status(400).json({ error: 'حسابك موثّق مسبقاً' });
+    await q.requestVerification(req.user.id, req.user.username, reason || '');
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: 'خطأ في الخادم' }); }
+});
+
+app.get('/api/verify/status', requireAuth, async (req, res) => {
+  try {
+    const user = await q.getUserById(req.user.id);
+    const req_ = await q.getUserVerification(req.user.id);
+    res.json({ verified: !!user?.verified, status: req_?.status || null });
+  } catch(e) { res.status(500).json({ error: 'خطأ' }); }
+});
+
+app.get('/api/admin/verifications', requireAdmin, async (req, res) => {
+  try { res.json(await q.listVerificationRequests()); }
+  catch(e) { res.status(500).json({ error: 'خطأ' }); }
+});
+
+app.post('/api/admin/verifications/:id/approve', requireAdmin, async (req, res) => {
+  try {
+    const { user_id } = req.body || {};
+    await q.approveVerification(req.params.id, user_id);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: 'خطأ' }); }
+});
+
+app.post('/api/admin/verifications/:id/reject', requireAdmin, async (req, res) => {
+  try {
+    await q.rejectVerification(req.params.id);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: 'خطأ' }); }
+});
+
+// ==================== Messages ====================
+app.get('/api/messages/unread', requireAuth, async (req, res) => {
+  try { res.json(await q.unreadCount(req.user.id)); } catch(e) { res.status(500).json({ error:'خطأ' }); }
+});
+app.get('/api/messages/conversations', requireAuth, async (req, res) => {
+  try { res.json(await q.getConversations(req.user.id)); } catch(e) { res.status(500).json({ error:'خطأ' }); }
+});
+app.get('/api/messages/:username', requireAuth, async (req, res) => {
+  try {
+    const other = await q.getPublicProfile(req.params.username);
+    if (!other) return res.status(404).json({ error:'المستخدم غير موجود' });
+    await q.markRead(other.id, req.user.id);
+    res.json(await q.getMessages(req.user.id, other.id));
+  } catch(e) { res.status(500).json({ error:'خطأ' }); }
+});
+app.post('/api/messages/:username', requireAuth, async (req, res) => {
+  try {
+    const { content, image } = req.body||{};
+    if (!content?.trim() && !image) return res.status(400).json({ error:'الرسالة فارغة' });
+    const other = await q.getPublicProfile(req.params.username);
+    if (!other) return res.status(404).json({ error:'المستخدم غير موجود' });
+    const me = await q.getUserById(req.user.id);
+    await q.sendMessageWithImage(me.id, other.id, me.display_name||me.username, other.display_name||other.username, content?.trim()||'', image||'');
+    res.json({ success:true });
+  } catch(e) { res.status(500).json({ error:'خطأ' }); }
+});
+
+// ==================== Pages ====================
+app.get('/admin',   (_,res)=>res.sendFile(path.join(__dirname,'public','admin.html')));
+app.get('/wiki',    (_,res)=>res.sendFile(path.join(__dirname,'public','wiki.html')));
+app.get('/archive', (_,res)=>res.sendFile(path.join(__dirname,'public','wiki.html')));
+app.get('/stock',   (_,res)=>res.sendFile(path.join(__dirname,'public','stock.html')));
+app.get('/council', (_,res)=>res.sendFile(path.join(__dirname,'public','council.html')));
+app.get('/records', (_,res)=>res.sendFile(path.join(__dirname,'public','records.html')));
+app.get('/hostaka', (_,res)=>res.sendFile(path.join(__dirname,'public','hostaka.html')));
+app.get('/profile', (_,res)=>res.sendFile(path.join(__dirname,'public','profile.html')));
+app.get('/group',   (_,res)=>res.sendFile(path.join(__dirname,'public','group.html')));
+app.get('/chat',    (_,res)=>res.sendFile(path.join(__dirname,'public','chat.html')));
+app.get('*',        (_,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
+
+const PORT = process.env.PORT || 3000;
+initDB()
+  .then(()=>app.listen(PORT,()=>console.log(`🚀 Malines on port ${PORT}`)))
+  .catch(err=>{ console.error('DB init failed:',err); process.exit(1); });
+
+module.exports = app;
