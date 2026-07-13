@@ -1,6 +1,7 @@
 {
-  "name": "malines-archive",
-  "version": "5.0.0",
+  "name": "hostaka",
+  "version": "1.0.0",
+  "description": "Hostaka Social Platform",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"
