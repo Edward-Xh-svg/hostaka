@@ -521,7 +521,7 @@ app.post('/api/messages/:username', requireAuth, async (req, res) => {
 
 // ==================== Pages ====================
 app.get('/admin',   (_,res)=>res.sendFile(path.join(__dirname,'public','admin.html')));
-app.get('/', (_,res)=>res.sendFile(path.join(__dirname,'public','records.html')));
+app.get('/',        (_,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
 app.get('/profile', (_,res)=>res.sendFile(path.join(__dirname,'public','profile.html')));
 app.get('/group',   (_,res)=>res.sendFile(path.join(__dirname,'public','group.html')));
 app.get('/chat',    (_,res)=>res.sendFile(path.join(__dirname,'public','chat.html')));
@@ -529,7 +529,7 @@ app.get('*',        (_,res)=>res.sendFile(path.join(__dirname,'public','index.ht
 
 const PORT = process.env.PORT || 3000;
 initDB()
-  .then(()=>app.listen(PORT,()=>console.log(`🚀 Malines on port ${PORT}`)))
-  .catch(err=>{ console.error('DB init failed:',err); process.exit(1); });
+.then(()=>app.listen(PORT,()=>console.log(`🚀 Hostaka on port ${PORT}`)))
+.catch(err=>{ console.error('DB init failed:',err); process.exit(1); });
 
 module.exports = app;
