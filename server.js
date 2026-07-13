@@ -521,12 +521,7 @@ app.post('/api/messages/:username', requireAuth, async (req, res) => {
 
 // ==================== Pages ====================
 app.get('/admin',   (_,res)=>res.sendFile(path.join(__dirname,'public','admin.html')));
-app.get('/wiki',    (_,res)=>res.sendFile(path.join(__dirname,'public','wiki.html')));
-app.get('/archive', (_,res)=>res.sendFile(path.join(__dirname,'public','wiki.html')));
-app.get('/stock',   (_,res)=>res.sendFile(path.join(__dirname,'public','stock.html')));
-app.get('/council', (_,res)=>res.sendFile(path.join(__dirname,'public','council.html')));
-app.get('/records', (_,res)=>res.sendFile(path.join(__dirname,'public','records.html')));
-app.get('/hostaka', (_,res)=>res.sendFile(path.join(__dirname,'public','hostaka.html')));
+app.get('/', (_,res)=>res.sendFile(path.join(__dirname,'public','records.html')));
 app.get('/profile', (_,res)=>res.sendFile(path.join(__dirname,'public','profile.html')));
 app.get('/group',   (_,res)=>res.sendFile(path.join(__dirname,'public','group.html')));
 app.get('/chat',    (_,res)=>res.sendFile(path.join(__dirname,'public','chat.html')));
