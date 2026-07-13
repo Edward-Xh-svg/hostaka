@@ -8,7 +8,7 @@ const app = express();
 app.use(express.json({ limit: '15mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-const JWT_SECRET = process.env.JWT_SECRET || 'malines-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'hostaka-secret-change-in-production';
 const JWT_EXPIRES = '30d';
 
 // ==================== JWT Auth ====================
@@ -135,118 +135,6 @@ app.post('/api/upload', requireAuth, async (req, res) => {
     if (!data.success) return res.status(500).json({ error: 'فشل الرفع على imgbb' });
     res.json({ url: data.data.url });
   } catch(e) { res.status(500).json({ error: 'خطأ: '+e.message }); }
-});
-
-// ==================== Articles ====================
-app.get('/api/articles', async (req, res) => {
-  try { res.json(await q.listPublished()); } catch(e) { res.status(500).json({ error:'خطأ' }); }
-});
-app.get('/api/admin/articles', requireAdmin, async (req, res) => {
-  try { res.json(await q.listArticles()); } catch(e) { res.status(500).json({ error:'خطأ' }); }
-});
-app.get('/api/articles/:slug', async (req, res) => {
-  try {
-    const a = await q.getArticle(req.params.slug);
-    if (!a) return res.status(404).json({ error:'غير موجود' });
-    const u = verifyToken(req);
-    if (!a.published && u?.role !== 'admin') return res.status(404).json({ error:'غير موجود' });
-    res.json(a);
-  } catch(e) { res.status(500).json({ error:'خطأ' }); }
-});
-app.post('/api/admin/articles', requireAdmin, async (req, res) => {
-  try {
-    const { slug,title,category,content,image,published } = req.body||{};
-    if (!slug||!title||!content) return res.status(400).json({ error:'بيانات ناقصة' });
-    await q.createArticle(slug.trim(),title.trim(),category||'عام',content,image||'',published?1:0,req.user.id);
-    res.json({ success:true });
-  } catch(e) {
-    if (e.message?.includes('UNIQUE')) return res.status(400).json({ error:'slug مستخدم مسبقاً' });
-    res.status(500).json({ error:'خطأ' });
-  }
-});
-app.put('/api/admin/articles/:slug', requireAdmin, async (req, res) => {
-  try {
-    const { title,category,content,image,published } = req.body||{};
-    await q.updateArticle(title,category||'عام',content,image||'',published?1:0,req.params.slug);
-    res.json({ success:true });
-  } catch(e) { res.status(500).json({ error:'خطأ' }); }
-});
-app.delete('/api/admin/articles/:slug', requireAdmin, async (req, res) => {
-  try { await q.deleteArticle(req.params.slug); res.json({ success:true }); }
-  catch(e) { res.status(500).json({ error:'خطأ' }); }
-});
-
-// ==================== Countries ====================
-app.get('/api/nbn/list', async (req, res) => {
-  try { res.json((await q.listByType('council')).map(x=>x.name)); } catch(e) { res.status(500).json({ error:'خطأ' }); }
-});
-app.get('/api/nbn/data/:name', async (req, res) => {
-  try {
-    const c = await q.getCountryByName(req.params.name);
-    if (!c) return res.status(404).json({ error:'غير موجود' });
-    res.json({ council_data:c.council_data, description:c.description });
-  } catch(e) { res.status(500).json({ error:'خطأ' }); }
-});
-app.get('/api/inc/list', async (req, res) => {
-  try { res.json((await q.listByType('stock')).map(x=>x.name)); } catch(e) { res.status(500).json({ error:'خطأ' }); }
-});
-app.get('/api/inc/data/:name', async (req, res) => {
-  try {
-    const c = await q.getCountryByName(req.params.name);
-    if (!c) return res.status(404).json({ error:'غير موجود' });
-    const cos = await q.getCompaniesByCountry(c.id);
-    res.json({
-      companies: cos.map((x,i)=>({index:i+1,value:x.name,id:x.id})),
-      values:    cos.map((x,i)=>({index:i+1,value:x.market_value})),
-      growth:    cos.map((x,i)=>({index:i+1,value:x.growth})),
-    });
-  } catch(e) { res.status(500).json({ error:'خطأ' }); }
-});
-app.get('/api/admin/countries', requireAdmin, async (req, res) => {
-  try {
-    const cs = await q.listCountries();
-    res.json(await Promise.all(cs.map(async c=>({...c,companies:await q.getCompaniesByCountry(c.id)}))));
-  } catch(e) { res.status(500).json({ error:'خطأ' }); }
-});
-app.post('/api/admin/countries', requireAdmin, async (req, res) => {
-  try {
-    const { name,flag,description,type,council_data } = req.body||{};
-    if (!name) return res.status(400).json({ error:'الاسم مطلوب' });
-    const r = await q.createCountry(name.trim(),flag||'',description||'',type||'both',council_data||'');
-    res.json({ success:true, id:Number(r.lastInsertRowid) });
-  } catch(e) {
-    if (e.message?.includes('UNIQUE')) return res.status(400).json({ error:'الاسم مستخدم' });
-    res.status(500).json({ error:'خطأ' });
-  }
-});
-app.put('/api/admin/countries/:id', requireAdmin, async (req, res) => {
-  try {
-    const { name,flag,description,type,council_data } = req.body||{};
-    await q.updateCountry(name,flag||'',description||'',type||'both',council_data||'',req.params.id);
-    res.json({ success:true });
-  } catch(e) { res.status(500).json({ error:'خطأ' }); }
-});
-app.delete('/api/admin/countries/:id', requireAdmin, async (req, res) => {
-  try { await q.deleteCountry(req.params.id); res.json({ success:true }); }
-  catch(e) { res.status(500).json({ error:'خطأ' }); }
-});
-app.post('/api/admin/companies', requireAdmin, async (req, res) => {
-  try {
-    const { country_id,name,market_value,growth,sort_order } = req.body||{};
-    const r = await q.createCompany(country_id,name.trim(),market_value||'0',growth||'0%',sort_order||0);
-    res.json({ success:true, id:Number(r.lastInsertRowid) });
-  } catch(e) { res.status(500).json({ error:'خطأ' }); }
-});
-app.put('/api/admin/companies/:id', requireAdmin, async (req, res) => {
-  try {
-    const { name,market_value,growth,sort_order } = req.body||{};
-    await q.updateCompany(name,market_value||'0',growth||'0%',sort_order||0,req.params.id);
-    res.json({ success:true });
-  } catch(e) { res.status(500).json({ error:'خطأ' }); }
-});
-app.delete('/api/admin/companies/:id', requireAdmin, async (req, res) => {
-  try { await q.deleteCompany(req.params.id); res.json({ success:true }); }
-  catch(e) { res.status(500).json({ error:'خطأ' }); }
 });
 
 // ==================== Admin: Users ====================
