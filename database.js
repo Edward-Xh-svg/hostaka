@@ -77,14 +77,13 @@ app.post('/api/logout',(_,res)=>res.json({success:true}));
 // Profile
 app.get('/api/profile/:username', async (req, res) => {
   try {
-    // استخراج التوكن إذا وجد
     const token = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
     let viewerId = null;
     if (token) {
       try {
         const decoded = jwt.verify(token, JWT_SECRET);
         viewerId = decoded.id;
-      } catch (e) { /* تجاهل التوكن غير الصالح */ }
+      } catch (e) { }
     }
     const user = await q.getPublicProfile(req.params.username, viewerId);
     if (!user) return res.status(404).json({ error: 'غير موجود' });
@@ -320,7 +319,7 @@ app.post('/api/follow/:username', requireAuth, async (req, res) => {
     const followed = await q.getPublicProfile(req.params.username);
     if (!followed) return res.status(404).json({ error: 'المستخدم غير موجود' });
     if (followed.id === req.user.id) {
-      return res.status(400).json({ error: '��ا يمكنك متابعة نفسك' });
+      return res.status(400).json({ error: 'لا يمكنك متابعة نفسك' });
     }
     await q.followUser(req.user.id, followed.id);
     res.json({ success: true, following: true });
@@ -342,14 +341,13 @@ app.delete('/api/follow/:username', requireAuth, async (req, res) => {
 
 app.get('/api/follow/status/:username', async (req, res) => {
   try {
-    // استخراج التوكن إذا وجد
     const token = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
     let viewerId = null;
     if (token) {
       try {
         const decoded = jwt.verify(token, JWT_SECRET);
         viewerId = decoded.id;
-      } catch (e) { /* تجاهل التوكن غير الصالح */ }
+      } catch (e) { }
     }
     const user = await q.getPublicProfile(req.params.username, viewerId);
     if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });

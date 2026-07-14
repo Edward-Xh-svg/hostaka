@@ -201,7 +201,7 @@ function getAsync(sql, params = []) {
   });
 }
 
-// دوال المستخدمين
+// دوال قاعدة البيانات
 const q = {
   // Users
   getUserByEmail: (email) => getAsync('SELECT * FROM users WHERE email = ?', [email]),
