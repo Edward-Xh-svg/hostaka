@@ -857,6 +857,10 @@ async function apiFetch(url, method = 'GET', body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token } };
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(url, opts);
+  if (!r.ok) {
+    const text = await r.text().catch(() => '');
+    throw new Error('HTTP ' + r.status + ': ' + text.slice(0, 200));
+  }
   return r.json();
 }
 
@@ -909,7 +913,10 @@ async function init() {
   await loadSidebar();
 
   const withUser = new URLSearchParams(location.search).get('with');
-  if (withUser) openChat(withUser);
+  if (withUser) {
+    // Small delay to ensure sidebar is rendered
+    setTimeout(() => openChat(withUser), 100);
+  }
 }
 
 function showNotLogged() {
@@ -1025,10 +1032,15 @@ async function openChat(username) {
   const peer = allUsers.find(u => u.username === username) || { username };
   updateTopbarPeer(peer);
 
+  // Clear any existing poll timer
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+
   // إنشاء واجهة المحادثة (بها msgsArea)
   document.getElementById('chatMain').innerHTML = `
-    <div class="msgs-area" id="msgsArea"></div>
-    <div class="img-preview-bar" id="imgPreviewBar">
+    <div class="msgs-area" id="msgsArea">
+      <div style="text-align:center;color:var(--muted);padding:30px;font-size:0.85rem;font-weight:600;">${t('loading')}</div>
+    </div>
+    <div class="img-preview-bar" id="imgPreviewBar" style="display:none;">
       <img id="imgPreviewThumb" src="" alt="">
       <button class="img-rm-btn" onclick="removeChatImg()">${SVG.close}</button>
       <span style="font-size:0.76rem;color:var(--muted);" id="imgAttachedText">${t('imageAttached')}</span>
@@ -1042,25 +1054,51 @@ async function openChat(username) {
 
   // تحميل الرسائل
   await loadMsgs(username);
-  if (pollTimer) clearInterval(pollTimer);
-  pollTimer = setInterval(() => loadMsgs(username, false), 4000);
+  // Start polling for new messages
+  pollTimer = setInterval(() => {
+    if (currentPeer === username) {
+      loadMsgs(username, false);
+    }
+  }, 4000);
 }
 
 // ============================================================
 //  تحميل وعرض الرسائل (نسخة قديمة تعمل)
 // ============================================================
 async function loadMsgs(username, scroll = true) {
+  const area = document.getElementById('msgsArea');
   try {
     const msgs = await apiFetch('/api/messages/' + encodeURIComponent(username));
-    if (!Array.isArray(msgs)) return;
+    if (!Array.isArray(msgs)) {
+      console.error('Expected array, got:', msgs);
+      if (area) area.innerHTML = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:0.85rem;font-weight:600;">⚠️ خطأ في تحميل الرسائل</div>';
+      return;
+    }
+    await loadMsgReactions(msgs);
     renderMsgs(msgs, scroll);
-  } catch (e) {}
+  } catch (e) {
+    console.error('loadMsgs failed:', e);
+    if (area) area.innerHTML = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:0.85rem;font-weight:600;">⚠️ ' + (e.message || 'تعذر الاتصال بالخادم') + '</div>';
+  }
 }
+async function loadMsgReactions(msgs) {
+  if (!msgs || !msgs.length) return;
+  try {
+    const msgIds = msgs.map(m => m.id).join(',');
+    const data = await apiFetch('/api/messages/reactions?ids=' + msgIds);
+    if (data && typeof data === 'object') {
+      Object.assign(msgReactions, data);
+    }
+  } catch (e) {
+    console.log('Reactions endpoint not available, using local state only');
+  }
+}
+
 
 function renderMsgs(msgs, scroll = true) {
   const area = document.getElementById('msgsArea');
   if (!area) return;
-  if (!msgs.length) {
+  if (!msgs || !msgs.length) {
     area.innerHTML = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:0.85rem;font-weight:600;">' + t('noMessages') + '</div>';
     return;
   }
@@ -1076,8 +1114,9 @@ function renderMsgs(msgs, scroll = true) {
     const isLast = !next || next.from_id != m.from_id;
     const av = m.from_avatar ? `<img src="${esc(m.from_avatar)}" alt="">` : (m.from_name || '?').charAt(0).toUpperCase();
     const rc = msgReactions[m.id] || { reactions: [], userReaction: null };
-    const reactionHtml = rc.reactions && rc.reactions.length ?
-      `<div class="msg-reaction" onclick="togglePicker(${m.id})">${rc.reactions.map(r => r.icon || r.emoji).join('')} <span style="font-size:0.7rem;color:var(--muted);">${rc.reactions.reduce((s, r) => s + Number(r.count), 0)}</span></div>` : '';
+    const totalReacts = rc.reactions && rc.reactions.length ? rc.reactions.reduce((s, r) => s + Number(r.count || 0), 0) : 0;
+    const reactionHtml = totalReacts > 0 ?
+      `<div class="msg-reaction" onclick="togglePicker(${m.id})">${rc.reactions.map(r => r.icon || r.emoji).join('')} <span style="font-size:0.7rem;color:var(--muted);">${totalReacts}</span></div>` : '';
     html += `<div class="msg-row ${isMine ? 'mine' : 'theirs'}">
       ${!isMine ? `<div class="msg-av ${isLast ? '' : 'invisible'}">${av}</div>` : ''}
       <div class="bubble-wrap">
@@ -1085,7 +1124,7 @@ function renderMsgs(msgs, scroll = true) {
           ${m.image ? `<img class="bubble-img" src="${esc(m.image)}" loading="lazy" onerror="this.style.display='none'">` : ''}
           ${m.content ? esc(m.content) : ''}
           <div class="react-picker" id="picker-${m.id}">
-            ${REACTIONS.map(r => `<button class="r-emoji ${rc?.userReaction === r.emoji ? 'active' : ''}" onclick="reactMsg(event,${m.id},'${r.emoji}')" title="${r.label}">${r.icon}</button>`).join('')}
+            ${REACTIONS.map(r => `<button class="r-emoji ${rc.userReaction === r.emoji ? 'active' : ''}" onclick="reactMsg(event,${m.id},'${r.emoji}')" title="${r.label}">${r.icon}</button>`).join('')}
           </div>
         </div>
         ${reactionHtml}
@@ -1114,11 +1153,16 @@ document.addEventListener('click', e => {
 async function reactMsg(e, mid, emoji) {
   e.stopPropagation();
   document.querySelectorAll('.react-picker.show').forEach(p => p.classList.remove('show'));
-  const d = await apiFetch('/api/messages/react/' + mid, 'POST', { emoji });
-  if (d.success) {
-    msgReactions[mid] = { reactions: d.reactions, userReaction: d.userReaction };
+  try {
+    const d = await apiFetch('/api/messages/react/' + mid, 'POST', { emoji });
+    if (d.success) {
+      msgReactions[mid] = { reactions: d.reactions || [], userReaction: d.userReaction || null };
+      if (currentPeer) await loadMsgs(currentPeer, false);
+    }
+  } catch (err) {
+    console.error('reactMsg failed:', err);
+    showToast('فشل إرسال التفاعل', 'error');
   }
-  if (currentPeer) await loadMsgs(currentPeer, false);
 }
 
 // ============================================================
@@ -1159,7 +1203,10 @@ async function sendMsg() {
     await apiFetch('/api/messages/' + encodeURIComponent(currentPeer), 'POST', { content, image: imageUrl });
     await loadMsgs(currentPeer);
     loadSidebar();
-  } catch (e) {}
+  } catch (e) {
+    console.error('sendMsg failed:', e);
+    showToast('فشل إرسال الرسالة', 'error');
+  }
   document.getElementById('sendBtn').disabled = false;
 }
 
