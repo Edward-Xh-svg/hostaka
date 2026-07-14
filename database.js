@@ -86,6 +86,7 @@ async function initDB() {
       description TEXT DEFAULT '',
       avatar      TEXT DEFAULT '',
       theme       TEXT DEFAULT 'default',
+      background  TEXT DEFAULT 'default',
       created_by  INTEGER NOT NULL REFERENCES users(id),
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -127,6 +128,15 @@ async function initDB() {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE(user_id)
     );
+
+    -- ===== جدول المتابعات =====
+    CREATE TABLE IF NOT EXISTS follows (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      follower_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      followed_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(follower_id, followed_id)
+    );
   `);
 
   // Migrations — إضافة أعمدة مفقودة
@@ -145,6 +155,7 @@ async function initDB() {
     "ALTER TABLE record_comments ADD COLUMN avatar       TEXT DEFAULT ''",
     "ALTER TABLE record_comments ADD COLUMN user_role    TEXT DEFAULT 'Member'",
     "ALTER TABLE messages ADD COLUMN image TEXT DEFAULT ''",
+    "ALTER TABLE groups ADD COLUMN background TEXT DEFAULT 'default'",
     "CREATE TABLE IF NOT EXISTS verify_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, username TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(user_id))",
     "CREATE TABLE IF NOT EXISTS message_reactions (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id INTEGER NOT NULL, user_id INTEGER NOT NULL, emoji TEXT NOT NULL DEFAULT 'heart', UNIQUE(message_id, user_id))",
   ];
@@ -165,11 +176,28 @@ async function initDB() {
   console.log('✅ Hostaka DB ready');
 }
 
+// ──────────────────────────────────────────────────────────────
+//  QUERIES
+// ──────────────────────────────────────────────────────────────
 const q = {
-  // Users
+  // ── Users ──
   getUserByEmail:   (email)    => db.execute({ sql:'SELECT * FROM users WHERE email=?', args:[email] }).then(first),
   getUserById:      (id)       => db.execute({ sql:'SELECT id,username,email,role,avatar,bio,game_id,display_name,cover,verified,created_at FROM users WHERE id=?', args:[id] }).then(first),
-  getPublicProfile: (username) => db.execute({ sql:'SELECT id,username,display_name,avatar,bio,game_id,role,verified,cover,created_at FROM users WHERE username=?', args:[username] }).then(first),
+  getPublicProfile: (username, viewerId = null) => {
+    // إحصائيات المتابعات مع إمكانية معرفة إذا كان المشاهد يتابع هذا المستخدم
+    return db.execute({ 
+      sql: `
+        SELECT 
+          u.id, u.username, u.display_name, u.avatar, u.bio, u.game_id, u.role, u.verified, u.cover, u.created_at,
+          (SELECT COUNT(*) FROM follows WHERE followed_id = u.id) AS followers_count,
+          (SELECT COUNT(*) FROM follows WHERE follower_id = u.id) AS following_count,
+          EXISTS (SELECT 1 FROM follows WHERE follower_id = ? AND followed_id = u.id) AS is_following
+        FROM users u
+        WHERE u.username = ?
+      `,
+      args: [viewerId || 0, username]
+    }).then(first);
+  },
   createUser:       (username,email,password) => db.execute({ sql:'INSERT INTO users (username,email,password) VALUES (?,?,?)', args:[username,email,password] }),
   updateProfile:    (display_name,bio,game_id,avatar,cover,id) => db.execute({ sql:'UPDATE users SET display_name=?,bio=?,game_id=?,avatar=?,cover=? WHERE id=?', args:[display_name,bio,game_id,avatar,cover,id] }),
   listUsers:        () => db.execute('SELECT id,username,email,role,avatar,display_name,verified,created_at FROM users ORDER BY created_at DESC').then(rows),
@@ -178,7 +206,7 @@ const q = {
   updateUserRole:   (role,id) => db.execute({ sql:'UPDATE users SET role=? WHERE id=?', args:[role,id] }),
   searchUsers:      (q) => db.execute({ sql:"SELECT id,username,display_name,avatar,role,verified FROM users WHERE username LIKE ? OR display_name LIKE ? LIMIT 15", args:['%'+q+'%','%'+q+'%'] }).then(rows),
 
-  // Records
+  // ── Records ──
   listRecords: () => db.execute(`
     SELECT r.*,
            COALESCE(u.avatar, r.user_avatar, '') as user_avatar,
@@ -199,7 +227,7 @@ const q = {
   getRecord:    (id) => db.execute({ sql:'SELECT * FROM records WHERE id=?', args:[id] }).then(first),
   getUserPosts: (uid) => db.execute({ sql:'SELECT * FROM records WHERE user_id=? ORDER BY created_at DESC', args:[uid] }).then(rows),
 
-  // Reactions
+  // ── Reactions ──
   getAllReactions:      () => db.execute('SELECT record_id,emoji,COUNT(*) as count FROM record_reactions GROUP BY record_id,emoji').then(rows),
   getReactions:        (rid) => db.execute({ sql:'SELECT emoji,COUNT(*) as count FROM record_reactions WHERE record_id=? GROUP BY emoji', args:[rid] }).then(rows),
   getUserAllReactions: (uid) => db.execute({ sql:'SELECT record_id,emoji FROM record_reactions WHERE user_id=?', args:[uid] }).then(rows),
@@ -207,7 +235,7 @@ const q = {
   addReaction:         (rid,uid,emoji) => db.execute({ sql:'INSERT OR REPLACE INTO record_reactions (record_id,user_id,emoji) VALUES (?,?,?)', args:[rid,uid,emoji] }),
   removeReaction:      (rid,uid) => db.execute({ sql:'DELETE FROM record_reactions WHERE record_id=? AND user_id=?', args:[rid,uid] }),
 
-  // Comments
+  // ── Comments ──
   getAllComments: () => db.execute(`
     SELECT rc.*, COALESCE(u.avatar,rc.avatar,'') as avatar, COALESCE(u.display_name,rc.display_name,'') as display_name
     FROM record_comments rc LEFT JOIN users u ON u.id=rc.user_id
@@ -225,7 +253,7 @@ const q = {
     ? db.execute({ sql:'DELETE FROM record_comments WHERE id=?', args:[id] })
     : db.execute({ sql:'DELETE FROM record_comments WHERE id=? AND user_id=?', args:[id,uid] }),
 
-  // Messages
+  // ── Messages ──
   getConversations: (uid) => db.execute({ sql:`
     SELECT m.*,u1.avatar as from_avatar,u2.avatar as to_avatar
     FROM messages m JOIN users u1 ON u1.id=m.from_id JOIN users u2 ON u2.id=m.to_id
@@ -236,16 +264,16 @@ const q = {
   markRead:     (fid,tid) => db.execute({ sql:'UPDATE messages SET read=1 WHERE from_id=? AND to_id=?', args:[fid,tid] }),
   unreadCount:  (uid) => db.execute({ sql:'SELECT COUNT(*) as count FROM messages WHERE to_id=? AND read=0', args:[uid] }).then(first),
 
-  // Message Reactions
+  // ── Message Reactions ──
   getMsgReactions:    (mid) => db.execute({ sql:'SELECT emoji,COUNT(*) as count FROM message_reactions WHERE message_id=? GROUP BY emoji', args:[mid] }).then(rows),
   getUserMsgReaction: (mid,uid) => db.execute({ sql:'SELECT emoji FROM message_reactions WHERE message_id=? AND user_id=?', args:[mid,uid] }).then(first),
   addMsgReaction:     (mid,uid,emoji) => db.execute({ sql:'INSERT OR REPLACE INTO message_reactions (message_id,user_id,emoji) VALUES (?,?,?)', args:[mid,uid,emoji] }),
   removeMsgReaction:  (mid,uid) => db.execute({ sql:'DELETE FROM message_reactions WHERE message_id=? AND user_id=?', args:[mid,uid] }),
 
-  // Groups
-  createGroup:       (name,desc,avatar,theme,by) => db.execute({ sql:'INSERT INTO groups (name,description,avatar,theme,created_by) VALUES (?,?,?,?,?)', args:[name,desc,avatar,theme,by] }),
+  // ── Groups ──
+  createGroup:       (name,desc,avatar,theme,background,by) => db.execute({ sql:'INSERT INTO groups (name,description,avatar,theme,background,created_by) VALUES (?,?,?,?,?,?)', args:[name,desc,avatar,theme,background,by] }),
   getGroup:          (id) => db.execute({ sql:'SELECT * FROM groups WHERE id=?', args:[id] }).then(first),
-  updateGroup:       (id,name,desc,avatar,theme) => db.execute({ sql:'UPDATE groups SET name=?,description=?,avatar=?,theme=? WHERE id=?', args:[name,desc,avatar,theme,id] }),
+  updateGroup:       (id,name,desc,avatar,theme,background) => db.execute({ sql:'UPDATE groups SET name=?,description=?,avatar=?,theme=?,background=? WHERE id=?', args:[name,desc,avatar,theme,background,id] }),
   deleteGroup:       (id) => db.execute({ sql:'DELETE FROM groups WHERE id=?', args:[id] }),
   getUserGroups:     (uid) => db.execute({ sql:'SELECT g.*,gm.role as my_role,gm.nickname FROM groups g JOIN group_members gm ON gm.group_id=g.id WHERE gm.user_id=? ORDER BY g.created_at DESC', args:[uid] }).then(rows),
   getGroupMembers:   (gid) => db.execute({ sql:'SELECT gm.*,u.username,u.display_name,u.avatar,u.verified FROM group_members gm JOIN users u ON u.id=gm.user_id WHERE gm.group_id=? ORDER BY gm.role DESC,gm.joined_at ASC', args:[gid] }).then(rows),
@@ -255,7 +283,7 @@ const q = {
   updateMemberNick:  (gid,uid,nick) => db.execute({ sql:'UPDATE group_members SET nickname=? WHERE group_id=? AND user_id=?', args:[nick,gid,uid] }),
   isMember:          (gid,uid) => db.execute({ sql:'SELECT role FROM group_members WHERE group_id=? AND user_id=?', args:[gid,uid] }).then(first),
 
-  // Group Messages
+  // ── Group Messages ──
   getGroupMessages:       (gid) => db.execute({ sql:'SELECT * FROM group_messages WHERE group_id=? ORDER BY created_at ASC', args:[gid] }).then(rows),
   sendGroupMessage:       (gid,uid,fn,fa,content,image) => db.execute({ sql:'INSERT INTO group_messages (group_id,user_id,from_name,from_avatar,content,image) VALUES (?,?,?,?,?,?)', args:[gid,uid,fn,fa,content,image||''] }),
   getGroupMsgReactions:   (mid) => db.execute({ sql:'SELECT emoji,COUNT(*) as count FROM group_message_reactions WHERE message_id=? GROUP BY emoji', args:[mid] }).then(rows),
@@ -263,12 +291,33 @@ const q = {
   addGroupMsgReaction:    (mid,uid,emoji) => db.execute({ sql:'INSERT OR REPLACE INTO group_message_reactions (message_id,user_id,emoji) VALUES (?,?,?)', args:[mid,uid,emoji] }),
   removeGroupMsgReaction: (mid,uid) => db.execute({ sql:'DELETE FROM group_message_reactions WHERE message_id=? AND user_id=?', args:[mid,uid] }),
 
-  // Verify
+  // ── Verify ──
   requestVerify:       (uid,username) => db.execute({ sql:"INSERT OR REPLACE INTO verify_requests (user_id,username,status) VALUES (?,?,'pending')", args:[uid,username] }),
   getVerifyRequests:   () => db.execute("SELECT vr.*,u.avatar,u.display_name FROM verify_requests vr JOIN users u ON u.id=vr.user_id WHERE vr.status='pending' ORDER BY vr.created_at DESC").then(rows),
   updateVerify:        (uid,status) => db.execute({ sql:'UPDATE verify_requests SET status=? WHERE user_id=?', args:[status,uid] }),
   setVerified:         (uid,val) => db.execute({ sql:'UPDATE users SET verified=? WHERE id=?', args:[val,uid] }),
   getUserVerifyStatus: (uid) => db.execute({ sql:'SELECT status FROM verify_requests WHERE user_id=?', args:[uid] }).then(first),
+
+  // ── Follows ──
+  followUser:       (followerId, followedId) => db.execute({ sql:'INSERT OR IGNORE INTO follows (follower_id, followed_id) VALUES (?,?)', args:[followerId, followedId] }),
+  unfollowUser:     (followerId, followedId) => db.execute({ sql:'DELETE FROM follows WHERE follower_id=? AND followed_id=?', args:[followerId, followedId] }),
+  isFollowing:      (followerId, followedId) => db.execute({ sql:'SELECT 1 FROM follows WHERE follower_id=? AND followed_id=?', args:[followerId, followedId] }).then(first).then(r => !!r),
+  countFollowers:   (userId) => db.execute({ sql:'SELECT COUNT(*) as count FROM follows WHERE followed_id=?', args:[userId] }).then(first).then(r => r ? r.count : 0),
+  countFollowing:   (userId) => db.execute({ sql:'SELECT COUNT(*) as count FROM follows WHERE follower_id=?', args:[userId] }).then(first).then(r => r ? r.count : 0),
+  getFollowers:     (userId) => db.execute({ sql:`
+    SELECT u.id, u.username, u.display_name, u.avatar, u.verified
+    FROM follows f JOIN users u ON u.id = f.follower_id
+    WHERE f.followed_id = ?
+    ORDER BY f.created_at DESC
+  `, args:[userId] }).then(rows),
+  getFollowing:     (userId) => db.execute({ sql:`
+    SELECT u.id, u.username, u.display_name, u.avatar, u.verified
+    FROM follows f JOIN users u ON u.id = f.followed_id
+    WHERE f.follower_id = ?
+    ORDER BY f.created_at DESC
+  `, args:[userId] }).then(rows),
+
+  // تحويل getPublicProfile لدعم إحصائيات المتابعة (تم تعديله أعلاه)
 };
 
 module.exports = { db, q, initDB };
