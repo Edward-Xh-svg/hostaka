@@ -77,7 +77,15 @@ app.post('/api/logout',(_,res)=>res.json({success:true}));
 // Profile
 app.get('/api/profile/:username', async (req, res) => {
   try {
-    const viewerId = req.user?.id || null;
+    // استخراج التوكن إذا وجد
+    const token = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
+    let viewerId = null;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        viewerId = decoded.id;
+      } catch (e) { /* تجاهل التوكن غير الصالح */ }
+    }
     const user = await q.getPublicProfile(req.params.username, viewerId);
     if (!user) return res.status(404).json({ error: 'غير موجود' });
     res.json(user);
@@ -334,7 +342,15 @@ app.delete('/api/follow/:username', requireAuth, async (req, res) => {
 
 app.get('/api/follow/status/:username', async (req, res) => {
   try {
-    const viewerId = req.user?.id || null;
+    // استخراج التوكن إذا وجد
+    const token = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
+    let viewerId = null;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        viewerId = decoded.id;
+      } catch (e) { /* تجاهل التوكن غير الصالح */ }
+    }
     const user = await q.getPublicProfile(req.params.username, viewerId);
     if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
     res.json({
