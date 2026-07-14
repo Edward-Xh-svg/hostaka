@@ -449,6 +449,25 @@ app.post('/api/messages/react/:id', requireAuth, async (req, res) => {
   }
 });
 
+// Get reactions for multiple messages at once (for chat loading)
+app.get('/api/messages/reactions', requireAuth, async (req, res) => {
+  try {
+    const ids = (req.query.ids || '').split(',').map(Number).filter(Boolean);
+    if (!ids.length) return res.json({});
+    const result = {};
+    for (const mid of ids) {
+      const reactions = await q.getMsgReactions(mid);
+      const userReaction = (await q.getUserMsgReaction(mid, req.user.id))?.emoji || null;
+      if (reactions.length || userReaction) {
+        result[mid] = { reactions, userReaction };
+      }
+    }
+    res.json(result);
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
 // ============================================================
 // Groups
 // ============================================================
