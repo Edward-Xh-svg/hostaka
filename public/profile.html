@@ -255,7 +255,6 @@
     .btn-msg:active{transform:scale(0.95);}
     .btn-msg svg{width:13px;height:13px;}
 
-    /* Follow button */
     .btn-follow{
       display:inline-flex;align-items:center;gap:6px;
       padding:8px 16px;
@@ -430,6 +429,54 @@
     .btn-go:hover{background:var(--primary-h);transform:translateY(-1px);}
     .btn-go:active{transform:scale(0.97);}
 
+    /* Modal for followers/following list */
+    .modal-bd{
+      position:fixed;inset:0;
+      background:rgba(0,0,0,0.85);
+      backdrop-filter:blur(16px);
+      -webkit-backdrop-filter:blur(16px);
+      display:flex;align-items:center;justify-content:center;
+      z-index:200;opacity:0;visibility:hidden;
+      transition:all 0.25s ease;padding:20px;
+    }
+    .modal-bd.show{opacity:1;visibility:visible;}
+    .modal-box{
+      background:var(--modal-bg);
+      border:1px solid var(--border);
+      border-radius:24px;
+      padding:24px;
+      width:100%;max-width:440px;
+      max-height:80vh;
+      transform:translateY(16px) scale(0.97);
+      transition:all 0.3s cubic-bezier(0.16,1,0.3,1);
+      overflow-y:auto;
+      box-shadow:var(--shadow);
+    }
+    .modal-bd.show .modal-box{transform:translateY(0) scale(1);}
+    .modal-title{font-size:1.1rem;font-weight:800;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:10px;}
+    .modal-title svg{width:20px;height:20px;color:var(--primary);}
+    .modal-close{background:none;border:none;color:var(--muted);cursor:pointer;margin-right:auto;padding:4px;}
+    .modal-close:hover{color:var(--text);}
+    .modal-user-item{
+      display:flex;align-items:center;gap:12px;
+      padding:10px 12px;border-radius:10px;
+      transition:background 0.15s;cursor:pointer;
+      border-bottom:1px solid var(--border);
+    }
+    .modal-user-item:hover{background:rgba(128,128,128,0.06);}
+    .modal-user-item .u-av{
+      width:40px;height:40px;border-radius:50%;
+      background:var(--avatar-gradient);
+      display:flex;align-items:center;justify-content:center;
+      font-weight:800;font-size:0.9rem;color:var(--black);
+      flex-shrink:0;overflow:hidden;
+    }
+    .modal-user-item .u-av img{width:100%;height:100%;object-fit:cover;}
+    .modal-user-item .u-info{flex:1;min-width:0;}
+    .modal-user-item .u-name{font-weight:700;color:var(--text);}
+    .modal-user-item .u-un{font-size:0.75rem;color:var(--muted);}
+    .modal-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:0.9rem;}
+
     @keyframes spin{to{transform:rotate(360deg);}}
     .spin{
       width:32px;height:32px;
@@ -490,6 +537,7 @@
       .fg input,.fg textarea{padding:10px 12px;}
       .btn-save{padding:10px 20px;}
       .not-logged{padding:80px 20px;}
+      .modal-box{padding:18px;max-width:100%;}
     }
     @media(max-width:400px){
       .topbar{padding:0 10px;}
@@ -565,6 +613,21 @@
 <input type="file" id="avFile" accept="image/*" style="display:none;" onchange="onAvatar(event)">
 <input type="file" id="coverFile" accept=".jpg,.jpeg,image/jpeg" style="display:none;" onchange="onCover(event)">
 
+<!-- Modal for followers/following -->
+<div class="modal-bd" id="userListModal">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span id="modalTitle">المتابعون</span>
+      <button class="modal-close" onclick="closeModal('userListModal')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="modalUserList">
+      <div class="spin" style="margin:20px auto;"></div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ============================================================
 //  TRANSLATIONS (i18n)
@@ -581,7 +644,8 @@ const LANG = {
     saveSuccess: 'تم الحفظ بنجاح', saveError: 'فشل الحفظ',
     connectionError: 'تعذر الاتصال', coverJpg: 'يُقبل JPG/JPEG فقط للغلاف',
     followers: 'متابعون', following: 'يتابع', follow: 'متابعة', unfollow: 'إلغاء المتابعة',
-    followError: 'حدث خطأ أثناء المتابعة'
+    followError: 'حدث خطأ أثناء المتابعة', followersList: 'المتابعون', followingList: 'المتابَعين',
+    noFollowers: 'لا يوجد متابعون', noFollowing: 'لا يتابع أحداً'
   },
   en: {
     back: 'Back', profile: 'Profile', editProfile: 'Edit Profile',
@@ -594,7 +658,8 @@ const LANG = {
     saveSuccess: 'Saved successfully', saveError: 'Save failed',
     connectionError: 'Connection error', coverJpg: 'JPG/JPEG only for cover',
     followers: 'Followers', following: 'Following', follow: 'Follow', unfollow: 'Unfollow',
-    followError: 'Error while following'
+    followError: 'Error while following', followersList: 'Followers', followingList: 'Following',
+    noFollowers: 'No followers yet', noFollowing: 'Not following anyone'
   },
   fr: {
     back: 'Retour', profile: 'Profil', editProfile: 'Modifier le profil',
@@ -607,7 +672,8 @@ const LANG = {
     saveSuccess: 'Enregistré', saveError: 'Échec',
     connectionError: 'Erreur de connexion', coverJpg: 'JPG/JPEG uniquement',
     followers: 'Abonnés', following: 'Abonnements', follow: 'Suivre', unfollow: 'Ne plus suivre',
-    followError: 'Erreur lors du suivi'
+    followError: 'Erreur lors du suivi', followersList: 'Abonnés', followingList: 'Abonnements',
+    noFollowers: 'Aucun abonné', noFollowing: 'Aucun abonnement'
   },
   ru: {
     back: 'Назад', profile: 'Профиль', editProfile: 'Редактировать профиль',
@@ -620,7 +686,8 @@ const LANG = {
     saveSuccess: 'Сохранено', saveError: 'Ошибка',
     connectionError: 'Ошибка соединения', coverJpg: 'Только JPG/JPEG',
     followers: 'Подписчики', following: 'Подписки', follow: 'Подписаться', unfollow: 'Отписаться',
-    followError: 'Ошибка при подписке'
+    followError: 'Ошибка при подписке', followersList: 'Подписчики', followingList: 'Подписки',
+    noFollowers: 'Нет подписчиков', noFollowing: 'Нет подписок'
   },
   zh: {
     back: '返回', profile: '个人资料', editProfile: '编辑资料',
@@ -633,7 +700,8 @@ const LANG = {
     saveSuccess: '保存成功', saveError: '保存失败',
     connectionError: '连接错误', coverJpg: '仅支持 JPG/JPEG',
     followers: '关注者', following: '正在关注', follow: '关注', unfollow: '取消关注',
-    followError: '关注出错'
+    followError: '关注出错', followersList: '关注者', followingList: '正在关注',
+    noFollowers: '暂无关注者', noFollowing: '未关注任何人'
   },
   ja: {
     back: '戻る', profile: 'プロフィール', editProfile: 'プロフィール編集',
@@ -646,7 +714,8 @@ const LANG = {
     saveSuccess: '保存しました', saveError: '保存に失敗しました',
     connectionError: '接続エラー', coverJpg: 'JPG/JPEGのみ対応',
     followers: 'フォロワー', following: 'フォロー中', follow: 'フォロー', unfollow: 'フォロー解除',
-    followError: 'フォロー中にエラーが発生しました'
+    followError: 'フォロー中にエラーが発生しました', followersList: 'フォロワー', followingList: 'フォロー中',
+    noFollowers: 'フォロワーはいません', noFollowing: 'フォローしている人はいません'
   }
 };
 
@@ -656,7 +725,7 @@ let currentTheme = localStorage.getItem('hostaka_theme') || 'light';
 // ============================================================
 //  CORE FUNCTIONS
 // ============================================================
-const getToken = () => localStorage.getItem('hostaka_token')||'';
+const getToken = () => localStorage.getItem('hostaka_token') || '';
 const urlParams = new URLSearchParams(location.search);
 const viewUsername = urlParams.get('u');
 let ME = null;
@@ -675,7 +744,6 @@ function applyLang() {
   document.getElementById('backText').textContent = t('back');
   document.getElementById('topbarTitle').textContent = t('profile');
   document.getElementById('coverEditText').textContent = t('changeCover');
-  // Update dynamic parts
   const tabPosts = document.getElementById('tabPosts');
   const tabEdit = document.getElementById('tabEdit');
   if (tabPosts) tabPosts.textContent = t('posts');
@@ -688,13 +756,9 @@ function applyLang() {
   const bioLabel = document.querySelector('.fg label[for="fBio"]');
   if (bioLabel) bioLabel.textContent = t('bio');
   const saveBtn = document.getElementById('saveBtn');
-  if (saveBtn) {
-    saveBtn.innerHTML = `${SVG.save}${t('save')}`;
-  }
-  // Update follower/following labels
+  if (saveBtn) saveBtn.innerHTML = `${SVG.save}${t('save')}`;
   const fLabels = document.querySelectorAll('.stat-l');
   if (fLabels.length >= 3) {
-    // Posts, Followers, Following
     fLabels[1].textContent = t('followers');
     fLabels[2].textContent = t('following');
   }
@@ -728,23 +792,19 @@ function setLang(lang) {
   localStorage.setItem('hostaka_lang', lang);
   document.getElementById('langMenu').classList.remove('show');
   applyLang();
-  // Reload the profile to update dynamic content with new language
-  if (viewUsername) {
-    loadPublicProfile(viewUsername);
-  } else if (ME) {
-    loadMyProfile();
-  }
+  if (viewUsername) loadPublicProfile(viewUsername);
+  else if (ME) loadMyProfile();
 }
 
 // ============================================================
 //  VERIFIED BADGE (Adaptive)
 // ============================================================
-function verifiedBadge(){
+function verifiedBadge() {
   return `<span class="verified-icon" title="${t('verified') || 'حساب موثق'}"><svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M23 12l-2.44-2.78.34-3.68-3.61-.82-1.89-3.18L12 3 8.6 1.54 6.71 4.72l-3.61.81.34 3.68L1 12l2.44 2.78-.34 3.69 3.61.82 1.89 3.18L12 21l3.4 1.46 1.89-3.18 3.61-.82-.34-3.68L23 12z" fill="var(--badge-verified-fill)" stroke="var(--badge-verified-fill)" stroke-width="0.5"/><path d="M10.6 16.2l-4.1-4.1 1.4-1.4 2.7 2.7 5.5-5.5 1.4 1.4-6.9 6.9z" fill="var(--badge-verified-check)"/></svg></span>`;
 }
 
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function fmtDate(s){ if(!s) return ''; return new Date(s).toLocaleDateString(currentLang === 'ar' ? 'ar-SA' : 'en-US', {year:'numeric', month:'long', day:'numeric'}); }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtDate(s) { if(!s) return ''; return new Date(s).toLocaleDateString(currentLang === 'ar' ? 'ar-SA' : 'en-US', {year:'numeric', month:'long', day:'numeric'}); }
 
 const SVG = {
   user:    `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
@@ -763,160 +823,149 @@ const SVG = {
 };
 
 // ============================================================
-//  FOLLOW FUNCTIONS (Placeholder - Needs API)
+//  FOLLOW FUNCTIONS (Real API)
 // ============================================================
+async function apiFetch(url, method = 'GET', body = null) {
+  const token = getToken();
+  const opts = { method, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  return res.json();
+}
+
 async function followUser(username) {
-  // TODO: تنفيذ طلب API للمتابعة
-  // POST /api/follow/{username}
-  // يجب أن يعيد { success: true, following: true/false }
-  console.log('[FOLLOW] متابعة المستخدم:', username);
-  showToast(t('follow') + ' ' + username);
-  // محاكاة نجاح مؤقت
-  return { success: true, following: true };
+  const data = await apiFetch('/api/follow/' + encodeURIComponent(username), 'POST');
+  if (data.success) return { success: true, following: true };
+  throw new Error(data.error || t('followError'));
 }
 
 async function unfollowUser(username) {
-  // TODO: تنفيذ طلب API لإلغاء المتابعة
-  // DELETE /api/follow/{username}
-  // يجب أن يعيد { success: true, following: false }
-  console.log('[UNFOLLOW] إلغاء متابعة المستخدم:', username);
-  showToast(t('unfollow') + ' ' + username);
-  return { success: true, following: false };
+  const data = await apiFetch('/api/follow/' + encodeURIComponent(username), 'DELETE');
+  if (data.success) return { success: true, following: false };
+  throw new Error(data.error || t('followError'));
 }
 
 async function getFollowStatus(username) {
-  // TODO: تنفيذ طلب API للتحقق من حالة المتابعة
-  // GET /api/follow/status/{username}
-  // يجب أن يعيد { following: true/false, followers_count: 0, following_count: 0 }
-  console.log('[FOLLOW STATUS] التحقق من حالة المتابعة:', username);
-  // محاكاة بيانات مؤقتة
-  return { following: false, followers_count: 0, following_count: 0 };
+  return await apiFetch('/api/follow/status/' + encodeURIComponent(username));
 }
 
 async function getFollowers(username) {
-  // TODO: تنفيذ طلب API لجلب قائمة المتابعين
-  // GET /api/followers/{username}
-  // يجب أن يعيد [{ username, display_name, avatar, ... }]
-  console.log('[FOLLOWERS] جلب قائمة المتابعين:', username);
-  return [];
+  return await apiFetch('/api/followers/' + encodeURIComponent(username));
 }
 
 async function getFollowing(username) {
-  // TODO: تنفيذ طلب API لجلب قائمة من يتابعهم المستخدم
-  // GET /api/following/{username}
-  // يجب أن يعيد [{ username, display_name, avatar, ... }]
-  console.log('[FOLLOWING] جلب قائمة المتابَعين:', username);
-  return [];
+  return await apiFetch('/api/following/' + encodeURIComponent(username));
 }
 
 // ============================================================
 //  MAIN LOGIC
 // ============================================================
-async function init(){
+async function init() {
   if (currentTheme === 'dark') {
     document.documentElement.setAttribute('data-theme', 'dark');
     document.getElementById('themeToggle').innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
   }
   applyLang();
 
-  window.addEventListener('scroll',()=>{
+  window.addEventListener('scroll', () => {
     document.getElementById('topbar').classList.toggle('scrolled', window.scrollY > 10);
   });
 
   const token = getToken();
-  if(viewUsername){
+  if (viewUsername) {
     await loadPublicProfile(viewUsername);
     return;
   }
-  if(!token){ renderNotLogged(); return; }
-  try{
-    const r = await fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+token}});
-    if(!r.ok){ renderNotLogged(); return; }
+  if (!token) { renderNotLogged(); return; }
+  try {
+    const r = await fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { renderNotLogged(); return; }
     const u = await r.json();
-    if(!u||u.error){ renderNotLogged(); return; }
+    if (!u || u.error) { renderNotLogged(); return; }
     ME = u;
     await loadMyProfile();
-  }catch(e){ renderNotLogged(); }
+  } catch (e) { renderNotLogged(); }
 }
 
 async function loadPublicProfile(username) {
-  try{
-    const [pr, ps] = await Promise.all([
-      fetch('/api/profile/'+encodeURIComponent(username)).then(r=>r.json()),
-      fetch('/api/user/'+encodeURIComponent(username)+'/posts').then(r=>r.json())
-    ]);
-    if(pr.error){ renderNotFound(); return; }
+  try {
+    const token = getToken();
+    const url = '/api/profile/' + encodeURIComponent(username);
+    const pr = await fetch(url, { headers: token ? { 'Authorization': 'Bearer ' + token } : {} }).then(r => r.json());
+    if (pr.error) { renderNotFound(); return; }
+    const ps = await fetch('/api/user/' + encodeURIComponent(username) + '/posts').then(r => r.json());
     document.getElementById('topbarTitle').textContent = pr.display_name || pr.username;
-    renderCover(pr.cover||'', false);
-    // Get follow status (if logged in)
+    renderCover(pr.cover || '', false);
     let followStatus = { following: false, followers_count: 0, following_count: 0 };
-    if (getToken()) {
-      try {
-        followStatus = await getFollowStatus(username);
-      } catch(e) {}
+    if (token) {
+      try { followStatus = await getFollowStatus(username); } catch (e) {}
     }
-    renderPublic(pr, Array.isArray(ps)?ps:[], followStatus);
-  }catch(e){ renderNotFound(); }
+    renderPublic(pr, Array.isArray(ps) ? ps : [], followStatus);
+  } catch (e) { renderNotFound(); }
 }
 
 async function loadMyProfile() {
   if (!ME) return;
   try {
+    const token = getToken();
     const [full, posts] = await Promise.all([
-      fetch('/api/me',{headers:{'Authorization':'Bearer '+getToken()}}).then(r=>r.ok?r.json():null),
-      fetch('/api/user/'+ME.username+'/posts').then(r=>r.ok?r.json():[])
+      fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.ok ? r.json() : null),
+      fetch('/api/user/' + ME.username + '/posts').then(r => r.ok ? r.json() : [])
     ]);
-    if(full && !full.error) {
+    if (full && !full.error) {
       ME = full;
-      renderCover(full.cover||'', true);
-      renderMyProfile(full, Array.isArray(posts)?posts:[]);
+      renderCover(full.cover || '', true);
+      renderMyProfile(full, Array.isArray(posts) ? posts : []);
     } else {
-      renderMyProfile(ME, Array.isArray(posts)?posts:[]);
+      renderMyProfile(ME, Array.isArray(posts) ? posts : []);
     }
-  } catch(e) {
+  } catch (e) {
     renderMyProfile(ME, []);
   }
 }
 
-function renderCover(url, editable){
-  const img=document.getElementById('coverImg');
-  const ph=document.getElementById('coverPlaceholder');
-  const btn=document.getElementById('coverEditBtn');
-  if(url){ img.src=url; img.style.display='block'; ph.style.display='none'; }
-  else { img.style.display='none'; ph.style.display='flex'; }
-  if(editable) btn.style.display='flex';
+function renderCover(url, editable) {
+  const img = document.getElementById('coverImg');
+  const ph = document.getElementById('coverPlaceholder');
+  const btn = document.getElementById('coverEditBtn');
+  if (url) { img.src = url; img.style.display = 'block'; ph.style.display = 'none'; }
+  else { img.style.display = 'none'; ph.style.display = 'flex'; }
+  if (editable) btn.style.display = 'flex';
 }
 
-function showToast(msg, type='success'){
+function showToast(msg, type = 'success') {
   let t = document.querySelector('.toast');
-  if(t) t.remove();
+  if (t) t.remove();
   t = document.createElement('div');
   t.className = 'toast toast-' + type;
   t.textContent = msg;
   document.body.appendChild(t);
-  requestAnimationFrame(()=>t.classList.add('show'));
-  setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),300); }, 3000);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
 }
 
-function renderNotFound(){
-  document.getElementById('profileSection').innerHTML=`<div class="not-logged">${SVG.user}<h2>${t('notFound')}</h2><p>${t('notFound')}</p><a href="/" class="btn-go">${SVG.arrow}${t('home')}</a></div>`;
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+document.querySelectorAll('.modal-bd').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); }));
+
+function renderNotFound() {
+  document.getElementById('profileSection').innerHTML = `<div class="not-logged">${SVG.user}<h2>${t('notFound')}</h2><p>${t('notFound')}</p><a href="/" class="btn-go">${SVG.arrow}${t('home')}</a></div>`;
 }
-function renderNotLogged(){
-  document.getElementById('profileSection').innerHTML=`<div class="not-logged">${SVG.user}<h2>${t('pleaseLogin')}</h2><p>${t('pleaseLogin')}</p><a href="/" class="btn-go">${SVG.arrow}${t('home')}</a></div>`;
+function renderNotLogged() {
+  document.getElementById('profileSection').innerHTML = `<div class="not-logged">${SVG.user}<h2>${t('pleaseLogin')}</h2><p>${t('pleaseLogin')}</p><a href="/" class="btn-go">${SVG.arrow}${t('home')}</a></div>`;
 }
 
-function roleBadge(role){
-  const label = (role==='admin') ? t('admin') : t('member');
-  return role==='admin'
+function roleBadge(role) {
+  const label = (role === 'admin') ? t('admin') : t('member');
+  return role === 'admin'
     ? `<span class="role-badge badge-admin">${SVG.star}${label}</span>`
     : `<span class="role-badge badge-member">${label}</span>`;
 }
 
-function avatarInner(user){
-  return user.avatar?`<img src="${esc(user.avatar)}" alt="">`:(esc((user.display_name||user.username||'?').charAt(0).toUpperCase()));
+function avatarInner(user) {
+  return user.avatar ? `<img src="${esc(user.avatar)}" alt="">` : (esc((user.display_name || user.username || '?').charAt(0).toUpperCase()));
 }
 
-function renderPublic(user, posts, followStatus = { following: false, followers_count: 0, following_count: 0 }) {
+function renderPublic(user, posts, followStatus) {
   userPosts = posts;
   const token = getToken();
   const isOwn = token && ME && ME.username === user.username;
@@ -937,18 +986,18 @@ function renderPublic(user, posts, followStatus = { following: false, followers_
     `;
   }
 
-  document.getElementById('profileSection').innerHTML=`
+  document.getElementById('profileSection').innerHTML = `
     <div class="avatar-pull">
       <div class="avatar-big" style="cursor:default;">${avatarInner(user)}</div>
       <div class="profile-actions">${actionsHtml}</div>
     </div>
     <div class="profile-meta">
-      <div class="meta-name">${esc(user.display_name||user.username)} ${user.verified?verifiedBadge():''}</div>
+      <div class="meta-name">${esc(user.display_name || user.username)} ${user.verified ? verifiedBadge() : ''}</div>
       <div class="meta-un">@${esc(user.username)}</div>
       ${roleBadge(user.role)}
-      ${user.bio?`<div class="meta-bio">${esc(user.bio)}</div>`:''}
+      ${user.bio ? `<div class="meta-bio">${esc(user.bio)}</div>` : ''}
       <div class="meta-info">
-        ${user.game_id?`<div class="info-item">${SVG.mail}<strong>${esc(user.game_id)}</strong></div>`:''}
+        ${user.game_id ? `<div class="info-item">${SVG.mail}<strong>${esc(user.game_id)}</strong></div>` : ''}
         <div class="info-item">${SVG.clock}${t('since')} ${fmtDate(user.created_at)}</div>
       </div>
       <div class="meta-stats">
@@ -963,14 +1012,13 @@ function renderPublic(user, posts, followStatus = { following: false, followers_
     <div class="posts-tab" id="postsTab">${renderPosts(posts)}</div>`;
 }
 
-function renderMyProfile(user, posts){
+function renderMyProfile(user, posts) {
   userPosts = posts;
-  document.getElementById('topbarTitle').textContent = user.display_name||user.username;
-  // Get follow stats for own profile
+  document.getElementById('topbarTitle').textContent = user.display_name || user.username;
   const followersCount = user.followers_count || 0;
   const followingCount = user.following_count || 0;
 
-  document.getElementById('profileSection').innerHTML=`
+  document.getElementById('profileSection').innerHTML = `
     <div class="avatar-pull">
       <div class="avatar-big" id="avBig" onclick="document.getElementById('avFile').click()" title="${t('changeAvatar')}">
         ${avatarInner(user)}
@@ -981,12 +1029,12 @@ function renderMyProfile(user, posts){
       </div>
     </div>
     <div class="profile-meta">
-      <div class="meta-name">${esc(user.display_name||user.username)} ${user.verified?verifiedBadge():''}</div>
+      <div class="meta-name">${esc(user.display_name || user.username)} ${user.verified ? verifiedBadge() : ''}</div>
       <div class="meta-un">@${esc(user.username)}</div>
       ${roleBadge(user.role)}
-      ${user.bio?`<div class="meta-bio">${esc(user.bio)}</div>`:''}
+      ${user.bio ? `<div class="meta-bio">${esc(user.bio)}</div>` : ''}
       <div class="meta-info">
-        ${user.game_id?`<div class="info-item">${SVG.mail}<strong>${esc(user.game_id)}</strong></div>`:''}
+        ${user.game_id ? `<div class="info-item">${SVG.mail}<strong>${esc(user.game_id)}</strong></div>` : ''}
         <div class="info-item">${SVG.clock}${t('since')} ${fmtDate(user.created_at)}</div>
       </div>
       <div class="meta-stats">
@@ -1004,20 +1052,20 @@ function renderMyProfile(user, posts){
       <div class="alert alert-err" id="pErr"></div>
       <div class="alert alert-ok" id="pOk"></div>
       <div class="fg-row">
-        <div class="fg"><label>${t('editProfile')}</label><input type="text" id="fName" value="${esc(user.display_name||'')}" placeholder="${t('editProfile')}"></div>
-        <div class="fg"><label>${t('gameId')}</label><input type="text" id="fGame" value="${esc(user.game_id||'')}" dir="ltr" placeholder="#0000"></div>
+        <div class="fg"><label>${t('editProfile')}</label><input type="text" id="fName" value="${esc(user.display_name || '')}" placeholder="${t('editProfile')}"></div>
+        <div class="fg"><label>${t('gameId')}</label><input type="text" id="fGame" value="${esc(user.game_id || '')}" dir="ltr" placeholder="#0000"></div>
       </div>
-      <div class="fg"><label>${t('bio')}</label><textarea id="fBio" placeholder="${t('bio')}">${esc(user.bio||'')}</textarea></div>
+      <div class="fg"><label>${t('bio')}</label><textarea id="fBio" placeholder="${t('bio')}">${esc(user.bio || '')}</textarea></div>
       <button class="btn-save" id="saveBtn" onclick="save()">${SVG.save}${t('save')}</button>
     </div>`;
 }
 
-function renderPosts(posts){
-  if(!posts||!posts.length) return `<div class="post-empty">${SVG.post}<div>${t('noPosts')}</div></div>`;
-  return posts.map(p=>`
+function renderPosts(posts) {
+  if (!posts || !posts.length) return `<div class="post-empty">${SVG.post}<div>${t('noPosts')}</div></div>`;
+  return posts.map(p => `
     <div class="post-card">
-      ${p.image?`<img class="post-img" src="${esc(p.image)}" loading="lazy" onerror="this.style.display='none'">`:''}
-      <div class="post-text">${p.content||''}</div>
+      ${p.image ? `<img class="post-img" src="${esc(p.image)}" loading="lazy" onerror="this.style.display='none'">` : ''}
+      <div class="post-text">${p.content || ''}</div>
       <div class="post-date">
         ${SVG.clock}
         ${fmtDate(p.created_at)}
@@ -1026,26 +1074,26 @@ function renderPosts(posts){
     </div>`).join('');
 }
 
-function switchTab(tab){
-  currentTab=tab;
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  const postsTab=document.getElementById('postsTab');
-  const editTab=document.getElementById('editTab');
-  if(tab==='posts'){
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  const postsTab = document.getElementById('postsTab');
+  const editTab = document.getElementById('editTab');
+  if (tab === 'posts') {
     document.getElementById('tabPosts')?.classList.add('active');
-    if(postsTab) postsTab.style.display='block';
-    if(editTab) editTab.style.display='none';
+    if (postsTab) postsTab.style.display = 'block';
+    if (editTab) editTab.style.display = 'none';
   } else {
     document.getElementById('tabEdit')?.classList.add('active');
-    if(postsTab) postsTab.style.display='none';
-    if(editTab) editTab.style.display='block';
+    if (postsTab) postsTab.style.display = 'none';
+    if (editTab) editTab.style.display = 'block';
   }
 }
 
-function sharePost(id){
-  const url=window.location.origin+'/?p='+id;
-  if(navigator.clipboard) navigator.clipboard.writeText(url).then(()=>showToast(t('linkCopied')));
-  else prompt('الرابط:',url);
+function sharePost(id) {
+  const url = window.location.origin + '/?p=' + id;
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => showToast(t('linkCopied')));
+  else prompt('الرابط:', url);
 }
 
 // ============================================================
@@ -1076,96 +1124,152 @@ async function toggleFollow(username, btnEl) {
           icon.outerHTML = SVG.follow;
         }
       }
-      // تحديث الإحصائيات (يجب إعادة تحميل البيانات من الخادم)
-      // يمكن استدعاء loadPublicProfile مرة أخرى أو تحديث الأرقام محلياً
+      // تحديث الإحصائيات
       if (viewUsername) {
         const followStatus = await getFollowStatus(username);
-        // تحديث الأرقام في الواجهة دون إعادة تحميل كامل
         const stats = document.querySelectorAll('.stat-n');
         if (stats.length >= 3) {
           stats[1].textContent = followStatus.followers_count || 0;
           stats[2].textContent = followStatus.following_count || 0;
         }
+      } else if (ME) {
+        // تحديث ملفي الشخصي
+        const meData = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + getToken() } }).then(r => r.json());
+        if (meData && !meData.error) {
+          const stats = document.querySelectorAll('.stat-n');
+          if (stats.length >= 3) {
+            stats[1].textContent = meData.followers_count || 0;
+            stats[2].textContent = meData.following_count || 0;
+          }
+        }
       }
     } else {
       showToast(result.error || t('followError'), 'error');
     }
-  } catch(e) {
+  } catch (e) {
     showToast(t('followError'), 'error');
   }
 }
 
 // ============================================================
-//  FOLLOWERS / FOLLOWING MODALS (Placeholder)
+//  FOLLOWERS / FOLLOWING MODALS
 // ============================================================
-function showFollowersModal(username) {
-  // TODO: تنفيذ عرض قائمة المتابعين في مودال
-  // يمكن استخدام API getFollowers(username)
-  showToast('قائمة المتابعين لـ ' + username + ' (سيتم تنفيذها لاحقاً)');
-  console.log('[MODAL] عرض متابعين:', username);
+async function showFollowersModal(username) {
+  const modal = document.getElementById('userListModal');
+  const title = document.getElementById('modalTitle');
+  const list = document.getElementById('modalUserList');
+  title.textContent = t('followersList');
+  modal.classList.add('show');
+  list.innerHTML = `<div class="spin" style="margin:20px auto;"></div>`;
+  try {
+    const data = await getFollowers(username);
+    renderUserList(list, data, t('noFollowers'));
+  } catch (e) {
+    list.innerHTML = `<div class="modal-empty">${t('connectionError')}</div>`;
+  }
 }
 
-function showFollowingModal(username) {
-  // TODO: تنفيذ عرض قائمة المتابَعين في مودال
-  showToast('قائمة المتابَعين لـ ' + username + ' (سيتم تنفيذها لاحقاً)');
-  console.log('[MODAL] عرض متابعين:', username);
+async function showFollowingModal(username) {
+  const modal = document.getElementById('userListModal');
+  const title = document.getElementById('modalTitle');
+  const list = document.getElementById('modalUserList');
+  title.textContent = t('followingList');
+  modal.classList.add('show');
+  list.innerHTML = `<div class="spin" style="margin:20px auto;"></div>`;
+  try {
+    const data = await getFollowing(username);
+    renderUserList(list, data, t('noFollowing'));
+  } catch (e) {
+    list.innerHTML = `<div class="modal-empty">${t('connectionError')}</div>`;
+  }
+}
+
+function renderUserList(container, users, emptyMsg) {
+  if (!users || !users.length) {
+    container.innerHTML = `<div class="modal-empty">${emptyMsg}</div>`;
+    return;
+  }
+  container.innerHTML = users.map(u => `
+    <div class="modal-user-item" onclick="window.location='/profile?u=${encodeURIComponent(u.username)}'">
+      <div class="u-av">${u.avatar ? `<img src="${esc(u.avatar)}" alt="">` : esc((u.display_name || u.username || '?').charAt(0).toUpperCase())}</div>
+      <div class="u-info">
+        <div class="u-name">${esc(u.display_name || u.username)} ${u.verified ? verifiedBadge() : ''}</div>
+        <div class="u-un">@${esc(u.username)}</div>
+      </div>
+    </div>
+  `).join('');
 }
 
 // ============================================================
 //  AVATAR / COVER UPLOAD & SAVE
 // ============================================================
-function onAvatar(e){
-  const f=e.target.files[0]; if(!f) return;
-  const r=new FileReader();
-  r.onload=ev=>{
-    newAvBase64=ev.target.result;
-    const el=document.getElementById('avBig');
-    if(el) el.innerHTML=`<img src="${newAvBase64}" alt=""><div class="av-overlay">${SVG.camera}</div>`;
+function onAvatar(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    newAvBase64 = ev.target.result;
+    const el = document.getElementById('avBig');
+    if (el) el.innerHTML = `<img src="${newAvBase64}" alt=""><div class="av-overlay">${SVG.camera}</div>`;
   };
   r.readAsDataURL(f);
 }
 
-function onCover(e){
-  const f=e.target.files[0]; if(!f) return;
-  if(!f.type.match('image/jpeg')){ showToast(t('coverJpg'),'error'); return; }
-  const r=new FileReader();
-  r.onload=ev=>{ newCoverBase64=ev.target.result; renderCover(newCoverBase64,true); };
+function onCover(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  if (!f.type.match('image/jpeg')) { showToast(t('coverJpg'), 'error'); return; }
+  const r = new FileReader();
+  r.onload = ev => { newCoverBase64 = ev.target.result; renderCover(newCoverBase64, true); };
   r.readAsDataURL(f);
-  e.target.value='';
+  e.target.value = '';
 }
 
-async function save(){
-  const display_name=document.getElementById('fName')?.value.trim()||'';
-  const bio=document.getElementById('fBio')?.value.trim()||'';
-  const game_id=document.getElementById('fGame')?.value.trim()||'';
-  const errEl=document.getElementById('pErr'), okEl=document.getElementById('pOk');
-  errEl.style.display='none'; okEl.style.display='none';
-  const btn=document.getElementById('saveBtn'); btn.disabled=true; btn.textContent='...';
-  const token=getToken();
-  try{
-    let avatarUrl=ME?.avatar||'';
-    let coverUrl=ME?.cover||'';
-    if(newAvBase64){
-      const up=await fetch('/api/upload',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({image:newAvBase64})});
-      const ud=await up.json(); if(ud.url) avatarUrl=ud.url;
+async function save() {
+  const display_name = document.getElementById('fName')?.value.trim() || '';
+  const bio = document.getElementById('fBio')?.value.trim() || '';
+  const game_id = document.getElementById('fGame')?.value.trim() || '';
+  const errEl = document.getElementById('pErr'), okEl = document.getElementById('pOk');
+  errEl.style.display = 'none'; okEl.style.display = 'none';
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  btn.textContent = '...';
+  const token = getToken();
+  try {
+    let avatarUrl = ME?.avatar || '';
+    let coverUrl = ME?.cover || '';
+    if (newAvBase64) {
+      const up = await fetch('/api/upload', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ image: newAvBase64 }) });
+      const ud = await up.json();
+      if (ud.url) avatarUrl = ud.url;
     }
-    if(newCoverBase64){
-      const up=await fetch('/api/upload',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({image:newCoverBase64})});
-      const ud=await up.json(); if(ud.url) coverUrl=ud.url;
+    if (newCoverBase64) {
+      const up = await fetch('/api/upload', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ image: newCoverBase64 }) });
+      const ud = await up.json();
+      if (ud.url) coverUrl = ud.url;
     }
-    const r=await fetch('/api/profile',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({display_name,bio,game_id,avatar:avatarUrl,cover:coverUrl})});
-    const d=await r.json();
-    if(d.success){
-      try{ const u=JSON.parse(localStorage.getItem('hostaka_user')||'{}'); u.avatar=avatarUrl; u.display_name=display_name; localStorage.setItem('hostaka_user',JSON.stringify(u)); }catch(e){}
-      okEl.textContent=t('saveSuccess'); okEl.style.display='block';
-      newAvBase64=''; newCoverBase64='';
+    const r = await fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ display_name, bio, game_id, avatar: avatarUrl, cover: coverUrl }) });
+    const d = await r.json();
+    if (d.success) {
+      try { const u = JSON.parse(localStorage.getItem('hostaka_user') || '{}'); u.avatar = avatarUrl; u.display_name = display_name; localStorage.setItem('hostaka_user', JSON.stringify(u)); } catch (e) {}
+      okEl.textContent = t('saveSuccess');
+      okEl.style.display = 'block';
+      newAvBase64 = '';
+      newCoverBase64 = '';
       showToast(t('saveSuccess'));
       window.location.reload();
-    } else { errEl.textContent=d.error||t('saveError'); errEl.style.display='block'; showToast(d.error||t('saveError'),'error'); }
-  }catch(e){ errEl.textContent=t('connectionError'); errEl.style.display='block'; showToast(t('connectionError'),'error'); }
-  finally{
-    btn.disabled=false;
-    btn.innerHTML=`${SVG.save}${t('save')}`;
+    } else {
+      errEl.textContent = d.error || t('saveError');
+      errEl.style.display = 'block';
+      showToast(d.error || t('saveError'), 'error');
+    }
+  } catch (e) {
+    errEl.textContent = t('connectionError');
+    errEl.style.display = 'block';
+    showToast(t('connectionError'), 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `${SVG.save}${t('save')}`;
   }
 }
 
