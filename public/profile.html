@@ -7,7 +7,7 @@
   <title>Hostaka — الملف الشخصي</title>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    /* ... نفس الأنماط السابقة ... */
+    /* ... نفس الأنماط السابقة (تم حذفها للاختصار، ولكن يجب تضمينها كاملة) ... */
     :root {
       --black: #ffffff;
       --dark: #f7f7f8;
@@ -68,7 +68,7 @@
       -webkit-font-smoothing:antialiased;
       transition:background 0.3s ease, color 0.3s ease;
     }
-    /* ... باقي الأنماط كما هي (نفس الإصدار السابق) ... */
+    /* باقي الأنماط كما هي (نفس الإصدار السابق) */
     .topbar{position:fixed;top:0;left:0;right:0;height:56px;background:var(--topbar-bg);backdrop-filter:blur(24px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:100;transition:background 0.3s ease, border-color 0.3s ease;}
     .topbar.scrolled{background:var(--black);}
     .topbar-left{display:flex;align-items:center;gap:8px;}
@@ -594,18 +594,25 @@ async function init() {
 async function loadPublicProfile(username) {
   try {
     const token = getToken();
-    const url = '/api/profile/' + encodeURIComponent(username);
-    const pr = await fetch(url, { headers: token ? { 'Authorization': 'Bearer ' + token } : {} }).then(r => r.json());
+    const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+    const pr = await fetch('/api/profile/' + encodeURIComponent(username), { headers }).then(r => r.json());
     if (pr.error) { renderNotFound(); return; }
     const ps = await fetch('/api/user/' + encodeURIComponent(username) + '/posts').then(r => r.json());
     document.getElementById('topbarTitle').textContent = pr.display_name || pr.username;
     renderCover(pr.cover || '', false);
-    let followStatus = { following: false, followers_count: 0, following_count: 0 };
-    if (token) {
-      try { followStatus = await getFollowStatus(username); } catch (e) {}
-    }
+    
+    // استخدام البيانات من pr مباشرة (لأن الخادم يعيد is_following عند تمرير التوكن)
+    const followStatus = {
+      following: pr.is_following || false,
+      followers_count: pr.followers_count || 0,
+      following_count: pr.following_count || 0
+    };
+    console.log('Follow status from profile:', followStatus);
     renderPublic(pr, Array.isArray(ps) ? ps : [], followStatus);
-  } catch (e) { renderNotFound(); }
+  } catch (e) {
+    console.error('Error loading public profile:', e);
+    renderNotFound();
+  }
 }
 
 async function loadMyProfile() {
@@ -805,7 +812,7 @@ function sharePost(id) {
 }
 
 // ============================================================
-//  FOLLOW / UNFOLLOW HANDLER (محسّن)
+//  FOLLOW / UNFOLLOW HANDLER
 // ============================================================
 async function toggleFollow(username, btnEl) {
   if (!getToken()) {
@@ -839,7 +846,6 @@ async function toggleFollow(username, btnEl) {
       if (freshStatus) {
         currentFollowStatus.followers_count = freshStatus.followers_count || 0;
         currentFollowStatus.following_count = freshStatus.following_count || 0;
-        // تحديث الأرقام في الواجهة مباشرة
         const stats = document.querySelectorAll('.stat-n');
         if (stats.length >= 3) {
           stats[1].textContent = freshStatus.followers_count || 0;
