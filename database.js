@@ -2,7 +2,7 @@ const express = require('express');
 const path    = require('path');
 const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
-const { q, initDB } = require('./database');
+const { q, initDB } = require('./db');  // ✅ تم التصحيح: استيراد من db.js وليس database.js
 
 const app = express();
 app.use(express.json({ limit: '15mb' }));
@@ -320,7 +320,7 @@ app.post('/api/follow/:username', requireAuth, async (req, res) => {
     const followed = await q.getPublicProfile(req.params.username);
     if (!followed) return res.status(404).json({ error: 'المستخدم غير موجود' });
     if (followed.id === req.user.id) {
-      return res.status(400).json({ error: 'لا يمكنك متابعة نفسك' });
+      return res.status(400).json({ error: '��ا يمكنك متابعة نفسك' });
     }
     await q.followUser(req.user.id, followed.id);
     res.json({ success: true, following: true });
