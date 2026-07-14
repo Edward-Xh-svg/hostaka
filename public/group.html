@@ -49,36 +49,351 @@
       --avatar-gradient:linear-gradient(145deg, #d4af37, #b8962e);
     }
 
-    /* ===== Chat Backgrounds ===== */
+    /* ===== خلفيات الدردشة المتطورة ===== */
     [data-chat-bg="default"] .msgs-area { background: var(--black); }
-    [data-chat-bg="gradient-blue"] .msgs-area { background: linear-gradient(135deg, #e0f7fa, #b2ebf2); }
-    [data-chat-bg="gradient-green"] .msgs-area { background: linear-gradient(135deg, #e8f5e9, #c8e6c9); }
-    [data-chat-bg="gradient-pink"] .msgs-area { background: linear-gradient(135deg, #fce4ec, #f8bbd0); }
-    [data-chat-bg="gradient-orange"] .msgs-area { background: linear-gradient(135deg, #fff3e0, #ffe0b2); }
-    [data-chat-bg="gradient-purple"] .msgs-area { background: linear-gradient(135deg, #f3e5f5, #e1bee7); }
-    [data-chat-bg="gradient-sunset"] .msgs-area { background: linear-gradient(135deg, #ffecd2, #fcb69f); }
-    [data-chat-bg="gradient-ocean"] .msgs-area { background: linear-gradient(135deg, #a1c4fd, #c2e9fb); }
-    [data-chat-bg="gradient-forest"] .msgs-area { background: linear-gradient(135deg, #d4fc79, #96e6a1); }
-    [data-chat-bg="gradient-lavender"] .msgs-area { background: linear-gradient(135deg, #e8d5f5, #d4b8e8); }
-    [data-chat-bg="dark"] .msgs-area { background: #1a1a1a; }
-    [data-chat-bg="dark"] .msgs-area .date-div span { background: #1a1a1a; }
-    [data-chat-bg="dark"] .msgs-area .bubble.theirs { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.08); }
-    [data-chat-bg="dark"] .msgs-area .bubble.mine { background: rgba(212,175,55,0.12); border-color: rgba(212,175,55,0.2); }
 
-    [data-theme="dark"] [data-chat-bg="gradient-blue"] .msgs-area { background: linear-gradient(135deg, #0d2137, #1a3a5c); }
-    [data-theme="dark"] [data-chat-bg="gradient-green"] .msgs-area { background: linear-gradient(135deg, #0d2818, #1a4a2a); }
-    [data-theme="dark"] [data-chat-bg="gradient-pink"] .msgs-area { background: linear-gradient(135deg, #2d1420, #4a1a2e); }
-    [data-theme="dark"] [data-chat-bg="gradient-orange"] .msgs-area { background: linear-gradient(135deg, #2d1a0d, #4a2e14); }
-    [data-theme="dark"] [data-chat-bg="gradient-purple"] .msgs-area { background: linear-gradient(135deg, #1a0d2d, #301a4a); }
-    [data-theme="dark"] [data-chat-bg="gradient-sunset"] .msgs-area { background: linear-gradient(135deg, #2d1a0d, #4a2014); }
-    [data-theme="dark"] [data-chat-bg="gradient-ocean"] .msgs-area { background: linear-gradient(135deg, #0d1a2d, #1a2d4a); }
-    [data-theme="dark"] [data-chat-bg="gradient-forest"] .msgs-area { background: linear-gradient(135deg, #0d1a0d, #1a2d1a); }
-    [data-theme="dark"] [data-chat-bg="gradient-lavender"] .msgs-area { background: linear-gradient(135deg, #1a0d2d, #2d1a40); }
-    [data-theme="dark"] [data-chat-bg="default"] .msgs-area { background: #0d0d0d; }
+    /* 1. أمواج (موجات متحركة) */
+    [data-chat-bg="waves"] .msgs-area {
+      background: linear-gradient(135deg, #0c3483 0%, #a2b6df 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    [data-chat-bg="waves"] .msgs-area::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(90deg,
+        rgba(255,255,255,0.05) 0%,
+        rgba(255,255,255,0.02) 20%,
+        rgba(255,255,255,0.05) 40%,
+        rgba(255,255,255,0.02) 60%,
+        rgba(255,255,255,0.05) 80%,
+        rgba(255,255,255,0.02) 100%
+      );
+      background-size: 200% 100%;
+      animation: waveMove 8s linear infinite;
+      pointer-events: none;
+    }
+    [data-theme="dark"][data-chat-bg="waves"] .msgs-area {
+      background: linear-gradient(135deg, #0a1a2e 0%, #1a3a5a 100%);
+    }
+    [data-theme="dark"][data-chat-bg="waves"] .msgs-area::before {
+      background: repeating-linear-gradient(90deg,
+        rgba(255,255,255,0.03) 0%,
+        rgba(255,255,255,0.01) 20%,
+        rgba(255,255,255,0.03) 40%,
+        rgba(255,255,255,0.01) 60%,
+        rgba(255,255,255,0.03) 80%,
+        rgba(255,255,255,0.01) 100%
+      );
+    }
+    @keyframes waveMove {
+      0% { background-position: 0 0; }
+      100% { background-position: -200% 0; }
+    }
 
-    /* Fallback for dark mode date divider */
-    [data-theme="dark"] .msgs-area .date-div span { background: var(--black); }
+    /* 2. غيوم (سحاب متحرك) */
+    [data-chat-bg="clouds"] .msgs-area {
+      background: linear-gradient(180deg, #87CEEB 0%, #E0F7FA 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    [data-chat-bg="clouds"] .msgs-area::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 20% 30%, rgba(255,255,255,0.6) 0%, transparent 40%),
+                  radial-gradient(circle at 70% 60%, rgba(255,255,255,0.4) 0%, transparent 30%),
+                  radial-gradient(circle at 40% 80%, rgba(255,255,255,0.5) 0%, transparent 35%);
+      background-size: 200% 200%;
+      animation: cloudMove 12s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+    [data-theme="dark"][data-chat-bg="clouds"] .msgs-area {
+      background: linear-gradient(180deg, #1a2a3a 0%, #2a4a6a 100%);
+    }
+    [data-theme="dark"][data-chat-bg="clouds"] .msgs-area::after {
+      background: radial-gradient(circle at 20% 30%, rgba(255,255,255,0.15) 0%, transparent 40%),
+                  radial-gradient(circle at 70% 60%, rgba(255,255,255,0.1) 0%, transparent 30%),
+                  radial-gradient(circle at 40% 80%, rgba(255,255,255,0.12) 0%, transparent 35%);
+    }
+    @keyframes cloudMove {
+      0% { background-position: 0% 0%; }
+      100% { background-position: 100% 100%; }
+    }
 
+    /* 3. نجوم (وميض) */
+    [data-chat-bg="stars"] .msgs-area {
+      background: linear-gradient(180deg, #0B0E1A 0%, #1A1F33 50%, #2A2F4A 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    [data-chat-bg="stars"] .msgs-area::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(2px 2px at 20% 30%, rgba(255,255,255,0.8), transparent),
+        radial-gradient(2px 2px at 40% 70%, rgba(255,255,255,0.6), transparent),
+        radial-gradient(3px 3px at 60% 20%, rgba(255,255,255,0.9), transparent),
+        radial-gradient(2px 2px at 80% 50%, rgba(255,255,255,0.5), transparent),
+        radial-gradient(3px 3px at 10% 80%, rgba(255,255,255,0.7), transparent),
+        radial-gradient(2px 2px at 90% 90%, rgba(255,255,255,0.6), transparent),
+        radial-gradient(2px 2px at 50% 40%, rgba(255,255,255,0.4), transparent),
+        radial-gradient(2px 2px at 30% 10%, rgba(255,255,255,0.5), transparent),
+        radial-gradient(2px 2px at 70% 70%, rgba(255,255,255,0.5), transparent);
+      background-size: 200% 200%;
+      animation: twinkle 4s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+    [data-theme="dark"][data-chat-bg="stars"] .msgs-area {
+      background: linear-gradient(180deg, #05080f 0%, #0d1420 50%, #1a1f33 100%);
+    }
+    @keyframes twinkle {
+      0% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+
+    /* 4. غابة (أوراق متحركة) */
+    [data-chat-bg="forest"] .msgs-area {
+      background: linear-gradient(135deg, #1a3a1a 0%, #2d5a2d 50%, #1a3a1a 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    [data-chat-bg="forest"] .msgs-area::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(45deg,
+        rgba(255,255,255,0.03) 0px,
+        rgba(255,255,255,0.03) 10px,
+        rgba(255,255,255,0.01) 10px,
+        rgba(255,255,255,0.01) 20px
+      );
+      background-size: 40px 40px;
+      animation: leafShake 6s linear infinite;
+      pointer-events: none;
+    }
+    [data-theme="dark"][data-chat-bg="forest"] .msgs-area {
+      background: linear-gradient(135deg, #0d1a0d 0%, #1a2d1a 50%, #0d1a0d 100%);
+    }
+    @keyframes leafShake {
+      0% { transform: rotate(0deg); }
+      50% { transform: rotate(2deg); }
+      100% { transform: rotate(-2deg); }
+    }
+
+    /* 5. غروب (تدرج ناري) */
+    [data-chat-bg="sunset"] .msgs-area {
+      background: linear-gradient(180deg, #FF7E5F 0%, #FEB47B 50%, #FF6B6B 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    [data-chat-bg="sunset"] .msgs-area::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 20% 80%, rgba(255,200,100,0.3) 0%, transparent 50%),
+                  radial-gradient(circle at 80% 40%, rgba(255,100,50,0.2) 0%, transparent 40%);
+      animation: sunsetGlow 8s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+    [data-theme="dark"][data-chat-bg="sunset"] .msgs-area {
+      background: linear-gradient(180deg, #3d1a0a 0%, #5a2a14 50%, #3d1a0a 100%);
+    }
+    [data-theme="dark"][data-chat-bg="sunset"] .msgs-area::before {
+      background: radial-gradient(circle at 20% 80%, rgba(200,100,30,0.2) 0%, transparent 50%),
+                  radial-gradient(circle at 80% 40%, rgba(150,80,30,0.15) 0%, transparent 40%);
+    }
+    @keyframes sunsetGlow {
+      0% { opacity: 0.6; }
+      100% { opacity: 1; }
+    }
+
+    /* 6. محيط (أمواج زرقاء) */
+    [data-chat-bg="ocean"] .msgs-area {
+      background: linear-gradient(180deg, #006994 0%, #00BFFF 40%, #87CEEB 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    [data-chat-bg="ocean"] .msgs-area::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(90deg,
+        rgba(255,255,255,0.05) 0%,
+        rgba(255,255,255,0.02) 15%,
+        rgba(255,255,255,0.05) 30%,
+        rgba(255,255,255,0.02) 45%,
+        rgba(255,255,255,0.05) 60%,
+        rgba(255,255,255,0.02) 75%,
+        rgba(255,255,255,0.05) 90%,
+        rgba(255,255,255,0.02) 100%
+      );
+      background-size: 300% 100%;
+      animation: oceanWave 10s linear infinite;
+      pointer-events: none;
+    }
+    [data-theme="dark"][data-chat-bg="ocean"] .msgs-area {
+      background: linear-gradient(180deg, #0a1a2d 0%, #1a3a5a 40%, #0a2a3a 100%);
+    }
+    [data-theme="dark"][data-chat-bg="ocean"] .msgs-area::after {
+      background: repeating-linear-gradient(90deg,
+        rgba(255,255,255,0.03) 0%,
+        rgba(255,255,255,0.01) 15%,
+        rgba(255,255,255,0.03) 30%,
+        rgba(255,255,255,0.01) 45%,
+        rgba(255,255,255,0.03) 60%,
+        rgba(255,255,255,0.01) 75%,
+        rgba(255,255,255,0.03) 90%,
+        rgba(255,255,255,0.01) 100%
+      );
+    }
+    @keyframes oceanWave {
+      0% { background-position: 0 0; }
+      100% { background-position: -300% 0; }
+    }
+
+    /* 7. زهور (أنماط زهرية) */
+    [data-chat-bg="flowers"] .msgs-area {
+      background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 50%, #f48fb1 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    [data-chat-bg="flowers"] .msgs-area::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle at 20% 30%, rgba(255,255,255,0.3) 0%, transparent 25%),
+                        radial-gradient(circle at 70% 60%, rgba(255,255,255,0.2) 0%, transparent 20%),
+                        radial-gradient(circle at 40% 80%, rgba(255,255,255,0.25) 0%, transparent 22%),
+                        radial-gradient(circle at 90% 20%, rgba(255,255,255,0.15) 0%, transparent 18%);
+      animation: flowerBloom 5s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+    [data-theme="dark"][data-chat-bg="flowers"] .msgs-area {
+      background: linear-gradient(135deg, #2d1420 0%, #4a1a2e 50%, #3d1a2a 100%);
+    }
+    [data-theme="dark"][data-chat-bg="flowers"] .msgs-area::before {
+      background-image: radial-gradient(circle at 20% 30%, rgba(255,200,200,0.1) 0%, transparent 25%),
+                        radial-gradient(circle at 70% 60%, rgba(255,200,200,0.08) 0%, transparent 20%),
+                        radial-gradient(circle at 40% 80%, rgba(255,200,200,0.12) 0%, transparent 22%),
+                        radial-gradient(circle at 90% 20%, rgba(255,200,200,0.06) 0%, transparent 18%);
+    }
+    @keyframes flowerBloom {
+      0% { transform: scale(1); opacity: 0.6; }
+      100% { transform: scale(1.05); opacity: 1; }
+    }
+
+    /* 8. هندسي (أنماط متكررة) */
+    [data-chat-bg="geometric"] .msgs-area {
+      background: #2c3e50;
+      position: relative;
+      overflow: hidden;
+    }
+    [data-chat-bg="geometric"] .msgs-area::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(30deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.05) 50%, transparent 50%, transparent 100%),
+        linear-gradient(120deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.03) 50%, transparent 50%, transparent 100%);
+      background-size: 60px 60px;
+      animation: geoShift 8s linear infinite;
+      pointer-events: none;
+    }
+    [data-theme="dark"][data-chat-bg="geometric"] .msgs-area {
+      background: #1a1a2e;
+    }
+    @keyframes geoShift {
+      0% { background-position: 0 0; }
+      100% { background-position: 60px 60px; }
+    }
+
+    /* 9. مخطط (خطوط مائلة) */
+    [data-chat-bg="stripes"] .msgs-area {
+      background: #2d2d2d;
+      position: relative;
+      overflow: hidden;
+    }
+    [data-chat-bg="stripes"] .msgs-area::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(45deg,
+        rgba(255,255,255,0.05) 0px,
+        rgba(255,255,255,0.05) 10px,
+        rgba(255,255,255,0.02) 10px,
+        rgba(255,255,255,0.02) 20px
+      );
+      animation: stripeMove 10s linear infinite;
+      pointer-events: none;
+    }
+    [data-theme="dark"][data-chat-bg="stripes"] .msgs-area {
+      background: #141414;
+    }
+    [data-theme="dark"][data-chat-bg="stripes"] .msgs-area::before {
+      background: repeating-linear-gradient(45deg,
+        rgba(255,255,255,0.03) 0px,
+        rgba(255,255,255,0.03) 10px,
+        rgba(255,255,255,0.01) 10px,
+        rgba(255,255,255,0.01) 20px
+      );
+    }
+    @keyframes stripeMove {
+      0% { background-position: 0 0; }
+      100% { background-position: 40px 40px; }
+    }
+
+    /* 10. داكن (خلفية سوداء أنيقة) */
+    [data-chat-bg="dark-elegant"] .msgs-area {
+      background: #0a0a0a;
+      position: relative;
+      overflow: hidden;
+    }
+    [data-chat-bg="dark-elegant"] .msgs-area::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 30% 40%, rgba(255,255,255,0.02) 0%, transparent 60%),
+                  radial-gradient(circle at 70% 60%, rgba(255,255,255,0.015) 0%, transparent 50%);
+      animation: darkGlow 6s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+    [data-theme="dark"][data-chat-bg="dark-elegant"] .msgs-area {
+      background: #050505;
+    }
+    @keyframes darkGlow {
+      0% { opacity: 0.3; }
+      100% { opacity: 0.8; }
+    }
+
+    /* 11. كلاسيكي (تدرج دافئ) */
+    [data-chat-bg="classic"] .msgs-area {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    [data-chat-bg="classic"] .msgs-area::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.2) 0%, transparent 70%);
+      animation: classicPulse 4s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+    [data-theme="dark"][data-chat-bg="classic"] .msgs-area {
+      background: linear-gradient(135deg, #1a1a2e 0%, #2d2d44 100%);
+    }
+    [data-theme="dark"][data-chat-bg="classic"] .msgs-area::before {
+      background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.05) 0%, transparent 70%);
+    }
+    @keyframes classicPulse {
+      0% { opacity: 0.4; }
+      100% { opacity: 0.8; }
+    }
+
+    /* ===== باقي الأنماط الأساسية ===== */
     *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
     html,body{height:100%;overflow:hidden;}
     body{background:var(--black);color:var(--text);font-family:'Cairo',sans-serif;display:flex;flex-direction:column;transition:background 0.3s ease, color 0.3s ease;}
@@ -196,13 +511,22 @@
       min-height:0;
       transition:background 0.4s ease;
       background:var(--chat-bg, transparent);
+      position:relative;
     }
     .msgs-area::-webkit-scrollbar{width:3px;}
     .msgs-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 
+    /* التأكد من أن الفقاعات تظهر فوق الخلفية */
+    .msgs-area .date-div,
+    .msgs-area .msg-row,
+    .msgs-area .msg-row * {
+      position: relative;
+      z-index: 1;
+    }
+
     .date-div{text-align:center;font-size:0.7rem;color:var(--muted);padding:8px 0;position:relative;}
-    .date-div::before{content:'';position:absolute;top:50%;left:0;right:0;height:1px;background:var(--border);}
-    .date-div span{position:relative;background:var(--black);padding:0 10px;}
+    .date-div::before{content:'';position:absolute;top:50%;left:0;right:0;height:1px;background:var(--border);z-index:0;}
+    .date-div span{position:relative;background:var(--black);padding:0 10px;z-index:1;}
 
     .msg-row{display:flex;align-items:flex-end;gap:7px;margin-bottom:6px;}
     .msg-row.mine{flex-direction:row-reverse;}
@@ -344,7 +668,7 @@
     .theme-dot{width:100%;aspect-ratio:1;border-radius:8px;cursor:pointer;border:2px solid transparent;transition:0.15s;}
     .theme-dot.active{border-color:var(--text);}
 
-    /* Background Grid */
+    /* Background Grid - أنماط الخلفيات المتحركة */
     .bg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px;}
     .bg-option{
       aspect-ratio:4/3;
@@ -354,6 +678,8 @@
       transition:0.2s;
       position:relative;
       overflow:hidden;
+      background-size:cover;
+      background-position:center;
     }
     .bg-option:hover{transform:scale(1.03);}
     .bg-option.active{border-color:var(--red);box-shadow:0 0 0 2px var(--red);}
@@ -371,29 +697,33 @@
       white-space:nowrap;
       font-weight:600;
     }
-    /* Background previews */
-    .bg-default{background:var(--black);}
-    .bg-gradient-blue{background:linear-gradient(135deg,#e0f7fa,#b2ebf2);}
-    .bg-gradient-green{background:linear-gradient(135deg,#e8f5e9,#c8e6c9);}
-    .bg-gradient-pink{background:linear-gradient(135deg,#fce4ec,#f8bbd0);}
-    .bg-gradient-orange{background:linear-gradient(135deg,#fff3e0,#ffe0b2);}
-    .bg-gradient-purple{background:linear-gradient(135deg,#f3e5f5,#e1bee7);}
-    .bg-gradient-sunset{background:linear-gradient(135deg,#ffecd2,#fcb69f);}
-    .bg-gradient-ocean{background:linear-gradient(135deg,#a1c4fd,#c2e9fb);}
-    .bg-gradient-forest{background:linear-gradient(135deg,#d4fc79,#96e6a1);}
-    .bg-gradient-lavender{background:linear-gradient(135deg,#e8d5f5,#d4b8e8);}
-    .bg-dark{background:#1a1a1a;}
-    [data-theme="dark"] .bg-default{background:#0d0d0d;}
-    [data-theme="dark"] .bg-gradient-blue{background:linear-gradient(135deg,#0d2137,#1a3a5c);}
-    [data-theme="dark"] .bg-gradient-green{background:linear-gradient(135deg,#0d2818,#1a4a2a);}
-    [data-theme="dark"] .bg-gradient-pink{background:linear-gradient(135deg,#2d1420,#4a1a2e);}
-    [data-theme="dark"] .bg-gradient-orange{background:linear-gradient(135deg,#2d1a0d,#4a2e14);}
-    [data-theme="dark"] .bg-gradient-purple{background:linear-gradient(135deg,#1a0d2d,#301a4a);}
-    [data-theme="dark"] .bg-gradient-sunset{background:linear-gradient(135deg,#2d1a0d,#4a2014);}
-    [data-theme="dark"] .bg-gradient-ocean{background:linear-gradient(135deg,#0d1a2d,#1a2d4a);}
-    [data-theme="dark"] .bg-gradient-forest{background:linear-gradient(135deg,#0d1a0d,#1a2d1a);}
-    [data-theme="dark"] .bg-gradient-lavender{background:linear-gradient(135deg,#1a0d2d,#2d1a40);}
-    [data-theme="dark"] .bg-dark{background:#0d0d0d;}
+
+    /* معاينة الخلفيات في الإعدادات (مصغرة) */
+    .bg-preview-default { background: var(--black); }
+    .bg-preview-waves { background: linear-gradient(135deg, #0c3483, #a2b6df); }
+    .bg-preview-clouds { background: linear-gradient(180deg, #87CEEB, #E0F7FA); }
+    .bg-preview-stars { background: linear-gradient(180deg, #0B0E1A, #1A1F33); }
+    .bg-preview-forest { background: linear-gradient(135deg, #1a3a1a, #2d5a2d); }
+    .bg-preview-sunset { background: linear-gradient(180deg, #FF7E5F, #FEB47B); }
+    .bg-preview-ocean { background: linear-gradient(180deg, #006994, #00BFFF); }
+    .bg-preview-flowers { background: linear-gradient(135deg, #fce4ec, #f8bbd0); }
+    .bg-preview-geometric { background: #2c3e50; }
+    .bg-preview-stripes { background: #2d2d2d; }
+    .bg-preview-dark-elegant { background: #0a0a0a; }
+    .bg-preview-classic { background: linear-gradient(135deg, #f5f7fa, #c3cfe2); }
+
+    [data-theme="dark"] .bg-preview-default { background: #0d0d0d; }
+    [data-theme="dark"] .bg-preview-waves { background: linear-gradient(135deg, #0a1a2e, #1a3a5a); }
+    [data-theme="dark"] .bg-preview-clouds { background: linear-gradient(180deg, #1a2a3a, #2a4a6a); }
+    [data-theme="dark"] .bg-preview-stars { background: linear-gradient(180deg, #05080f, #0d1420); }
+    [data-theme="dark"] .bg-preview-forest { background: linear-gradient(135deg, #0d1a0d, #1a2d1a); }
+    [data-theme="dark"] .bg-preview-sunset { background: linear-gradient(180deg, #3d1a0a, #5a2a14); }
+    [data-theme="dark"] .bg-preview-ocean { background: linear-gradient(180deg, #0a1a2d, #1a3a5a); }
+    [data-theme="dark"] .bg-preview-flowers { background: linear-gradient(135deg, #2d1420, #4a1a2e); }
+    [data-theme="dark"] .bg-preview-geometric { background: #1a1a2e; }
+    [data-theme="dark"] .bg-preview-stripes { background: #141414; }
+    [data-theme="dark"] .bg-preview-dark-elegant { background: #050505; }
+    [data-theme="dark"] .bg-preview-classic { background: linear-gradient(135deg, #1a1a2e, #2d2d44); }
 
     .toast{
       position:fixed;bottom:24px;left:50%;
@@ -520,9 +850,9 @@ const LANG = {
     groupUpdated: 'تم تحديث المجموعة', leftGroup: 'تم مغادرة المجموعة',
     confirmLeave: 'مغادرة المجموعة؟', confirmKick: 'إزالة هذا العضو؟',
     themeChanged: 'تم تغيير الثيم', chatBackground: 'خلفية الدردشة',
-    bgDefault: 'افتراضي', bgBlue: 'أزرق', bgGreen: 'أخضر', bgPink: 'وردي',
-    bgOrange: 'برتقالي', bgPurple: 'بنفسجي', bgSunset: 'غروب', bgOcean: 'محيط',
-    bgForest: 'غابة', bgLavender: 'لافندر', bgDark: 'داكن',
+    bgDefault: 'افتراضي', bgWaves: 'أمواج', bgClouds: 'غيوم', bgStars: 'نجوم',
+    bgForest: 'غابة', bgSunset: 'غروب', bgOcean: 'محيط', bgFlowers: 'زهور',
+    bgGeometric: 'هندسي', bgStripes: 'مخطط', bgDarkElegant: 'داكن أنيق', bgClassic: 'كلاسيكي',
     backgroundChanged: 'تم تغيير الخلفية'
   },
   en: {
@@ -537,9 +867,9 @@ const LANG = {
     groupUpdated: 'Group updated', leftGroup: 'Left group',
     confirmLeave: 'Leave this group?', confirmKick: 'Remove this member?',
     themeChanged: 'Theme changed', chatBackground: 'Chat Background',
-    bgDefault: 'Default', bgBlue: 'Blue', bgGreen: 'Green', bgPink: 'Pink',
-    bgOrange: 'Orange', bgPurple: 'Purple', bgSunset: 'Sunset', bgOcean: 'Ocean',
-    bgForest: 'Forest', bgLavender: 'Lavender', bgDark: 'Dark',
+    bgDefault: 'Default', bgWaves: 'Waves', bgClouds: 'Clouds', bgStars: 'Stars',
+    bgForest: 'Forest', bgSunset: 'Sunset', bgOcean: 'Ocean', bgFlowers: 'Flowers',
+    bgGeometric: 'Geometric', bgStripes: 'Stripes', bgDarkElegant: 'Dark Elegant', bgClassic: 'Classic',
     backgroundChanged: 'Background changed'
   },
   fr: {
@@ -554,9 +884,9 @@ const LANG = {
     groupUpdated: 'Groupe mis à jour', leftGroup: 'Groupe quitté',
     confirmLeave: 'Quitter ce groupe ?', confirmKick: 'Retirer ce membre ?',
     themeChanged: 'Thème changé', chatBackground: 'Fond de discussion',
-    bgDefault: 'Défaut', bgBlue: 'Bleu', bgGreen: 'Vert', bgPink: 'Rose',
-    bgOrange: 'Orange', bgPurple: 'Violet', bgSunset: 'Coucher', bgOcean: 'Océan',
-    bgForest: 'Forêt', bgLavender: 'Lavande', bgDark: 'Sombre',
+    bgDefault: 'Défaut', bgWaves: 'Vagues', bgClouds: 'Nuages', bgStars: 'Étoiles',
+    bgForest: 'Forêt', bgSunset: 'Coucher', bgOcean: 'Océan', bgFlowers: 'Fleurs',
+    bgGeometric: 'Géométrique', bgStripes: 'Rayures', bgDarkElegant: 'Sombre élégant', bgClassic: 'Classique',
     backgroundChanged: 'Fond changé'
   },
   ru: {
@@ -571,9 +901,9 @@ const LANG = {
     groupUpdated: 'Группа обновлена', leftGroup: 'Группа покинута',
     confirmLeave: 'Покинуть группу?', confirmKick: 'Удалить участника?',
     themeChanged: 'Тема изменена', chatBackground: 'Фон чата',
-    bgDefault: 'По умолчанию', bgBlue: 'Синий', bgGreen: 'Зелёный', bgPink: 'Розовый',
-    bgOrange: 'Оранжевый', bgPurple: 'Фиолетовый', bgSunset: 'Закат', bgOcean: 'Океан',
-    bgForest: 'Лес', bgLavender: 'Лаванда', bgDark: 'Тёмный',
+    bgDefault: 'По умолчанию', bgWaves: 'Волны', bgClouds: 'Облака', bgStars: 'Звёзды',
+    bgForest: 'Лес', bgSunset: 'Закат', bgOcean: 'Океан', bgFlowers: 'Цветы',
+    bgGeometric: 'Геометрический', bgStripes: 'Полосы', bgDarkElegant: 'Тёмный элегантный', bgClassic: 'Классический',
     backgroundChanged: 'Фон изменён'
   },
   zh: {
@@ -588,9 +918,9 @@ const LANG = {
     groupUpdated: '群组已更新', leftGroup: '已退出群组',
     confirmLeave: '退出此群组？', confirmKick: '移除该成员？',
     themeChanged: '主题已更改', chatBackground: '聊天背景',
-    bgDefault: '默认', bgBlue: '蓝色', bgGreen: '绿色', bgPink: '粉色',
-    bgOrange: '橙色', bgPurple: '紫色', bgSunset: '日落', bgOcean: '海洋',
-    bgForest: '森林', bgLavender: '薰衣草', bgDark: '深色',
+    bgDefault: '默认', bgWaves: '波浪', bgClouds: '云朵', bgStars: '星空',
+    bgForest: '森林', bgSunset: '日落', bgOcean: '海洋', bgFlowers: '花朵',
+    bgGeometric: '几何', bgStripes: '条纹', bgDarkElegant: '暗黑优雅', bgClassic: '经典',
     backgroundChanged: '背景已更改'
   },
   ja: {
@@ -605,9 +935,9 @@ const LANG = {
     groupUpdated: 'グループを更新しました', leftGroup: 'グループを退出しました',
     confirmLeave: 'このグループを退出しますか？', confirmKick: 'このメンバーを削除しますか？',
     themeChanged: 'テーマを変更しました', chatBackground: 'チャットの背景',
-    bgDefault: 'デフォルト', bgBlue: 'ブルー', bgGreen: 'グリーン', bgPink: 'ピンク',
-    bgOrange: 'オレンジ', bgPurple: 'パープル', bgSunset: 'サンセット', bgOcean: 'オーシャン',
-    bgForest: 'フォレスト', bgLavender: 'ラベンダー', bgDark: 'ダーク',
+    bgDefault: 'デフォルト', bgWaves: '波', bgClouds: '雲', bgStars: '星',
+    bgForest: '森', bgSunset: '夕日', bgOcean: '海', bgFlowers: '花',
+    bgGeometric: '幾何学', bgStripes: 'ストライプ', bgDarkElegant: 'ダークエレガント', bgClassic: 'クラシック',
     backgroundChanged: '背景を変更しました'
   }
 };
@@ -692,19 +1022,20 @@ const THEMES = [
   {name:'pink',    color:'#e91e63'},
 ];
 
-// Chat backgrounds
+// Chat backgrounds - المتطورة
 const CHAT_BACKGROUNDS = [
-  { id: 'default', label: 'bgDefault' },
-  { id: 'gradient-blue', label: 'bgBlue' },
-  { id: 'gradient-green', label: 'bgGreen' },
-  { id: 'gradient-pink', label: 'bgPink' },
-  { id: 'gradient-orange', label: 'bgOrange' },
-  { id: 'gradient-purple', label: 'bgPurple' },
-  { id: 'gradient-sunset', label: 'bgSunset' },
-  { id: 'gradient-ocean', label: 'bgOcean' },
-  { id: 'gradient-forest', label: 'bgForest' },
-  { id: 'gradient-lavender', label: 'bgLavender' },
-  { id: 'dark', label: 'bgDark' },
+  { id: 'default', label: 'bgDefault', previewClass: 'bg-preview-default' },
+  { id: 'waves', label: 'bgWaves', previewClass: 'bg-preview-waves' },
+  { id: 'clouds', label: 'bgClouds', previewClass: 'bg-preview-clouds' },
+  { id: 'stars', label: 'bgStars', previewClass: 'bg-preview-stars' },
+  { id: 'forest', label: 'bgForest', previewClass: 'bg-preview-forest' },
+  { id: 'sunset', label: 'bgSunset', previewClass: 'bg-preview-sunset' },
+  { id: 'ocean', label: 'bgOcean', previewClass: 'bg-preview-ocean' },
+  { id: 'flowers', label: 'bgFlowers', previewClass: 'bg-preview-flowers' },
+  { id: 'geometric', label: 'bgGeometric', previewClass: 'bg-preview-geometric' },
+  { id: 'stripes', label: 'bgStripes', previewClass: 'bg-preview-stripes' },
+  { id: 'dark-elegant', label: 'bgDarkElegant', previewClass: 'bg-preview-dark-elegant' },
+  { id: 'classic', label: 'bgClassic', previewClass: 'bg-preview-classic' },
 ];
 
 let ME = null, GROUP = null, MEMBERS = [], myImgBase64 = '', pollTimer = null, settingsOpen = false;
@@ -920,7 +1251,7 @@ function renderSettings(){
       <div class="sp-label">${t('chatBackground')}</div>
       <div class="bg-grid">
         ${CHAT_BACKGROUNDS.map(bg=>`
-          <div class="bg-option ${currentBg===bg.id?'active':''} bg-${bg.id}" onclick="setBackground('${bg.id}')" title="${t(bg.label)}">
+          <div class="bg-option ${currentBg===bg.id?'active':''} ${bg.previewClass}" onclick="setBackground('${bg.id}')" title="${t(bg.label)}">
             <span class="bg-label">${t(bg.label)}</span>
           </div>
         `).join('')}
