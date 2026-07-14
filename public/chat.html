@@ -7,6 +7,7 @@
   <title>Hostaka — الرسائل</title>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
+    /* ... جميع الأنماط السابقة كما هي (لم تتغير) ... */
     :root{
       --black:#ffffff;
       --dark:#f7f7f8;
@@ -1108,7 +1109,9 @@ async function apiFetch(url,method='GET',body=null){
   const token=getToken();
   const opts={method,headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}};
   if(body) opts.body=JSON.stringify(body);
-  const r=await fetch(url,opts); return r.json();
+  const r=await fetch(url,opts);
+  if(!r.ok) throw new Error('HTTP error '+r.status);
+  return r.json();
 }
 
 const SVG = {
@@ -1182,7 +1185,10 @@ async function loadSidebar(){
       apiFetch('/api/messages/conversations'),
       apiFetch('/api/groups'),
     ]);
-  }catch(e){ allUsers=[]; conversations=[]; groups=[]; }
+  }catch(e){ 
+    console.error('loadSidebar error', e);
+    allUsers=[]; conversations=[]; groups=[]; 
+  }
   renderSidebar();
 }
 
@@ -1287,13 +1293,18 @@ async function loadMsgs(username,scroll=true){
     const msgs=await apiFetch('/api/messages/'+encodeURIComponent(username));
     if(!Array.isArray(msgs)) return;
     renderMsgs(msgs,scroll);
-  }catch(e){}
+  }catch(e){
+    console.error('loadMsgs error', e);
+  }
 }
 
 function renderMsgs(msgs,scroll=true){
   const area=document.getElementById('msgsArea');
   if(!area) return;
-  if(!msgs.length){ area.innerHTML='<div style="text-align:center;color:var(--muted);padding:30px;font-size:0.85rem;font-weight:600;">'+t('noMessages')+'</div>'; return; }
+  if(!msgs || !msgs.length){ 
+    area.innerHTML='<div style="text-align:center;color:var(--muted);padding:30px;font-size:0.85rem;font-weight:600;">'+t('noMessages')+'</div>'; 
+    return; 
+  }
   let html='',lastDay='';
   msgs.forEach((m,i)=>{
     const isMine=m.from_id==ME?.id;
@@ -1301,8 +1312,8 @@ function renderMsgs(msgs,scroll=true){
     if(day!==lastDay){ html+=`<div class="date-divider"><span>${day}</span></div>`; lastDay=day; }
     const next=msgs[i+1]; const isLast=!next||next.from_id!=m.from_id;
     const av=m.from_avatar?`<img src="${esc(m.from_avatar)}" alt="">`:m.from_name.charAt(0).toUpperCase();
-    const rc=msgReactions[m.id];
-    const reactionHtml=rc&&rc.reactions&&rc.reactions.length?
+    const rc=msgReactions[m.id] || { reactions: [], userReaction: null };
+    const reactionHtml=rc.reactions && rc.reactions.length ?
       `<div class="msg-reaction" onclick="togglePicker(${m.id})">${rc.reactions.map(r=>r.icon||r.emoji).join('')} <span style="font-size:0.7rem;color:var(--muted);">${rc.reactions.reduce((s,r)=>s+Number(r.count),0)}</span></div>`:'';
     html+=`<div class="msg-row ${isMine?'mine':'theirs'}">
       ${!isMine?`<div class="msg-av ${isLast?'':'invisible'}">${av}</div>`:''}
@@ -1337,9 +1348,11 @@ document.addEventListener('click',e=>{
 async function reactMsg(e,mid,emoji){
   e.stopPropagation();
   document.querySelectorAll('.react-picker.show').forEach(p=>p.classList.remove('show'));
-  const d=await apiFetch('/api/messages/react/'+mid,'POST',{emoji});
-  if(d.success){ msgReactions[mid]={reactions:d.reactions,userReaction:d.userReaction}; }
-  if(currentPeer) await loadMsgs(currentPeer,false);
+  try{
+    const d=await apiFetch('/api/messages/react/'+mid,'POST',{emoji});
+    if(d.success){ msgReactions[mid]={reactions:d.reactions,userReaction:d.userReaction}; }
+    if(currentPeer) await loadMsgs(currentPeer,false);
+  }catch(e){}
 }
 
 function onChatImg(e){
@@ -1412,13 +1425,18 @@ async function createGroup(){
   const members=[...document.querySelectorAll('#cgMembers input:checked')].map(i=>Number(i.value));
   const btn=document.getElementById('createGroupBtn');
   btn.disabled=true; btn.textContent='...';
-  const d=await apiFetch('/api/groups','POST',{name,members});
-  if(d.id){
-    closeCreateGroup();
-    showToast(t('groupCreated'));
-    window.location='/group?g='+d.id;
-  } else {
-    showToast(d.error||t('error'),'error');
+  try{
+    const d=await apiFetch('/api/groups','POST',{name,members});
+    if(d.id){
+      closeCreateGroup();
+      showToast(t('groupCreated'));
+      window.location='/group?g='+d.id;
+    } else {
+      showToast(d.error||t('error'),'error');
+      btn.disabled=false; btn.innerHTML=`<span id="modalCreateBtn">${t('create')}</span>`;
+    }
+  }catch(e){
+    showToast(t('error'),'error');
     btn.disabled=false; btn.innerHTML=`<span id="modalCreateBtn">${t('create')}</span>`;
   }
 }
