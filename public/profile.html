@@ -8,20 +8,41 @@
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root{
-    --black:#ffffff;
-    --dark:#f7f7f8;
-    --card:#ffffff;
-    --border:#e5e5e5;
-    --text:#1a1a1a;
-    --muted:#6b7280;
-    --red:#000000;
-    --red-h:#333333;
-    --accent:#000000;
-    --mine-bg:rgba(0,0,0,0.08);
-    --mine-border:rgba(0,0,0,0.12);
-    --their-bg:rgba(0,0,0,0.04);
-    --their-border:rgba(0,0,0,0.06);
-}
+      --black:#ffffff;
+      --dark:#f7f7f8;
+      --card:#ffffff;
+      --border:#e5e5e5;
+      --text:#1a1a1a;
+      --muted:#6b7280;
+      --red:#000000;
+      --red-h:#333333;
+      --accent:#000000;
+      --mine-bg:rgba(0,0,0,0.08);
+      --mine-border:rgba(0,0,0,0.12);
+      --their-bg:rgba(0,0,0,0.04);
+      --their-border:rgba(0,0,0,0.06);
+      --topbar-bg:rgba(255,255,255,0.75);
+      --input-bg:#f7f7f8;
+      --modal-bg:#ffffff;
+      --shadow:0 8px 32px rgba(0,0,0,0.3);
+      --avatar-gradient:linear-gradient(145deg, var(--red), #333333);
+    }
+    [data-theme="dark"] {
+      --black:#0d0d0d;
+      --dark:#141414;
+      --card:#1a1a1a;
+      --border:#2a2a2a;
+      --text:#e5e5e5;
+      --muted:#8d8d8d;
+      --red:#d4af37;
+      --red-h:#e6c74a;
+      --accent:#d4af37;
+      --topbar-bg:rgba(13,13,13,0.85);
+      --input-bg:#222222;
+      --modal-bg:#1a1a1a;
+      --shadow:0 8px 32px rgba(0,0,0,0.7);
+      --avatar-gradient:linear-gradient(145deg, #d4af37, #b8962e);
+    }
     *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
     html{scroll-behavior:smooth;}
     body{
@@ -30,6 +51,7 @@
       font-family:'Cairo',sans-serif;
       min-height:100vh;
       -webkit-font-smoothing:antialiased;
+      transition:background 0.3s ease, color 0.3s ease;
     }
 
     .topbar{
@@ -38,45 +60,102 @@
       left:0;
       right:0;
       height:56px;
-      background:rgba(255,255,255,0.75);
+      background:var(--topbar-bg);
       backdrop-filter:blur(24px) saturate(1.2);
       -webkit-backdrop-filter:blur(24px) saturate(1.2);
-      border-bottom:1px solid rgba(255,255,255,0.04);
+      border-bottom:1px solid var(--border);
       display:flex;
       align-items:center;
       justify-content:space-between;
       padding:0 16px;
       z-index:100;
-      transition:background 0.3s;
+      transition:background 0.3s ease, border-color 0.3s ease;
     }
-    .topbar.scrolled{background:rgba(255,255,255,0.92);}
+    .topbar.scrolled{background:var(--black);}
+    .topbar-left{display:flex;align-items:center;gap:8px;}
+    .topbar-right{display:flex;align-items:center;gap:6px;}
     .back-btn{
       display:inline-flex;
       align-items:center;
       gap:7px;
-      background:rgba(0,0,0,0.03);
+      background:rgba(128,128,128,0.08);
       border:1px solid var(--border);
-      color:#444;
+      color:var(--muted);
       padding:7px 14px;
       border-radius:999px;
       cursor:pointer;
-      font-family:'Cairo';
+      font-family:'Cairo',sans-serif;
       font-size:0.82rem;
       text-decoration:none;
       transition:all 0.2s;
       font-weight:600;
     }
-    .back-btn:hover{background:rgba(0,0,0,0.06);color:#1a1a1a;border-color:rgba(255,255,255,0.15);}
+    .back-btn:hover{background:rgba(128,128,128,0.15);color:var(--text);border-color:var(--border);}
     .back-btn:active{transform:scale(0.95);}
     .back-btn svg{width:14px;height:14px;}
-    .topbar-title{font-weight:800;font-size:0.9rem;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;}
+    .topbar-title{font-weight:800;font-size:0.9rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;}
+
+    .icon-btn {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(128,128,128,0.08);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--muted);
+      transition: all 0.2s ease;
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+    .icon-btn:hover, .icon-btn:active { background: rgba(128,128,128,0.15); color: var(--text); border-color: var(--border); }
+    .icon-btn svg { width: 16px; height: 16px; }
+
+    .lang-selector { position: relative; }
+    .lang-menu {
+      position: absolute;
+      top: 42px;
+      left: 0;
+      background: var(--modal-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 6px 0;
+      min-width: 140px;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-6px) scale(0.96);
+      transition: all 0.2s cubic-bezier(0.16,1,0.3,1);
+      z-index: 20;
+      box-shadow: var(--shadow);
+    }
+    .lang-menu.show { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+    .lang-menu button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px 16px;
+      background: none;
+      border: none;
+      color: var(--text);
+      font-family: 'Cairo', sans-serif;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.15s;
+      text-align: right;
+    }
+    .lang-menu button:hover { background: rgba(128,128,128,0.08); }
+    .lang-menu button .flag { font-size: 1.1rem; }
 
     .cover-wrap{
       position:relative;
       width:100%;
       height:220px;
       margin-top:56px;
-      background:#ffffff;
+      background:var(--card);
       overflow:hidden;
       cursor:pointer;
       transition:height 0.3s;
@@ -96,24 +175,24 @@
       position:absolute;
       bottom:12px;
       left:12px;
-      background:rgba(0,0,0,0.75);
+      background:rgba(0,0,0,0.7);
       backdrop-filter:blur(10px);
       -webkit-backdrop-filter:blur(10px);
-      border:1px solid rgba(255,255,255,0.15);
-      color:#1a1a1a;
-      padding:7px 14px;
-      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.1);
+      color:#fff;
+      padding:6px 12px;
+      border-radius:8px;
       cursor:pointer;
-      font-family:'Cairo';
-      font-size:0.78rem;
+      font-family:'Cairo',sans-serif;
+      font-size:0.72rem;
       display:none;
       align-items:center;
-      gap:6px;
+      gap:5px;
       transition:all 0.2s;
       font-weight:600;
     }
-    .cover-edit-btn:hover{background:rgba(0,0,0,0.9);border-color:rgba(255,255,255,0.3);}
-    .cover-edit-btn svg{width:13px;height:13px;}
+    .cover-edit-btn:hover{background:rgba(0,0,0,0.9);}
+    .cover-edit-btn svg{width:12px;height:12px;}
     .cover-wrap:hover .cover-edit-btn{display:flex;}
 
     .profile-section{max-width:720px;margin:0 auto;padding:0 18px;}
@@ -130,13 +209,13 @@
       width:96px;
       height:96px;
       border-radius:50%;
-      background:linear-gradient(145deg,var(--red),#333333);
+      background:var(--avatar-gradient);
       display:flex;
       align-items:center;
       justify-content:center;
       font-size:2.2rem;
       font-weight:800;
-      color:#1a1a1a;
+      color:#fff;
       overflow:hidden;
       border:3px solid var(--black);
       flex-shrink:0;
@@ -144,12 +223,12 @@
       cursor:pointer;
       transition:transform 0.2s,box-shadow 0.2s;
     }
-    .avatar-big:hover{transform:scale(1.03);box-shadow:0 0 0 4px rgba(0,0,0,0.15);}
+    .avatar-big:hover{transform:scale(1.03);box-shadow:0 0 0 4px rgba(212,175,55,0.2);}
     .avatar-big img{width:100%;height:100%;object-fit:cover;}
     .av-overlay{
       position:absolute;
       inset:0;
-      background:rgba(0,0,0,0.55);
+      background:rgba(0,0,0,0.5);
       display:flex;
       align-items:center;
       justify-content:center;
@@ -166,17 +245,17 @@
       align-items:center;
       gap:6px;
       padding:8px 16px;
-      background:rgba(0,0,0,0.04);
+      background:rgba(128,128,128,0.08);
       border:1px solid var(--border);
       border-radius:10px;
-      color:#444;
+      color:var(--muted);
       cursor:pointer;
-      font-family:'Cairo';
+      font-family:'Cairo',sans-serif;
       font-size:0.82rem;
       font-weight:700;
       transition:all 0.18s;
     }
-    .btn-edit:hover{background:rgba(255,255,255,0.1);color:#1a1a1a;border-color:rgba(255,255,255,0.15);}
+    .btn-edit:hover{background:rgba(128,128,128,0.15);color:var(--text);border-color:var(--border);}
     .btn-edit:active{transform:scale(0.95);}
     .btn-edit svg{width:13px;height:13px;}
     .btn-msg{
@@ -184,18 +263,18 @@
       align-items:center;
       gap:6px;
       padding:8px 16px;
-      background:rgba(0,0,0,0.1);
-      border:1px solid rgba(0,0,0,0.25);
+      background:rgba(212,175,55,0.12);
+      border:1px solid rgba(212,175,55,0.25);
       border-radius:10px;
-      color:#111;
+      color:var(--red);
       cursor:pointer;
-      font-family:'Cairo';
+      font-family:'Cairo',sans-serif;
       font-size:0.82rem;
       font-weight:700;
       transition:all 0.18s;
       text-decoration:none;
     }
-    .btn-msg:hover{background:rgba(0,0,0,0.18);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.1);}
+    .btn-msg:hover{background:rgba(212,175,55,0.2);transform:translateY(-1px);}
     .btn-msg:active{transform:scale(0.95);}
     .btn-msg svg{width:13px;height:13px;}
 
@@ -203,7 +282,7 @@
     .meta-name{
       font-size:1.3rem;
       font-weight:900;
-      color:#1a1a1a;
+      color:var(--text);
       display:flex;
       align-items:center;
       gap:8px;
@@ -222,18 +301,18 @@
       font-weight:700;
       margin-top:6px;
     }
-    .badge-admin{background:rgba(0,0,0,0.14);color:#111;border:1px solid rgba(0,0,0,0.22);}
+    .badge-admin{background:rgba(212,175,55,0.15);color:var(--red);border:1px solid rgba(212,175,55,0.25);}
     .badge-admin svg{width:10px;height:10px;}
-    .badge-member{background:rgba(0,0,0,0.03);color:var(--muted);border:1px solid var(--border);}
-    .meta-bio{color:#555;font-size:0.9rem;line-height:1.8;margin-top:12px;font-family:'Noto Naskh Arabic',serif;word-break:break-word;}
+    .badge-member{background:rgba(128,128,128,0.08);color:var(--muted);border:1px solid var(--border);}
+    .meta-bio{color:var(--muted);font-size:0.9rem;line-height:1.8;margin-top:12px;font-family:'Noto Naskh Arabic',serif;word-break:break-word;}
     .meta-info{display:flex;flex-wrap:wrap;gap:16px;margin-top:10px;}
     .info-item{display:flex;align-items:center;gap:5px;font-size:0.8rem;color:var(--muted);}
-    .info-item strong{color:#666;}
+    .info-item strong{color:var(--text);}
     .info-item svg{width:12px;height:12px;}
     .meta-stats{display:flex;gap:24px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
     .stat{cursor:default;transition:transform 0.15s;}
     .stat:hover{transform:translateY(-1px);}
-    .stat-n{font-size:1.1rem;font-weight:800;color:#1a1a1a;}
+    .stat-n{font-size:1.1rem;font-weight:800;color:var(--text);}
     .stat-l{font-size:0.74rem;color:var(--muted);}
 
     .tabs-bar{display:flex;border-bottom:1px solid var(--border);margin-top:16px;}
@@ -241,7 +320,7 @@
       flex:1;
       padding:12px;
       text-align:center;
-      font-family:'Cairo';
+      font-family:'Cairo',sans-serif;
       font-size:0.85rem;
       font-weight:700;
       color:var(--muted);
@@ -253,8 +332,8 @@
       margin-bottom:-1px;
       position:relative;
     }
-    .tab-btn.active{color:#1a1a1a;border-bottom-color:#111;}
-    .tab-btn:hover:not(.active){color:#444;}
+    .tab-btn.active{color:var(--text);border-bottom-color:var(--red);}
+    .tab-btn:hover:not(.active){color:var(--text);}
 
     .posts-tab{padding:16px 0;}
     .post-card{
@@ -266,26 +345,17 @@
       transition:all 0.2s ease;
       position:relative;
     }
-    .post-card::before{
-      content:'';
-      position:absolute;
-      top:0;
-      left:0;
-      right:0;
-      height:1px;
-      background:linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent);
-    }
-    .post-card:hover{border-color:rgba(255,255,255,0.08);}
+    .post-card:hover{border-color:var(--border);}
     .post-img{width:100%;border-radius:10px;max-height:260px;object-fit:cover;margin-bottom:12px;display:block;}
-    .post-text{font-family:'Noto Naskh Arabic',serif;color:#444;font-size:0.95rem;line-height:1.9;word-break:break-word;}
-    .post-text h2{font-size:1.1rem;font-weight:800;color:#1a1a1a;margin:6px 0 4px;}
-    .post-text h3{font-size:1rem;font-weight:700;color:#333;margin:4px 0 2px;}
-    .post-text blockquote{border-right:3px solid #111;padding-right:12px;color:#666;font-style:italic;margin:8px 0;background:rgba(0,0,0,0.03);padding:8px 12px;border-radius:0 8px 8px 0;}
+    .post-text{font-family:'Noto Naskh Arabic',serif;color:var(--text);font-size:0.95rem;line-height:1.9;word-break:break-word;}
+    .post-text h2{font-size:1.1rem;font-weight:800;color:var(--text);margin:6px 0 4px;}
+    .post-text h3{font-size:1rem;font-weight:700;color:var(--text);margin:4px 0 2px;}
+    .post-text blockquote{border-right:3px solid var(--red);padding-right:12px;color:var(--muted);font-style:italic;margin:8px 0;background:rgba(128,128,128,0.05);padding:8px 12px;border-radius:0 8px 8px 0;}
     .post-text ul{padding-right:20px;margin:6px 0;}
     .post-text hr{border:none;border-top:1px solid var(--border);margin:10px 0;}
-    .post-text b,.post-text strong{color:#1a1a1a;}
-    .post-text a{color:#111;text-decoration:none;border-bottom:1px solid rgba(0,0,0,0.3);transition:border-color 0.2s;}
-    .post-text a:hover{border-color:#111;}
+    .post-text b,.post-text strong{color:var(--text);}
+    .post-text a{color:var(--red);text-decoration:none;border-bottom:1px solid rgba(212,175,55,0.3);transition:border-color 0.2s;}
+    .post-text a:hover{border-color:var(--red);}
     .post-date{
       font-size:0.74rem;
       color:var(--muted);
@@ -308,7 +378,7 @@
       justify-content:center;
       margin-right:auto;
     }
-    .post-share:hover{color:#1a1a1a;background:rgba(0,0,0,0.04);}
+    .post-share:hover{color:var(--text);background:rgba(128,128,128,0.08);}
     .post-share:active{transform:scale(0.9);}
     .post-share svg{width:13px;height:13px;}
     .post-empty{
@@ -322,20 +392,20 @@
     .edit-section{padding:16px 0;animation:fadeIn 0.3s ease;}
     @keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
     .fg{margin-bottom:14px;}
-    .fg label{display:block;margin-bottom:6px;color:#777;font-size:0.82rem;font-weight:600;}
+    .fg label{display:block;margin-bottom:6px;color:var(--muted);font-size:0.82rem;font-weight:600;}
     .fg input,.fg textarea{
       width:100%;
       padding:11px 14px;
-      background:#f7f7f8;
-      border:1px solid rgba(0,0,0,0.1);
+      background:var(--input-bg);
+      border:1px solid var(--border);
       border-radius:10px;
-      color:#1a1a1a;
-      font-family:'Cairo';
+      color:var(--text);
+      font-family:'Cairo',sans-serif;
       font-size:0.9rem;
       transition:all 0.2s;
     }
-    .fg input:focus,.fg textarea:focus{outline:none;border-color:rgba(0,0,0,0.2);background:#f0f0f0;box-shadow:0 0 0 3px rgba(255,255,255,0.03);}
-    .fg input::placeholder,.fg textarea::placeholder{color:#444;}
+    .fg input:focus,.fg textarea:focus{outline:none;border-color:var(--border);background:var(--input-bg);box-shadow:0 0 0 3px rgba(128,128,128,0.08);}
+    .fg input::placeholder,.fg textarea::placeholder{color:var(--muted);}
     .fg textarea{resize:vertical;min-height:80px;line-height:1.7;}
     .fg-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
     .alert{
@@ -347,24 +417,24 @@
       font-weight:600;
       animation:fadeIn 0.2s ease;
     }
-    .alert-err{background:rgba(0,0,0,0.1);color:#111;border:1px solid rgba(0,0,0,0.2);}
+    .alert-err{background:rgba(212,175,55,0.1);color:var(--red);border:1px solid rgba(212,175,55,0.2);}
     .alert-ok{background:rgba(34,197,94,0.08);color:#4ade80;border:1px solid rgba(34,197,94,0.18);}
     .btn-save{
       display:inline-flex;
       align-items:center;
       gap:7px;
       padding:11px 24px;
-      background:#fff;
-      color:#000;
+      background:var(--red);
+      color:#fff;
       border:none;
       border-radius:10px;
       cursor:pointer;
-      font-family:'Cairo';
+      font-family:'Cairo',sans-serif;
       font-weight:800;
       font-size:0.88rem;
       transition:all 0.2s;
     }
-    .btn-save:hover{background:#e8e8e8;transform:translateY(-1px);}
+    .btn-save:hover{background:var(--red-h);transform:translateY(-1px);}
     .btn-save:active{transform:translateY(0);}
     .btn-save:disabled{opacity:0.5;cursor:not-allowed;transform:none;}
     .btn-save svg{width:14px;height:14px;}
@@ -379,30 +449,30 @@
       text-align:center;
       animation:fadeIn 0.4s ease;
     }
-    .not-logged h2{font-size:1.2rem;font-weight:800;color:#1a1a1a;}
+    .not-logged h2{font-size:1.2rem;font-weight:800;color:var(--text);}
     .not-logged p{color:var(--muted);font-size:0.85rem;max-width:300px;line-height:1.6;}
     .btn-go{
       display:inline-flex;
       align-items:center;
       gap:6px;
       padding:11px 24px;
-      background:#fff;
-      color:#000;
+      background:var(--red);
+      color:#fff;
       border-radius:10px;
       font-weight:800;
       font-size:0.88rem;
       text-decoration:none;
       transition:all 0.2s;
     }
-    .btn-go:hover{background:#e8e8e8;transform:translateY(-1px);}
+    .btn-go:hover{background:var(--red-h);transform:translateY(-1px);}
     .btn-go:active{transform:scale(0.97);}
 
     @keyframes spin{to{transform:rotate(360deg);}}
     .spin{
       width:32px;
       height:32px;
-      border:3px solid #222;
-      border-top-color:#000;
+      border:3px solid var(--border);
+      border-top-color:var(--red);
       border-radius:50%;
       animation:spin 0.8s linear infinite;
       margin:80px auto 14px;
@@ -429,13 +499,13 @@
       text-align:center;
     }
     .toast.show{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0);}
-    .toast-success{background:rgba(255,255,255,0.97);color:#1a1a1a;border-color:var(--border);}
-    .toast-error{background:rgba(0,0,0,0.95);color:#1a1a1a;border-color:rgba(0,0,0,0.4);}
+    .toast-success{background:var(--modal-bg);color:var(--text);border-color:var(--border);}
+    .toast-error{background:var(--red);color:#fff;border-color:var(--red);}
 
     ::-webkit-scrollbar{width:6px;}
     ::-webkit-scrollbar-track{background:transparent;}
-    ::-webkit-scrollbar-thumb{background:#333;border-radius:3px;}
-    ::-webkit-scrollbar-thumb:hover{background:#444;}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+    ::-webkit-scrollbar-thumb:hover{background:var(--muted);}
 
     @media(max-width:768px){
       .topbar{height:52px;padding:0 12px;}
@@ -444,13 +514,13 @@
       .topbar-title{font-size:0.82rem;max-width:140px;}
       .cover-wrap{height:160px;margin-top:52px;}
       .cover-placeholder svg{width:36px;height:36px;}
-      .cover-edit-btn{padding:6px 10px;font-size:0.72px;}
+      .cover-edit-btn{padding:5px 10px;font-size:0.7rem;}
       .profile-section{padding:0 14px;}
       .avatar-pull{margin-top:-40px;}
       .avatar-big{width:78px;height:78px;font-size:1.8rem;border-width:2px;}
       .av-overlay svg{width:14px;height:14px;}
       .profile-actions{gap:6px;}
-      .btn-edit,.btn-msg{padding:7px 12px;font-size:0.78rem;}
+      .btn-edit,.btn-msg{padding:6px 12px;font-size:0.78rem;}
       .meta-name{font-size:1.1rem;}
       .verified-icon svg{width:15px;height:15px;}
       .meta-bio{font-size:0.85rem;}
@@ -466,7 +536,6 @@
       .btn-save{padding:10px 20px;}
       .not-logged{padding:80px 20px;}
     }
-
     @media(max-width:400px){
       .topbar{padding:0 10px;}
       .topbar-title{max-width:100px;}
@@ -477,7 +546,6 @@
       .stat-n{font-size:0.95rem;}
       .tab-btn{padding:8px;font-size:0.78rem;}
     }
-
     @media(prefers-reduced-motion:reduce){
       *,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important;}
     }
@@ -485,12 +553,43 @@
 </head>
 <body>
 <header class="topbar" id="topbar">
-  <a href="javascript:history.back()" class="back-btn">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-    رجوع
-  </a>
-  <span class="topbar-title" id="topbarTitle">الملف الشخصي</span>
-  <div style="width:80px;"></div>
+  <div class="topbar-left">
+    <a href="javascript:history.back()" class="back-btn" id="backBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      <span id="backText">رجوع</span>
+    </a>
+    <span class="topbar-title" id="topbarTitle">الملف الشخصي</span>
+  </div>
+  <div class="topbar-right">
+    <button class="icon-btn" id="themeToggle" onclick="toggleTheme()" title="تبديل الثيم">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/>
+        <line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/>
+        <line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    </button>
+    <div class="lang-selector icon-btn" id="langToggle" onclick="toggleLangMenu()" title="تغيير اللغة">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="2" y1="12" x2="22" y2="12"/>
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      </svg>
+      <div class="lang-menu" id="langMenu">
+        <button onclick="setLang('ar')"><span class="flag">🇸🇦</span> العربية</button>
+        <button onclick="setLang('en')"><span class="flag">🇬🇧</span> English</button>
+        <button onclick="setLang('fr')"><span class="flag">🇫🇷</span> Français</button>
+        <button onclick="setLang('ru')"><span class="flag">🇷🇺</span> Русский</button>
+        <button onclick="setLang('zh')"><span class="flag">🇨🇳</span> 中文</button>
+        <button onclick="setLang('ja')"><span class="flag">🇯🇵</span> 日本語</button>
+      </div>
+    </div>
+  </div>
 </header>
 
 <div class="cover-wrap" id="coverWrap">
@@ -499,8 +598,8 @@
   </div>
   <img id="coverImg" class="cover-img" style="display:none;" alt="">
   <button class="cover-edit-btn" id="coverEditBtn" onclick="document.getElementById('coverFile').click()">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-    تغيير الغلاف
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    <span id="coverEditText">تغيير الغلاف</span>
   </button>
 </div>
 
@@ -512,6 +611,84 @@
 <input type="file" id="coverFile" accept=".jpg,.jpeg,image/jpeg" style="display:none;" onchange="onCover(event)">
 
 <script>
+// ============================================================
+//  TRANSLATIONS (i18n)
+// ============================================================
+const LANG = {
+  ar: {
+    back: 'رجوع', profile: 'الملف الشخصي', editProfile: 'تعديل الملف',
+    posts: 'المنشورات', edit: 'تعديل الملف', gameId: 'معرّف اللعبة',
+    bio: 'نبذة شخصية', save: 'حفظ التغييرات', changeCover: 'تغيير الغلاف',
+    changeAvatar: 'تغيير الصورة', member: 'Member', admin: 'Admin',
+    since: 'منذ', noPosts: 'لا توجد منشورات بعد', notFound: 'المستخدم غير موجود',
+    pleaseLogin: 'يجب تسجيل الدخول لعرض ملفك الشخصي',
+    home: 'الرئيسية', shareLink: 'مشاركة الرابط', linkCopied: 'تم نسخ الرابط',
+    saveSuccess: 'تم الحفظ بنجاح', saveError: 'فشل الحفظ',
+    connectionError: 'تعذر الاتصال', coverJpg: 'يُقبل JPG/JPEG فقط للغلاف'
+  },
+  en: {
+    back: 'Back', profile: 'Profile', editProfile: 'Edit Profile',
+    posts: 'Posts', edit: 'Edit Profile', gameId: 'Game ID',
+    bio: 'Bio', save: 'Save Changes', changeCover: 'Change Cover',
+    changeAvatar: 'Change Avatar', member: 'Member', admin: 'Admin',
+    since: 'Since', noPosts: 'No posts yet', notFound: 'User not found',
+    pleaseLogin: 'Please login to view your profile',
+    home: 'Home', shareLink: 'Share link', linkCopied: 'Link copied',
+    saveSuccess: 'Saved successfully', saveError: 'Save failed',
+    connectionError: 'Connection error', coverJpg: 'JPG/JPEG only for cover'
+  },
+  fr: {
+    back: 'Retour', profile: 'Profil', editProfile: 'Modifier le profil',
+    posts: 'Publications', edit: 'Modifier', gameId: 'ID de jeu',
+    bio: 'Bio', save: 'Enregistrer', changeCover: 'Changer la couverture',
+    changeAvatar: 'Changer l\'avatar', member: 'Membre', admin: 'Admin',
+    since: 'Depuis', noPosts: 'Aucune publication', notFound: 'Utilisateur introuvable',
+    pleaseLogin: 'Connectez-vous pour voir votre profil',
+    home: 'Accueil', shareLink: 'Partager le lien', linkCopied: 'Lien copié',
+    saveSuccess: 'Enregistré', saveError: 'Échec',
+    connectionError: 'Erreur de connexion', coverJpg: 'JPG/JPEG uniquement'
+  },
+  ru: {
+    back: 'Назад', profile: 'Профиль', editProfile: 'Редактировать профиль',
+    posts: 'Посты', edit: 'Редактировать', gameId: 'ID игры',
+    bio: 'О себе', save: 'Сохранить', changeCover: 'Сменить обложку',
+    changeAvatar: 'Сменить аватар', member: 'Участник', admin: 'Админ',
+    since: 'С', noPosts: 'Нет постов', notFound: 'Пользователь не найден',
+    pleaseLogin: 'Войдите, чтобы просмотреть профиль',
+    home: 'Главная', shareLink: 'Поделиться ссылкой', linkCopied: 'Ссылка скопирована',
+    saveSuccess: 'Сохранено', saveError: 'Ошибка',
+    connectionError: 'Ошибка соединения', coverJpg: 'Только JPG/JPEG'
+  },
+  zh: {
+    back: '返回', profile: '个人资料', editProfile: '编辑资料',
+    posts: '帖子', edit: '编辑', gameId: '游戏ID',
+    bio: '简介', save: '保存更改', changeCover: '更换封面',
+    changeAvatar: '更换头像', member: '成员', admin: '管理员',
+    since: '注册于', noPosts: '暂无帖子', notFound: '用户未找到',
+    pleaseLogin: '请登录查看您的个人资料',
+    home: '首页', shareLink: '分享链接', linkCopied: '链接已复制',
+    saveSuccess: '保存成功', saveError: '保存失败',
+    connectionError: '连接错误', coverJpg: '仅支持 JPG/JPEG'
+  },
+  ja: {
+    back: '戻る', profile: 'プロフィール', editProfile: 'プロフィール編集',
+    posts: '投稿', edit: '編集', gameId: 'ゲームID',
+    bio: '自己紹介', save: '変更を保存', changeCover: 'カバー変更',
+    changeAvatar: 'アバター変更', member: 'メンバー', admin: '管理者',
+    since: '登録日', noPosts: '投稿はありません', notFound: 'ユーザーが見つかりません',
+    pleaseLogin: 'ログインしてプロフィールを表示',
+    home: 'ホーム', shareLink: 'リンクを共有', linkCopied: 'リンクをコピーしました',
+    saveSuccess: '保存しました', saveError: '保存に失敗しました',
+    connectionError: '接続エラー', coverJpg: 'JPG/JPEGのみ対応'
+  }
+};
+
+let currentLang = localStorage.getItem('hostaka_lang') || 'ar';
+let currentTheme = localStorage.getItem('hostaka_theme') || 'light';
+
+// ============================================================
+//  CORE FUNCTIONS
+// ============================================================
 const getToken = () => localStorage.getItem('hostaka_token')||'';
 const urlParams = new URLSearchParams(location.search);
 const viewUsername = urlParams.get('u');
@@ -521,16 +698,130 @@ let newCoverBase64 = '';
 let currentTab = 'posts';
 let userPosts = [];
 
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function fmtDate(s){ if(!s) return ''; return new Date(s).toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'}); }
-
-function verifiedBadge(){
-  return `<span class="verified-icon" title="حساب موثق"><svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M23 12l-2.44-2.78.34-3.68-3.61-.82-1.89-3.18L12 3 8.6 1.54 6.71 4.72l-3.61.81.34 3.68L1 12l2.44 2.78-.34 3.69 3.61.82 1.89 3.18L12 21l3.4 1.46 1.89-3.18 3.61-.82-.34-3.68L23 12z" fill="#d4af37" stroke="#d4af37" stroke-width="0.5"/><path d="M10.6 16.2l-4.1-4.1 1.4-1.4 2.7 2.7 5.5-5.5 1.4 1.4-6.9 6.9z" fill="#ffffff"/></svg></span>`;
+function t(key) {
+  return LANG[currentLang]?.[key] || LANG['ar'][key] || key;
 }
+
+function applyLang() {
+  document.documentElement.lang = currentLang;
+  document.documentElement.dir = (currentLang === 'ar') ? 'rtl' : 'ltr';
+  document.getElementById('backText').textContent = t('back');
+  document.getElementById('topbarTitle').textContent = t('profile');
+  document.getElementById('coverEditText').textContent = t('changeCover');
+  // Update dynamic sections if rendered
+  const profileSection = document.getElementById('profileSection');
+  if (profileSection && !profileSection.querySelector('.spin')) {
+    // Re-render if user data is loaded
+    if (viewUsername) {
+      // We don't have user data here, we rely on render functions
+    } else if (ME) {
+      // We need to re-render, but we don't have posts easily here.
+      // Instead, we call a reload of the profile data or just update texts.
+      // To keep it simple, we use a flag or re-fetch.
+      // Since this is a static file, we can just re-run the init or update the DOM directly.
+      // We'll call refreshUI if available.
+      refreshUITexts();
+    }
+  }
+}
+
+function refreshUITexts() {
+  // Update tab buttons if they exist
+  const tabPosts = document.getElementById('tabPosts');
+  const tabEdit = document.getElementById('tabEdit');
+  if (tabPosts) tabPosts.textContent = t('posts');
+  if (tabEdit) tabEdit.textContent = t('edit');
+  // Update edit section labels
+  const fNameLabel = document.querySelector('.fg label[for="fName"]');
+  if (fNameLabel) {
+    const labels = document.querySelectorAll('.fg label');
+    if (labels.length >= 2) {
+      labels[0].textContent = t('editProfile'); // Display Name
+      labels[1].textContent = t('gameId');
+    }
+  }
+  const fBioLabel = document.querySelector('.fg label[for="fBio"]');
+  if (fBioLabel) fBioLabel.textContent = t('bio');
+  const saveBtn = document.getElementById('saveBtn');
+  if (saveBtn) {
+    const span = saveBtn.querySelector('span') || saveBtn;
+    span.innerHTML = `${SVG.save}${t('save')}`;
+  }
+}
+
+function toggleTheme() {
+  const html = document.documentElement;
+  if (currentTheme === 'light') {
+    html.setAttribute('data-theme', 'dark');
+    currentTheme = 'dark';
+    document.getElementById('themeToggle').innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+  } else {
+    html.removeAttribute('data-theme');
+    currentTheme = 'light';
+    document.getElementById('themeToggle').innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+  }
+  localStorage.setItem('hostaka_theme', currentTheme);
+}
+
+function toggleLangMenu() {
+  document.getElementById('langMenu').classList.toggle('show');
+}
+document.addEventListener('click', (e) => {
+  if (!document.getElementById('langToggle').contains(e.target)) {
+    document.getElementById('langMenu').classList.remove('show');
+  }
+});
+
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('hostaka_lang', lang);
+  document.getElementById('langMenu').classList.remove('show');
+  applyLang();
+  // Re-render profile section to update dynamic texts
+  if (viewUsername) {
+    // If viewing someone else, we need to re-fetch or just update texts.
+    // Since we don't have user data stored globally for view, we can just update static parts.
+    refreshUITexts();
+    // Update meta stats label
+    const statL = document.querySelector('.stat-l');
+    if (statL) statL.textContent = t('posts');
+    const metaUn = document.querySelector('.meta-un');
+    // Role badge is static text, update it
+    const roleBadges = document.querySelectorAll('.role-badge');
+    roleBadges.forEach(b => {
+      if (b.textContent.includes('Admin') || b.textContent.includes('مدير') || b.textContent.includes('管理员')) {
+        b.textContent = t('admin');
+      } else if (b.textContent.includes('Member') || b.textContent.includes('عضو')) {
+        b.textContent = t('member');
+      }
+    });
+    // Since we can't easily re-render posts without data, we reload the page or just leave it.
+    // Better to reload the page for simplicity to ensure all dynamic data is translated.
+    // But we can just re-fetch.
+    if (viewUsername) {
+      // Reload data or just refresh page? Let's just reload page for simplicity on language change.
+      // Actually, let's just refresh the whole profile data.
+      window.location.reload();
+    }
+  } else if (ME) {
+    // Reload the profile data from server to re-render with new language
+    window.location.reload();
+  }
+}
+
+// ============================================================
+//  VERIFIED BADGE (Golden)
+// ============================================================
+function verifiedBadge(){
+  return `<span class="verified-icon" title="${t('verified') || 'حساب موثق'}"><svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M23 12l-2.44-2.78.34-3.68-3.61-.82-1.89-3.18L12 3 8.6 1.54 6.71 4.72l-3.61.81.34 3.68L1 12l2.44 2.78-.34 3.69 3.61.82 1.89 3.18L12 21l3.4 1.46 1.89-3.18 3.61-.82-.34-3.68L23 12z" fill="#d4af37" stroke="#d4af37" stroke-width="0.5"/><path d="M10.6 16.2l-4.1-4.1 1.4-1.4 2.7 2.7 5.5-5.5 1.4 1.4-6.9 6.9z" fill="#ffffff"/></svg></span>`;
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtDate(s){ if(!s) return ''; return new Date(s).toLocaleDateString(currentLang === 'ar' ? 'ar-SA' : 'en-US', {year:'numeric', month:'long', day:'numeric'}); }
 
 const SVG = {
   user:    `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
-  post:    `<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+  post:    `<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
   share:   `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>`,
   edit:    `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
   msg:     `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
@@ -542,7 +833,19 @@ const SVG = {
   arrow:   `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>`,
 };
 
+// ============================================================
+//  MAIN LOGIC
+// ============================================================
 async function init(){
+  // Apply saved theme
+  if (currentTheme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    document.getElementById('themeToggle').innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+  }
+
+  // Apply language
+  applyLang();
+
   window.addEventListener('scroll',()=>{
     document.getElementById('topbar').classList.toggle('scrolled', window.scrollY > 10);
   });
@@ -600,16 +903,17 @@ function showToast(msg, type='success'){
 }
 
 function renderNotFound(){
-  document.getElementById('profileSection').innerHTML=`<div class="not-logged">${SVG.user}<h2>المستخدم غير موجود</h2><p>قد يكون تم حذف الحساب أو الرابط غير صحيح</p><a href="/" class="btn-go">${SVG.arrow}الرئيسية</a></div>`;
+  document.getElementById('profileSection').innerHTML=`<div class="not-logged">${SVG.user}<h2>${t('notFound')}</h2><p>${t('notFound')}</p><a href="/" class="btn-go">${SVG.arrow}${t('home')}</a></div>`;
 }
 function renderNotLogged(){
-  document.getElementById('profileSection').innerHTML=`<div class="not-logged">${SVG.user}<h2>يجب تسجيل الدخول</h2><p>سجّل الدخول لعرض ملفك الشخصي والتفاعل مع المنصة</p><a href="/" class="btn-go">${SVG.arrow}الرئيسية</a></div>`;
+  document.getElementById('profileSection').innerHTML=`<div class="not-logged">${SVG.user}<h2>${t('pleaseLogin')}</h2><p>${t('pleaseLogin')}</p><a href="/" class="btn-go">${SVG.arrow}${t('home')}</a></div>`;
 }
 
 function roleBadge(role){
+  const label = (role==='admin') ? t('admin') : t('member');
   return role==='admin'
-    ? `<span class="role-badge badge-admin">${SVG.star}Admin</span>`
-    : `<span class="role-badge badge-member">Member</span>`;
+    ? `<span class="role-badge badge-admin">${SVG.star}${label}</span>`
+    : `<span class="role-badge badge-member">${label}</span>`;
 }
 
 function avatarInner(user){
@@ -623,7 +927,7 @@ function renderPublic(user, posts){
     <div class="avatar-pull">
       <div class="avatar-big" style="cursor:default;">${avatarInner(user)}</div>
       <div class="profile-actions">
-        ${token&&token!==''?`<a href="/chat?with=${esc(user.username)}" class="btn-msg">${SVG.msg}مراسلة</a>`:''}
+        ${token&&token!==''?`<a href="/chat?with=${esc(user.username)}" class="btn-msg">${SVG.msg}${t('message')||'مراسلة'}</a>`:''}
       </div>
     </div>
     <div class="profile-meta">
@@ -633,14 +937,14 @@ function renderPublic(user, posts){
       ${user.bio?`<div class="meta-bio">${esc(user.bio)}</div>`:''}
       <div class="meta-info">
         ${user.game_id?`<div class="info-item">${SVG.mail}<strong>${esc(user.game_id)}</strong></div>`:''}
-        <div class="info-item">${SVG.clock}منذ ${fmtDate(user.created_at)}</div>
+        <div class="info-item">${SVG.clock}${t('since')} ${fmtDate(user.created_at)}</div>
       </div>
       <div class="meta-stats">
-        <div class="stat"><div class="stat-n">${posts.length}</div><div class="stat-l">منشور</div></div>
+        <div class="stat"><div class="stat-n">${posts.length}</div><div class="stat-l">${t('posts')}</div></div>
       </div>
     </div>
     <div class="tabs-bar">
-      <button class="tab-btn active" onclick="switchTab('posts')">المنشورات</button>
+      <button class="tab-btn active" onclick="switchTab('posts')">${t('posts')}</button>
     </div>
     <div class="posts-tab" id="postsTab">${renderPosts(posts)}</div>`;
 }
@@ -650,12 +954,12 @@ function renderMyProfile(user, posts){
   document.getElementById('topbarTitle').textContent = user.display_name||user.username;
   document.getElementById('profileSection').innerHTML=`
     <div class="avatar-pull">
-      <div class="avatar-big" id="avBig" onclick="document.getElementById('avFile').click()" title="تغيير الصورة">
+      <div class="avatar-big" id="avBig" onclick="document.getElementById('avFile').click()" title="${t('changeAvatar')}">
         ${avatarInner(user)}
         <div class="av-overlay">${SVG.camera}</div>
       </div>
       <div class="profile-actions">
-        <button class="btn-edit" onclick="switchTab('edit')">${SVG.edit}تعديل</button>
+        <button class="btn-edit" onclick="switchTab('edit')">${SVG.edit}${t('editProfile')}</button>
       </div>
     </div>
     <div class="profile-meta">
@@ -665,31 +969,31 @@ function renderMyProfile(user, posts){
       ${user.bio?`<div class="meta-bio">${esc(user.bio)}</div>`:''}
       <div class="meta-info">
         ${user.game_id?`<div class="info-item">${SVG.mail}<strong>${esc(user.game_id)}</strong></div>`:''}
-        <div class="info-item">${SVG.clock}منذ ${fmtDate(user.created_at)}</div>
+        <div class="info-item">${SVG.clock}${t('since')} ${fmtDate(user.created_at)}</div>
       </div>
       <div class="meta-stats">
-        <div class="stat"><div class="stat-n">${posts.length}</div><div class="stat-l">منشور</div></div>
+        <div class="stat"><div class="stat-n">${posts.length}</div><div class="stat-l">${t('posts')}</div></div>
       </div>
     </div>
     <div class="tabs-bar">
-      <button class="tab-btn active" id="tabPosts" onclick="switchTab('posts')">المنشورات</button>
-      <button class="tab-btn" id="tabEdit" onclick="switchTab('edit')">تعديل الملف</button>
+      <button class="tab-btn active" id="tabPosts" onclick="switchTab('posts')">${t('posts')}</button>
+      <button class="tab-btn" id="tabEdit" onclick="switchTab('edit')">${t('editProfile')}</button>
     </div>
     <div class="posts-tab" id="postsTab">${renderPosts(posts)}</div>
     <div class="edit-section" id="editTab" style="display:none;">
       <div class="alert alert-err" id="pErr"></div>
       <div class="alert alert-ok" id="pOk"></div>
       <div class="fg-row">
-        <div class="fg"><label>الاسم المعروض</label><input type="text" id="fName" value="${esc(user.display_name||'')}" placeholder="اسمك المعروض"></div>
-        <div class="fg"><label>معرّف اللعبة</label><input type="text" id="fGame" value="${esc(user.game_id||'')}" dir="ltr" placeholder="#0000"></div>
+        <div class="fg"><label>${t('editProfile')}</label><input type="text" id="fName" value="${esc(user.display_name||'')}" placeholder="${t('editProfile')}"></div>
+        <div class="fg"><label>${t('gameId')}</label><input type="text" id="fGame" value="${esc(user.game_id||'')}" dir="ltr" placeholder="#0000"></div>
       </div>
-      <div class="fg"><label>نبذة شخصية</label><textarea id="fBio" placeholder="اكتب نبذة مختصرة عنك...">${esc(user.bio||'')}</textarea></div>
-      <button class="btn-save" id="saveBtn" onclick="save()">${SVG.save}حفظ التغييرات</button>
+      <div class="fg"><label>${t('bio')}</label><textarea id="fBio" placeholder="${t('bio')}">${esc(user.bio||'')}</textarea></div>
+      <button class="btn-save" id="saveBtn" onclick="save()">${SVG.save}${t('save')}</button>
     </div>`;
 }
 
 function renderPosts(posts){
-  if(!posts||!posts.length) return `<div class="post-empty">${SVG.post}<div>لا توجد منشورات بعد</div></div>`;
+  if(!posts||!posts.length) return `<div class="post-empty">${SVG.post}<div>${t('noPosts')}</div></div>`;
   return posts.map(p=>`
     <div class="post-card">
       ${p.image?`<img class="post-img" src="${esc(p.image)}" loading="lazy" onerror="this.style.display='none'">`:''}
@@ -697,7 +1001,7 @@ function renderPosts(posts){
       <div class="post-date">
         ${SVG.clock}
         ${fmtDate(p.created_at)}
-        <button class="post-share" onclick="sharePost(${p.id})" title="مشاركة الرابط">${SVG.share}</button>
+        <button class="post-share" onclick="sharePost(${p.id})" title="${t('shareLink')}">${SVG.share}</button>
       </div>
     </div>`).join('');
 }
@@ -720,7 +1024,7 @@ function switchTab(tab){
 
 function sharePost(id){
   const url=window.location.origin+'/?p='+id;
-  if(navigator.clipboard) navigator.clipboard.writeText(url).then(()=>showToast('تم نسخ الرابط'));
+  if(navigator.clipboard) navigator.clipboard.writeText(url).then(()=>showToast(t('linkCopied')));
   else prompt('الرابط:',url);
 }
 
@@ -737,7 +1041,7 @@ function onAvatar(e){
 
 function onCover(e){
   const f=e.target.files[0]; if(!f) return;
-  if(!f.type.match('image/jpeg')){ showToast('يُقبل JPG/JPEG فقط للغلاف','error'); return; }
+  if(!f.type.match('image/jpeg')){ showToast(t('coverJpg'),'error'); return; }
   const r=new FileReader();
   r.onload=ev=>{ newCoverBase64=ev.target.result; renderCover(newCoverBase64,true); };
   r.readAsDataURL(f);
@@ -750,7 +1054,7 @@ async function save(){
   const game_id=document.getElementById('fGame')?.value.trim()||'';
   const errEl=document.getElementById('pErr'), okEl=document.getElementById('pOk');
   errEl.style.display='none'; okEl.style.display='none';
-  const btn=document.getElementById('saveBtn'); btn.disabled=true; btn.textContent='جارٍ الحفظ...';
+  const btn=document.getElementById('saveBtn'); btn.disabled=true; btn.textContent='...';
   const token=getToken();
   try{
     let avatarUrl=ME?.avatar||'';
@@ -767,17 +1071,21 @@ async function save(){
     const d=await r.json();
     if(d.success){
       try{ const u=JSON.parse(localStorage.getItem('hostaka_user')||'{}'); u.avatar=avatarUrl; u.display_name=display_name; localStorage.setItem('hostaka_user',JSON.stringify(u)); }catch(e){}
-      okEl.textContent='تم الحفظ بنجاح'; okEl.style.display='block';
+      okEl.textContent=t('saveSuccess'); okEl.style.display='block';
       newAvBase64=''; newCoverBase64='';
-      showToast('تم الحفظ بنجاح');
-    } else { errEl.textContent=d.error||'فشل الحفظ'; errEl.style.display='block'; showToast(d.error||'فشل الحفظ','error'); }
-  }catch(e){ errEl.textContent='تعذر الاتصال'; errEl.style.display='block'; showToast('تعذر الاتصال','error'); }
+      showToast(t('saveSuccess'));
+      window.location.reload(); // Reload to reflect changes with new language
+    } else { errEl.textContent=d.error||t('saveError'); errEl.style.display='block'; showToast(d.error||t('saveError'),'error'); }
+  }catch(e){ errEl.textContent=t('connectionError'); errEl.style.display='block'; showToast(t('connectionError'),'error'); }
   finally{
     btn.disabled=false;
-    btn.innerHTML=`${SVG.save}حفظ التغييرات`;
+    btn.innerHTML=`${SVG.save}${t('save')}`;
   }
 }
 
+// ============================================================
+//  START
+// ============================================================
 init();
 </script>
 </body>
