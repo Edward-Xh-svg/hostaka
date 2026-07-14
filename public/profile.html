@@ -444,7 +444,7 @@
       .topbar-title{font-size:0.82rem;max-width:140px;}
       .cover-wrap{height:160px;margin-top:52px;}
       .cover-placeholder svg{width:36px;height:36px;}
-      .cover-edit-btn{padding:6px 10px;font-size:0.72rem;}
+      .cover-edit-btn{padding:6px 10px;font-size:0.72px;}
       .profile-section{padding:0 14px;}
       .avatar-pull{margin-top:-40px;}
       .avatar-big{width:78px;height:78px;font-size:1.8rem;border-width:2px;}
@@ -524,8 +524,8 @@ let userPosts = [];
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDate(s){ if(!s) return ''; return new Date(s).toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'}); }
 
-function verifiedBadge(size=16){
-  return `<span class="verified-icon" title="حساب موثق"><svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><path d="M23 12l-2.44-2.78.34-3.68-3.61-.82-1.89-3.18L12 3 8.6 1.54 6.71 4.72l-3.61.81.34 3.68L1 12l2.44 2.78-.34 3.69 3.61.82 1.89 3.18L12 21l3.4 1.46 1.89-3.18 3.61-.82-.34-3.68L23 12z" fill="#fff"/><path d="M10.6 16.2l-4.1-4.1 1.4-1.4 2.7 2.7 5.5-5.5 1.4 1.4-6.9 6.9z" fill="#111"/></svg></span>`;
+function verifiedBadge(){
+  return `<span class="verified-icon" title="حساب موثق"><svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M23 12l-2.44-2.78.34-3.68-3.61-.82-1.89-3.18L12 3 8.6 1.54 6.71 4.72l-3.61.81.34 3.68L1 12l2.44 2.78-.34 3.69 3.61.82 1.89 3.18L12 21l3.4 1.46 1.89-3.18 3.61-.82-.34-3.68L23 12z" fill="#d4af37" stroke="#d4af37" stroke-width="0.5"/><path d="M10.6 16.2l-4.1-4.1 1.4-1.4 2.7 2.7 5.5-5.5 1.4 1.4-6.9 6.9z" fill="#ffffff"/></svg></span>`;
 }
 
 const SVG = {
