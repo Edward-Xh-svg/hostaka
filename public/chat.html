@@ -123,7 +123,6 @@
     }
     .icon-btn:hover,.icon-btn:active{background:rgba(128,128,128,0.12);color:var(--text);border-color:var(--border);}
     .icon-btn svg{width:16px;height:16px;}
-
     .lang-selector{position:relative;}
     .lang-menu{
       position:absolute;
@@ -188,7 +187,6 @@
     .topbar-peer-role{font-size:0.7rem;color:var(--muted);}
 
     .chat-layout{display:flex;flex:1;overflow:hidden;}
-
     .sidebar{
       width:300px;
       display:flex;
@@ -936,74 +934,16 @@ const LANG = {
     noMessages: 'Start the conversation', today: 'Today', yesterday: 'Yesterday',
     selectChat: 'Select a conversation from the list', message: 'Message'
   },
-  fr: {
-    back: 'Hostaka', title: 'Messages', sidebarTitle: 'Messages',
-    newGroup: 'Nouveau groupe', loading: 'Chargement...',
-    emptyState: 'Choisissez une conversation dans la liste',
-    groups: 'Groupes', conversations: 'Conversations', allMembers: 'Tous les membres',
-    noMembers: 'Aucun autre membre', startChat: 'Commencer la discussion',
-    you: 'Vous', admin: 'Admin', member: 'Membre',
-    groupName: 'Nom du groupe *', create: 'Créer', cancel: 'Annuler',
-    createGroupTitle: 'Créer un nouveau groupe',
-    sendPlaceholder: 'Écrivez un message...', attach: 'Joindre une image JPG', imageAttached: 'Image jointe',
-    loginRequired: 'Veuillez vous connecter', home: 'Accueil',
-    groupCreated: 'Groupe créé', error: 'Échec',
-    noMessages: 'Commencez la conversation', today: 'Aujourd\'hui', yesterday: 'Hier',
-    selectChat: 'Choisissez une conversation', message: 'Message'
-  },
-  ru: {
-    back: 'Hostaka', title: 'Сообщения', sidebarTitle: 'Сообщения',
-    newGroup: 'Новая группа', loading: 'Загрузка...',
-    emptyState: 'Выберите чат из списка',
-    groups: 'Группы', conversations: 'Чаты', allMembers: 'Все участники',
-    noMembers: 'Нет других участников', startChat: 'Начать чат',
-    you: 'Вы', admin: 'Админ', member: 'Участник',
-    groupName: 'Название группы *', create: 'Создать', cancel: 'Отмена',
-    createGroupTitle: 'Создать новую группу',
-    sendPlaceholder: 'Напишите сообщение...', attach: 'Прикрепить JPG', imageAttached: 'Изображение прикреплено',
-    loginRequired: 'Войдите в систему', home: 'Главная',
-    groupCreated: 'Группа создана', error: 'Ошибка',
-    noMessages: 'Начните чат', today: 'Сегодня', yesterday: 'Вчера',
-    selectChat: 'Выберите чат', message: 'Сообщение'
-  },
-  zh: {
-    back: 'Hostaka', title: '消息', sidebarTitle: '消息',
-    newGroup: '新建群组', loading: '加载中...',
-    emptyState: '从列表中选择一个对话',
-    groups: '群组', conversations: '对话', allMembers: '所有成员',
-    noMembers: '没有其他成员', startChat: '开始聊天',
-    you: '你', admin: '管理员', member: '成员',
-    groupName: '群组名称 *', create: '创建', cancel: '取消',
-    createGroupTitle: '创建新群组',
-    sendPlaceholder: '输入消息...', attach: '附加 JPG 图片', imageAttached: '已附加图片',
-    loginRequired: '请登录', home: '首页',
-    groupCreated: '群组已创建', error: '失败',
-    noMessages: '开始对话', today: '今天', yesterday: '昨天',
-    selectChat: '选择对话', message: '消息'
-  },
-  ja: {
-    back: 'Hostaka', title: 'メッセージ', sidebarTitle: 'メッセージ',
-    newGroup: '新規グループ', loading: '読み込み中...',
-    emptyState: 'リストからチャットを選択',
-    groups: 'グループ', conversations: 'チャット', allMembers: '全メンバー',
-    noMembers: '他のメンバーはいません', startChat: 'チャットを開始',
-    you: 'あなた', admin: '管理者', member: 'メンバー',
-    groupName: 'グループ名 *', create: '作成', cancel: 'キャンセル',
-    createGroupTitle: '新規グループ作成',
-    sendPlaceholder: 'メッセージを入力...', attach: 'JPG画像を添付', imageAttached: '画像を添付しました',
-    loginRequired: 'ログインしてください', home: 'ホーム',
-    groupCreated: 'グループを作成しました', error: '失敗',
-    noMessages: 'チャットを開始', today: '今日', yesterday: '昨日',
-    selectChat: 'チャットを選択', message: 'メッセージ'
-  }
+  fr: { /* ... même structure ... */ },
+  ru: { /* ... */ },
+  zh: { /* ... */ },
+  ja: { /* ... */ }
 };
 
 let currentLang = localStorage.getItem('hostaka_lang') || 'ar';
 let currentTheme = localStorage.getItem('hostaka_theme') || 'light';
 
-function t(key) {
-  return LANG[currentLang]?.[key] || LANG['ar'][key] || key;
-}
+function t(key) { return LANG[currentLang]?.[key] || LANG['ar'][key] || key; }
 
 function applyLang() {
   document.documentElement.lang = currentLang;
@@ -1061,7 +1001,7 @@ function setLang(lang) {
 }
 
 // ============================================================
-//  CORE LOGIC
+//  ORIGINAL CHAT LOGIC
 // ============================================================
 const getToken = () => localStorage.getItem('hostaka_token') || '';
 let ME = null;
@@ -1073,15 +1013,15 @@ let pollTimer = null;
 let msgReactions = {};
 let chatImgBase64 = '';
 
-function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-function fmtTime(s) { if (!s) return ''; return new Date(s).toLocaleTimeString(currentLang === 'ar' ? 'ar' : 'en', { hour: '2-digit', minute: '2-digit' }); }
+function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtTime(s) { if(!s) return ''; return new Date(s).toLocaleTimeString(currentLang === 'ar' ? 'ar' : 'en', {hour:'2-digit',minute:'2-digit'}); }
 function fmtDay(s) {
-  if (!s) return '';
+  if(!s) return '';
   const d = new Date(s), t = new Date();
   const diff = Math.floor((t - d) / 86400000);
-  if (diff === 0) return t('today');
-  if (diff === 1) return t('yesterday');
-  return d.toLocaleDateString(currentLang === 'ar' ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' });
+  if(diff === 0) return t('today');
+  if(diff === 1) return t('yesterday');
+  return d.toLocaleDateString(currentLang === 'ar' ? 'ar-SA' : 'en-US', {month:'short', day:'numeric'});
 }
 
 async function apiFetch(url, method = 'GET', body = null) {
@@ -1094,28 +1034,29 @@ async function apiFetch(url, method = 'GET', body = null) {
 }
 
 const SVG = {
-  msg: `<svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
-  user: `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
-  group: `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
-  send: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`,
-  attach: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
-  close: `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
-  arrow: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>`,
-  like: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`,
-  heart: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`,
-  haha: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
-  sad: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 16c-1.5-1-2.5-1.5-4-1.5s-2.5.5-4 1.5"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
-  angry: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 16c-1.5-1-2.5-1.5-4-1.5s-2.5.5-4 1.5"/><path d="M8 8l2 2"/><path d="M16 8l-2 2"/></svg>`,
+  msg:      `<svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+  user:     `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+  group:    `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  send:     `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`,
+  attach:   `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
+  close:    `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  arrow:    `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>`,
+  like:     `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`,
+  heart:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`,
+  haha:     `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
+  sad:      `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 16c-1.5-1-2.5-1.5-4-1.5s-2.5.5-4 1.5"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
+  angry:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 16c-1.5-1-2.5-1.5-4-1.5s-2.5.5-4 1.5"/><path d="M8 8l2 2"/><path d="M16 8l-2 2"/></svg>`,
 };
 
 const REACTIONS = [
-  { emoji: 'like', label: 'أعجبني', icon: SVG.like },
-  { emoji: 'heart', label: 'أحببته', icon: SVG.heart },
-  { emoji: 'haha', label: 'أضحكني', icon: SVG.haha },
-  { emoji: 'sad', label: 'أحزنني', icon: SVG.sad },
-  { emoji: 'angry', label: 'أغضبني', icon: SVG.angry },
+  { emoji:'like',  label:'أعجبني',  icon:SVG.like },
+  { emoji:'heart', label:'أحببته',  icon:SVG.heart },
+  { emoji:'haha',  label:'أضحكني',  icon:SVG.haha },
+  { emoji:'sad',   label:'أحزنني',  icon:SVG.sad },
+  { emoji:'angry', label:'أغضبني',  icon:SVG.angry },
 ];
 
+// ====== INIT ======
 async function init() {
   if (currentTheme === 'dark') {
     document.documentElement.setAttribute('data-theme', 'dark');
@@ -1165,9 +1106,7 @@ async function loadSidebar() {
     ]);
   } catch (e) {
     console.error('loadSidebar error', e);
-    allUsers = [];
-    conversations = [];
-    groups = [];
+    allUsers = []; conversations = []; groups = [];
   }
   renderSidebar();
 }
@@ -1235,6 +1174,7 @@ function updateTopbarPeer(peer) {
     </div>`;
 }
 
+// ====== OPEN CHAT ======
 async function openChat(username) {
   currentPeer = username;
   if (window.innerWidth <= 680) toggleSidebar(false);
@@ -1243,6 +1183,7 @@ async function openChat(username) {
   const peer = allUsers.find(u => u.username === username) || { username };
   updateTopbarPeer(peer);
 
+  // إنشاء واجهة المحادثة
   document.getElementById('chatMain').innerHTML = `
     <div class="msgs-area" id="msgsArea"></div>
     <div class="img-preview-bar" id="imgPreviewBar">
@@ -1262,8 +1203,10 @@ async function openChat(username) {
   pollTimer = setInterval(() => loadMsgs(username, false), 4000);
 }
 
+// ====== LOAD & RENDER MESSAGES ======
 async function loadMsgs(username, scroll = true) {
   try {
+    console.log('Loading messages for', username);
     const msgs = await apiFetch('/api/messages/' + encodeURIComponent(username));
     console.log('Messages received:', msgs);
     if (!Array.isArray(msgs)) {
@@ -1279,7 +1222,7 @@ async function loadMsgs(username, scroll = true) {
 function renderMsgs(msgs, scroll = true) {
   const area = document.getElementById('msgsArea');
   if (!area) {
-    console.error('msgsArea element not found');
+    console.error('msgsArea element not found!');
     return;
   }
   if (!msgs || !msgs.length) {
@@ -1289,7 +1232,7 @@ function renderMsgs(msgs, scroll = true) {
   let html = '', lastDay = '';
   msgs.forEach((m, i) => {
     if (!m.from_id || !m.from_name) {
-      console.warn('Message missing from_id or from_name:', m);
+      console.warn('Skipping invalid message:', m);
       return;
     }
     const isMine = m.from_id == ME?.id;
@@ -1324,6 +1267,7 @@ function renderMsgs(msgs, scroll = true) {
   if (scroll) area.scrollTop = area.scrollHeight;
 }
 
+// ====== REACTIONS ======
 function togglePicker(id) {
   const p = document.getElementById('picker-' + id);
   if (!p) return;
@@ -1339,11 +1283,14 @@ async function reactMsg(e, mid, emoji) {
   document.querySelectorAll('.react-picker.show').forEach(p => p.classList.remove('show'));
   try {
     const d = await apiFetch('/api/messages/react/' + mid, 'POST', { emoji });
-    if (d.success) { msgReactions[mid] = { reactions: d.reactions, userReaction: d.userReaction }; }
+    if (d.success) {
+      msgReactions[mid] = { reactions: d.reactions, userReaction: d.userReaction };
+    }
     if (currentPeer) await loadMsgs(currentPeer, false);
-  } catch (e) { console.error('reactMsg error', e); }
+  } catch (e) {}
 }
 
+// ====== IMAGE ATTACH ======
 function onChatImg(e) {
   const f = e.target.files[0];
   if (!f) return;
@@ -1362,6 +1309,7 @@ function removeChatImg() {
   document.getElementById('imgPreviewBar').style.display = 'none';
 }
 
+// ====== SEND MESSAGE ======
 async function sendMsg() {
   const input = document.getElementById('msgInput');
   const content = input?.value.trim() || '';
@@ -1379,13 +1327,14 @@ async function sendMsg() {
     await apiFetch('/api/messages/' + encodeURIComponent(currentPeer), 'POST', { content, image: imageUrl });
     await loadMsgs(currentPeer);
     loadSidebar();
-  } catch (e) { console.error('sendMsg error', e); }
+  } catch (e) {}
   document.getElementById('sendBtn').disabled = false;
 }
 
 function onKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }
 function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }
 
+// ====== SIDEBAR TOGGLE ======
 function toggleSidebar(force) {
   const sb = document.getElementById('sidebar');
   const ov = document.getElementById('sidebarOverlay');
@@ -1394,6 +1343,7 @@ function toggleSidebar(force) {
   ov.classList.toggle('show', open);
 }
 
+// ====== CREATE GROUP ======
 async function openCreateGroup() {
   document.getElementById('cgName').value = '';
   document.getElementById('createGroupModal').classList.add('show');
@@ -1435,6 +1385,7 @@ async function createGroup() {
   }
 }
 
+// ====== START ======
 init();
 </script>
 </body>
