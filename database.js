@@ -163,7 +163,7 @@ async function initDB() {
     try { await db.execute(sql); } catch(e) { /* column/table already exists */ }
   }
 
-  // Admin — Hostaka (FIXED)
+  // Admin — Hostaka
   const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@hostaka.io';
   const ADMIN_PASS  = process.env.ADMIN_PASS  || 'hostaka-admin-2026';
   const hash = bcrypt.hashSync(ADMIN_PASS, 10);
