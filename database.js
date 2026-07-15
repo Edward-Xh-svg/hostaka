@@ -163,15 +163,50 @@ async function initDB() {
     try { await db.execute(sql); } catch(e) { /* column/table already exists */ }
   }
 
-  // Admin — Hostaka
+  // Admin — Hostaka (FIXED)
   const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@hostaka.io';
   const ADMIN_PASS  = process.env.ADMIN_PASS  || 'hostaka-admin-2026';
-  const adminRes = await db.execute({ sql:"SELECT id FROM users WHERE role='admin' LIMIT 1", args:[] });
   const hash = bcrypt.hashSync(ADMIN_PASS, 10);
+
+  // Find existing admin by username='admin' first, then by role
+  let adminRes = await db.execute({ sql:"SELECT id, email FROM users WHERE username='admin' LIMIT 1", args:[] });
   if (adminRes.rows.length === 0) {
-    await db.execute({ sql:"INSERT OR IGNORE INTO users (username,email,password,role,display_name) VALUES (?,?,?,?,?)", args:['admin', ADMIN_EMAIL, hash, 'admin', 'Admin'] });
+    adminRes = await db.execute({ sql:"SELECT id, email FROM users WHERE role='admin' LIMIT 1", args:[] });
+  }
+
+  if (adminRes.rows.length === 0) {
+    // No admin exists — create one
+    try {
+      await db.execute({
+        sql:"INSERT INTO users (username,email,password,role,display_name) VALUES (?,?,?,?,?)",
+        args:['admin', ADMIN_EMAIL, hash, 'admin', 'Admin']
+      });
+      console.log('✅ Admin user created');
+    } catch (e) {
+      // If email exists, just log and continue
+      if (e.message?.includes('UNIQUE constraint failed')) {
+        console.log('⚠️ Admin email already exists in users table, skipping insert');
+      } else {
+        throw e;
+      }
+    }
   } else {
-    await db.execute({ sql:"UPDATE users SET email=?,password=? WHERE role='admin'", args:[ADMIN_EMAIL, hash] });
+    // Admin exists — update by ID (not by role, to avoid updating multiple rows)
+    const adminId = adminRes.rows[0].id;
+    try {
+      await db.execute({
+        sql:"UPDATE users SET email=?, password=? WHERE id=?",
+        args:[ADMIN_EMAIL, hash, adminId]
+      });
+    } catch (e) {
+      if (e.message?.includes('UNIQUE constraint failed')) {
+        console.log('⚠️ Admin email conflicts with existing user, keeping current email');
+        // Just update password
+        await db.execute({ sql:"UPDATE users SET password=? WHERE id=?", args:[hash, adminId] });
+      } else {
+        throw e;
+      }
+    }
   }
   console.log('✅ Hostaka DB ready');
 }
