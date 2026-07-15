@@ -846,8 +846,8 @@ function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt
 function fmtTime(s) { if(!s) return ''; return new Date(s).toLocaleTimeString(currentLang === 'ar' ? 'ar' : 'en', {hour:'2-digit',minute:'2-digit'}); }
 function fmtDay(s) {
   if(!s) return '';
-  const d = new Date(s), t = new Date();
-  const diff = Math.floor((t - d) / 86400000);
+  const d = new Date(s), now = new Date();
+  const diff = Math.floor((now - d) / 86400000);
   if(diff === 0) return t('today');
   if(diff === 1) return t('yesterday');
   return d.toLocaleDateString(currentLang === 'ar' ? 'ar-SA' : 'en-US', {month:'short', day:'numeric'});
