@@ -1,3 +1,5 @@
+require('dotenv').config(); // ⬅️ تمت الإضافة لتحميل المتغيرات من .env
+
 const express = require('express');
 const path    = require('path');
 const bcrypt  = require('bcryptjs');
@@ -153,7 +155,7 @@ app.post('/api/upload', requireAuth, async (req, res) => {
   }
 });
 
-// ===== رفع الفيديوهات عبر api.video (باستخدام form-data مع المفتاح المقدم) =====
+// ===== رفع الفيديوهات عبر api.video (باستخدام المفتاح من البيئة فقط) =====
 app.post('/api/upload/video', requireAuth, async (req, res) => {
   try {
     const { video } = req.body || {};
@@ -167,15 +169,15 @@ app.post('/api/upload/video', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'حجم الفيديو يتجاوز 25 ميجابايت' });
     }
 
-    // استخدام المفتاح المقدم مباشرةً (أو من متغير البيئة)
-    const apiKey = process.env.API_VIDEO_API_KEY || 'aV37y9doznnRW6zOpOpzlcU9OcenWfTR2uJM1DB5UeR';
+    // 🔐 المفتاح يُقرأ من متغير البيئة فقط – لا قيمة افتراضية!
+    const apiKey = process.env.API_VIDEO_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ error: 'API_VIDEO_API_KEY غير مُعدّ' });
+      console.error('❌ API_VIDEO_API_KEY غير موجود في البيئة');
+      return res.status(500).json({ error: 'API_VIDEO_API_KEY غير مُعدّ على الخادم' });
     }
 
     // إنشاء FormData مع الملف
     const form = new FormData();
-    // استخدام Buffer مباشرةً مع تحديد اسم الملف ونوعه
     form.append('file', buffer, { filename: 'video.mp4', contentType: 'video/mp4' });
 
     // إرسال الطلب إلى api.video
