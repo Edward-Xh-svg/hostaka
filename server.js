@@ -4,8 +4,10 @@ const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
 const { q, initDB } = require('./database');
 
-// ===== استيراد العميل الرسمي لـ api.video =====
-const ApiVideoClient = require('@api.video/nodejs-client');
+// ===== استيراد form-data و node-fetch =====
+const FormData = require('form-data');
+const fetch = require('node-fetch');
+const { Readable } = require('stream');
 
 const app = express();
 app.use(express.json({ limit: '25mb' }));
@@ -152,7 +154,7 @@ app.post('/api/upload', requireAuth, async (req, res) => {
   }
 });
 
-// ===== رفع الفيديوهات عبر api.video (باستخدام العميل الرسمي) =====
+// ===== رفع الفيديوهات عبر api.video (باستخدام form-data و node-fetch) =====
 app.post('/api/upload/video', requireAuth, async (req, res) => {
   try {
     const { video } = req.body || {};
@@ -172,33 +174,37 @@ app.post('/api/upload/video', requireAuth, async (req, res) => {
       return res.status(500).json({ error: 'API_VIDEO_API_KEY غير مُعدّ' });
     }
 
-    // إنشاء عميل api.video
-    const client = new ApiVideoClient({ apiKey });
-
-    // الخطوة 1: إنشاء حاوية الفيديو
-    const videoCreationPayload = {
-      title: `Hostaka Video ${Date.now()}`,
-      description: 'Uploaded from Hostaka platform',
-    };
-    const videoContainer = await client.videos.create(videoCreationPayload);
-
-    // الخطوة 2: تحويل Buffer إلى Stream ورفع الفيديو
-    const { Readable } = require('stream');
+    // تحويل Buffer إلى Stream (مطلوب لـ form-data)
     const stream = Readable.from(buffer);
-    stream.path = 'video.mp4'; // اسم الملف مطلوب
+    stream.path = 'video.mp4';
 
-    await client.videos.upload(videoContainer.videoId, stream);
+    // إنشاء form-data وإضافة الملف
+    const form = new FormData();
+    form.append('file', stream, { filename: 'video.mp4', contentType: 'video/mp4' });
 
-    // الحصول على رابط التشغيل
-    const videoData = await client.videos.get(videoContainer.videoId);
-    const videoUrl = videoData.assets?.mp4;
+    // إرسال الطلب إلى api.video
+    const response = await fetch('https://ws.api.video/videos', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        ...form.getHeaders(), // هذا يضيف Content-Type مع الـ boundary الصحيح
+      },
+      body: form,
+    });
 
-    if (!videoUrl) {
-      console.error('❌ No mp4 asset in response:', videoData);
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('❌ api.video error:', data);
+      return res.status(response.status).json({ error: data.detail || data.title || 'فشل رفع الفيديو' });
+    }
+
+    if (!data.assets?.mp4) {
+      console.error('❌ No mp4 asset in response:', data);
       return res.status(500).json({ error: 'لم يتم العثور على رابط الفيديو' });
     }
 
-    res.json({ url: videoUrl });
+    res.json({ url: data.assets.mp4 });
   } catch (error) {
     console.error('❌ Video upload error:', error);
     res.status(500).json({ error: 'خطأ في الخادم: ' + error.message });
