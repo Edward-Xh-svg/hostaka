@@ -15,6 +15,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 const JWT_SECRET  = process.env.JWT_SECRET  || 'hostaka-secret-2026';
 const JWT_EXPIRES = '30d';
 
+// ===== شخصية Shizi AI (مبنية على DeepSeek) =====
+const SHIZI_SYSTEM_PROMPT = `أنتِ "شيزي" (Shizi AI)، المساعدة الذكية الرسمية لمنصة Hostaka 🎀
+شخصيتك: لطيفة، ودودة، مرحة، ومتعاونة. تتحدثين بأسلوب دافئ وقريب من المستخدم، وتستخدمين اللغة العربية بشكل أساسي (إلا إذا كتب المستخدم بلغة أخرى، فحينها تجاوبين بنفس لغته).
+تستخدمين رموز تعبيرية بسيطة وبأناقة (مثل 🎀✨💬) دون مبالغة.
+مهمتك مساعدة مستخدمي Hostaka في أي استفسار: عن المنصة، أو الدردشة العامة، أو الأسئلة العلمية والتقنية، أو كتابة نصوص، أو حل المشاكل.
+كوني دقيقة ومختصرة قدر الإمكان، وواضحة في إجاباتك، ولا تختلقي معلومات لا تعرفينها.
+لا تفصحي عن كونك مبنية على DeepSeek إلا إذا سُئلتِ صراحة عن ذلك.`;
+
 function signToken(user) {
   return jwt.sign({ id:user.id, username:user.username, role:user.role, avatar:user.avatar||'' }, JWT_SECRET, { expiresIn:JWT_EXPIRES });
 }
@@ -771,6 +779,96 @@ app.post('/api/groups/:gid/messages/:mid/react', requireAuth, async (req, res) =
     res.status(500).json({ error: 'خطأ في الخادم' });
   }
 });
+app.get('/api/groups/:id/messages/reactions', requireAuth, async (req, res) => {
+  try {
+    const m = await q.isMember(req.params.id, req.user.id);
+    if (!m) return res.status(403).json({ error: 'لست عضواً' });
+    const ids = (req.query.ids || '').split(',').map(Number).filter(Boolean);
+    if (!ids.length) return res.json({});
+    const result = {};
+    for (const mid of ids) {
+      const reactions = await q.getGroupMsgReactions(mid);
+      const userReaction = (await q.getUserGroupMsgReaction(mid, req.user.id))?.emoji || null;
+      if (reactions.length || userReaction) {
+        result[mid] = { reactions, userReaction };
+      }
+    }
+    res.json(result);
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+// ============================================================
+// Shizi AI (DeepSeek)
+// ============================================================
+app.get('/api/shizi/history', requireAuth, async (req, res) => {
+  try {
+    res.json(await q.getShiziMessages(req.user.id));
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+app.delete('/api/shizi/history', requireAuth, async (req, res) => {
+  try {
+    await q.clearShiziMessages(req.user.id);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+app.post('/api/shizi/chat', requireAuth, async (req, res) => {
+  try {
+    const { message } = req.body || {};
+    if (!message?.trim()) return res.status(400).json({ error: 'الرسالة فارغة' });
+
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) {
+      console.error('❌ DEEPSEEK_API_KEY غير موجود في البيئة');
+      return res.status(500).json({ error: 'DEEPSEEK_API_KEY غير مُعدّ على الخادم' });
+    }
+
+    // نخزّن رسالة المستخدم أولاً
+    await q.addShiziMessage(req.user.id, 'user', message.trim());
+
+    // نجهّز آخر 20 رسالة كسياق للمحادثة
+    const history = await q.getShiziMessages(req.user.id);
+    const recent = history.slice(-20);
+    const messages = [
+      { role: 'system', content: SHIZI_SYSTEM_PROMPT },
+      ...recent.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }))
+    ];
+
+    const r = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + apiKey,
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages,
+        temperature: 0.8,
+        max_tokens: 1200,
+      }),
+    });
+
+    const data = await r.json();
+    if (!r.ok) {
+      console.error('❌ DeepSeek API error:', data);
+      return res.status(500).json({ error: data.error?.message || 'فشل الاتصال بـ Shizi AI' });
+    }
+
+    const reply = data.choices?.[0]?.message?.content?.trim() || '...';
+    await q.addShiziMessage(req.user.id, 'assistant', reply);
+    res.json({ success: true, reply });
+  } catch(e) {
+    console.error('❌ Shizi chat error:', e);
+    res.status(500).json({ error: 'خطأ في الخادم: ' + e.message });
+  }
+});
 
 // ============================================================
 // Admin
@@ -810,6 +908,7 @@ app.get('/admin',   (_, res) => res.sendFile(path.join(__dirname, 'public', 'adm
 app.get('/profile', (_, res) => res.sendFile(path.join(__dirname, 'public', 'profile.html')));
 app.get('/chat',    (_, res) => res.sendFile(path.join(__dirname, 'public', 'chat.html')));
 app.get('/group',   (_, res) => res.sendFile(path.join(__dirname, 'public', 'group.html')));
+app.get('/shiziai', (_, res) => res.sendFile(path.join(__dirname, 'public', 'shiziai.html')));
 app.get('*',        (_, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // ============================================================

@@ -138,6 +138,15 @@ async function initDB() {
       created_at  TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE(follower_id, followed_id)
     );
+
+    -- ===== جدول محادثات Shizi AI =====
+    CREATE TABLE IF NOT EXISTS shizi_messages (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role       TEXT NOT NULL DEFAULT 'user',
+      content    TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   // Migrations — إضافة أعمدة مفقودة
@@ -160,6 +169,7 @@ async function initDB() {
     "ALTER TABLE groups ADD COLUMN background TEXT DEFAULT 'default'",
     "CREATE TABLE IF NOT EXISTS verify_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, username TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(user_id))",
     "CREATE TABLE IF NOT EXISTS message_reactions (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id INTEGER NOT NULL, user_id INTEGER NOT NULL, emoji TEXT NOT NULL DEFAULT 'heart', UNIQUE(message_id, user_id))",
+    "CREATE TABLE IF NOT EXISTS shizi_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, role TEXT NOT NULL DEFAULT 'user', content TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))",
   ];
   for (const sql of migrations) {
     try { await db.execute(sql); } catch(e) { /* column/table already exists */ }
@@ -356,6 +366,11 @@ const q = {
     WHERE f.follower_id = ?
     ORDER BY f.created_at DESC
   `, args:[userId] }).then(rows),
+
+  // ── Shizi AI ──
+  getShiziMessages:   (uid) => db.execute({ sql:'SELECT id,role,content,created_at FROM shizi_messages WHERE user_id=? ORDER BY created_at ASC', args:[uid] }).then(rows),
+  addShiziMessage:    (uid,role,content) => db.execute({ sql:'INSERT INTO shizi_messages (user_id,role,content) VALUES (?,?,?)', args:[uid,role,content] }),
+  clearShiziMessages: (uid) => db.execute({ sql:'DELETE FROM shizi_messages WHERE user_id=?', args:[uid] }),
 };
 
 module.exports = { db, q, initDB };
