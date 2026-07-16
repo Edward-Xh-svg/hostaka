@@ -308,6 +308,7 @@
     }
     .post-card:hover{border-color:var(--border);transform:translateY(-2px);box-shadow:var(--shadow);}
     .card-img{width:100%;max-height:340px;object-fit:cover;display:block;}
+    .card-video{width:100%;max-height:400px;object-fit:contain;display:block;background:#000;border-radius:8px;}
     .card-body{padding:20px 24px;}
 
     .pub-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;}
@@ -606,9 +607,10 @@
     .btn-ghost:hover{background:rgba(128,128,128,0.1);color:var(--text);border-color:var(--border);}
     .btn-ghost:active{transform:scale(0.96);}
 
-    .img-preview-wrap{position:relative;margin-bottom:14px;display:none;}
-    .img-preview-wrap img{max-width:100%;max-height:200px;object-fit:cover;border-radius:12px;border:1px solid var(--border);display:block;}
-    .img-preview-wrap .remove-img{
+    .media-preview-wrap{position:relative;margin-bottom:14px;display:none;}
+    .media-preview-wrap img{max-width:100%;max-height:200px;object-fit:cover;border-radius:12px;border:1px solid var(--border);display:block;}
+    .media-preview-wrap video{max-width:100%;max-height:200px;border-radius:12px;border:1px solid var(--border);display:block;background:#000;}
+    .media-preview-wrap .remove-media{
       position:absolute;top:8px;left:8px;
       background:rgba(0,0,0,0.7);
       border:none;color:#fff;
@@ -616,8 +618,8 @@
       cursor:pointer;display:flex;align-items:center;justify-content:center;
       transition:all 0.2s;backdrop-filter:blur(4px);
     }
-    .img-preview-wrap .remove-img:hover{background:var(--primary);}
-    .img-preview-wrap .remove-img svg{width:12px;height:12px;}
+    .media-preview-wrap .remove-media:hover{background:var(--primary);}
+    .media-preview-wrap .remove-media svg{width:12px;height:12px;}
 
     .toast{
       position:fixed;bottom:24px;left:50%;
@@ -660,6 +662,7 @@
       .feed{padding:0 14px;margin:16px auto 60px;gap:16px;}
       .post-card{border-radius:16px;}
       .card-img{max-height:240px;}
+      .card-video{max-height:260px;}
       .card-body{padding:16px 18px;}
       .pub-avatar{width:40px;height:40px;}
       .pub-name{font-size:0.88rem;}
@@ -759,8 +762,6 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           <span class="drop-profile">الملف الشخصي</span>
         </button>
-        <!-- إزالة زر الرسائل لأنه موجود كأيقونة منفصلة -->
-        <!-- إضافة زر تحميل تطبيق الأندرويد -->
         <button onclick="window.open('https://www.mediafire.com/file/cj90k9ac3jja29i/Hostaka_V1.2.apk/file', '_blank')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span class="drop-download">تحميل تطبيق الأندرويد</span>
@@ -865,18 +866,18 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>
       </button>
       <div style="flex:1;"></div>
-      <button class="fmt-btn" onclick="document.getElementById('postImgFile').click()" title="إرفاق صورة JPG" style="gap:5px;">
+      <button class="fmt-btn" onclick="document.getElementById('postMediaFile').click()" title="إرفاق صورة أو فيديو" style="gap:5px;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-        <span id="attachImageText">صورة</span>
+        <span id="attachMediaText">وسائط</span>
       </button>
-      <input type="file" id="postImgFile" accept=".jpg,.jpeg,image/jpeg" style="display:none;" onchange="onPostImg(event)">
+      <input type="file" id="postMediaFile" accept=".jpg,.jpeg,image/jpeg,.mp4,.webm,.mov,.avi,.mkv,.ogg,video/*" style="display:none;" onchange="onPostMedia(event)">
     </div>
     <div class="fg">
       <div id="postEditor" class="post-editor" contenteditable="true" dir="auto" placeholder="اكتب منشورك هنا..."></div>
     </div>
-    <div class="img-preview-wrap" id="postImgPreviewWrap">
-      <img id="postImgPreview" alt="">
-      <button class="remove-img" onclick="removePostImg()" title="إزالة الصورة">
+    <div class="media-preview-wrap" id="postMediaPreviewWrap">
+      <div id="postMediaPreview"></div>
+      <button class="remove-media" onclick="removePostMedia()" title="إزالة الملف">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -900,13 +901,14 @@ const LANG = {
     loginSubmit: 'دخول', registerSubmit: 'إنشاء الحساب',
     admin: 'لوحة الإدارة', profile: 'الملف الشخصي', chat: 'الرسائل', logout: 'تسجيل الخروج',
     loading: 'جارٍ تحميل المنشورات...', empty: 'لا توجد منشورات بعد',
-    postModalTitle: 'منشور جديد', attachImage: 'صورة', cancel: 'إلغاء', publish: 'نشر',
+    postModalTitle: 'منشور جديد', attachMedia: 'صورة / فيديو', cancel: 'إلغاء', publish: 'نشر',
     react: 'تفاعل', comment: 'تعليق', delete: 'حذف', share: 'مشاركة الرابط', message: 'مراسلة',
     reply: 'أضف تعليقاً...', verified: 'حساب موثق', member: 'Member', adminRole: 'Admin',
     copyLink: 'تم نسخ الرابط', verifyRequest: 'تم إرسال طلب التوثيق', verifyPending: 'طلبك قيد المراجعة',
     deleteConfirm: 'حذف هذا المنشور؟', deleteComment: 'حذف التعليق؟',
     sortLatest: 'الأحدث', sortPopular: 'الأكثر تفاعلاً', sortRandom: 'عشوائي',
-    downloadAndroid: 'تحميل تطبيق الأندرويد'
+    downloadAndroid: 'تحميل تطبيق الأندرويد', fileTooLarge: 'حجم الملف يتجاوز 25 ميغابايت',
+    invalidFile: 'يُقبل JPG للصور و MP4 للفيديوهات'
   },
   en: {
     title: 'Hostaka', subtitle: 'An open social platform for everyone',
@@ -916,13 +918,14 @@ const LANG = {
     loginSubmit: 'Login', registerSubmit: 'Create Account',
     admin: 'Dashboard', profile: 'Profile', chat: 'Messages', logout: 'Logout',
     loading: 'Loading posts...', empty: 'No posts yet',
-    postModalTitle: 'New Post', attachImage: 'Image', cancel: 'Cancel', publish: 'Publish',
+    postModalTitle: 'New Post', attachMedia: 'Image / Video', cancel: 'Cancel', publish: 'Publish',
     react: 'React', comment: 'Comment', delete: 'Delete', share: 'Share link', message: 'Message',
     reply: 'Add a comment...', verified: 'Verified account', member: 'Member', adminRole: 'Admin',
     copyLink: 'Link copied', verifyRequest: 'Verification request sent', verifyPending: 'Your request is pending',
     deleteConfirm: 'Delete this post?', deleteComment: 'Delete this comment?',
     sortLatest: 'Latest', sortPopular: 'Most Popular', sortRandom: 'Random',
-    downloadAndroid: 'Download Android App'
+    downloadAndroid: 'Download Android App', fileTooLarge: 'File exceeds 25MB limit',
+    invalidFile: 'Only JPG images and MP4 videos are allowed'
   },
   fr: {
     title: 'Hostaka', subtitle: 'Une plateforme sociale ouverte à tous',
@@ -932,13 +935,14 @@ const LANG = {
     loginSubmit: 'Se connecter', registerSubmit: 'Créer un compte',
     admin: 'Tableau de bord', profile: 'Profil', chat: 'Messages', logout: 'Déconnexion',
     loading: 'Chargement...', empty: 'Aucune publication',
-    postModalTitle: 'Nouvelle publication', attachImage: 'Image', cancel: 'Annuler', publish: 'Publier',
+    postModalTitle: 'Nouvelle publication', attachMedia: 'Image / Vidéo', cancel: 'Annuler', publish: 'Publier',
     react: 'Réagir', comment: 'Commenter', delete: 'Supprimer', share: 'Partager', message: 'Message',
     reply: 'Ajouter un commentaire...', verified: 'Compte vérifié', member: 'Membre', adminRole: 'Admin',
     copyLink: 'Lien copié', verifyRequest: 'Demande envoyée', verifyPending: 'En attente',
     deleteConfirm: 'Supprimer ?', deleteComment: 'Supprimer ce commentaire ?',
     sortLatest: 'Derniers', sortPopular: 'Plus populaires', sortRandom: 'Aléatoire',
-    downloadAndroid: 'Télécharger l\'app Android'
+    downloadAndroid: 'Télécharger l\'app Android', fileTooLarge: 'Fichier dépasse 25 Mo',
+    invalidFile: 'Seules les images JPG et vidéos MP4 sont autorisées'
   },
   ru: {
     title: 'Hostaka', subtitle: 'Открытая социальная платформа для всех',
@@ -948,13 +952,14 @@ const LANG = {
     loginSubmit: 'Войти', registerSubmit: 'Создать аккаунт',
     admin: 'Панель', profile: 'Профиль', chat: 'Сообщения', logout: 'Выйти',
     loading: 'Загрузка...', empty: 'Нет постов',
-    postModalTitle: 'Новый пост', attachImage: 'Изображение', cancel: 'Отмена', publish: 'Опубликовать',
+    postModalTitle: 'Новый пост', attachMedia: 'Изображение / Видео', cancel: 'Отмена', publish: 'Опубликовать',
     react: 'Реакция', comment: 'Комментарий', delete: 'Удалить', share: 'Поделиться', message: 'Сообщение',
     reply: 'Добавить комментарий...', verified: 'Верифицирован', member: 'Участник', adminRole: 'Админ',
     copyLink: 'Ссылка скопирована', verifyRequest: 'Запрос отправлен', verifyPending: 'На рассмотрении',
     deleteConfirm: 'Удалить пост?', deleteComment: 'Удалить комментарий?',
     sortLatest: 'Новые', sortPopular: 'Популярные', sortRandom: 'Случайные',
-    downloadAndroid: 'Скачать Android-приложение'
+    downloadAndroid: 'Скачать Android-приложение', fileTooLarge: 'Файл превышает 25 МБ',
+    invalidFile: 'Разрешены только JPG и MP4'
   },
   zh: {
     title: 'Hostaka', subtitle: '面向所有人的开放社交平台',
@@ -964,13 +969,14 @@ const LANG = {
     loginSubmit: '登录', registerSubmit: '创建账户',
     admin: '管理面板', profile: '个人资料', chat: '消息', logout: '退出',
     loading: '加载中...', empty: '暂无帖子',
-    postModalTitle: '新帖子', attachImage: '图片', cancel: '取消', publish: '发布',
+    postModalTitle: '新帖子', attachMedia: '图片 / 视频', cancel: '取消', publish: '发布',
     react: '反应', comment: '评论', delete: '删除', share: '分享链接', message: '消息',
     reply: '添加评论...', verified: '已验证', member: '成员', adminRole: '管理员',
     copyLink: '链接已复制', verifyRequest: '验证请求已发送', verifyPending: '审核中',
     deleteConfirm: '删除此帖子？', deleteComment: '删除此评论？',
     sortLatest: '最新', sortPopular: '最受欢迎', sortRandom: '随机',
-    downloadAndroid: '下载安卓应用'
+    downloadAndroid: '下载安卓应用', fileTooLarge: '文件超过25MB',
+    invalidFile: '仅允许 JPG 图片和 MP4 视频'
   },
   ja: {
     title: 'Hostaka', subtitle: '誰でも参加できるオープンソーシャルプラットフォーム',
@@ -980,13 +986,14 @@ const LANG = {
     loginSubmit: 'ログイン', registerSubmit: 'アカウント作成',
     admin: '管理パネル', profile: 'プロフィール', chat: 'メッセージ', logout: 'ログアウト',
     loading: '読み込み中...', empty: '投稿はありません',
-    postModalTitle: '新規投稿', attachImage: '画像', cancel: 'キャンセル', publish: '投稿する',
+    postModalTitle: '新規投稿', attachMedia: '画像 / 動画', cancel: 'キャンセル', publish: '投稿する',
     react: 'リアクション', comment: 'コメント', delete: '削除', share: 'リンクを共有', message: 'メッセージ',
     reply: 'コメントを追加...', verified: '認証済み', member: 'メンバー', adminRole: '管理者',
     copyLink: 'リンクをコピーしました', verifyRequest: '認証リクエストを送信しました', verifyPending: '審査中',
     deleteConfirm: 'この投稿を削除しますか？', deleteComment: 'このコメントを削除しますか？',
     sortLatest: '最新', sortPopular: '人気順', sortRandom: 'ランダム',
-    downloadAndroid: 'Androidアプリをダウンロード'
+    downloadAndroid: 'Androidアプリをダウンロード', fileTooLarge: 'ファイルが25MBを超えています',
+    invalidFile: 'JPG画像とMP4動画のみ許可されています'
   }
 };
 
@@ -1002,7 +1009,9 @@ const stored = localStorage.getItem('hostaka_user');
 let ME = null;
 let allPosts = [];
 let dropVisible = false;
-let postImgBase64 = '';
+let postMediaBase64 = '';
+let postMediaType = ''; // 'image' or 'video'
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 
 try { if(stored) ME = JSON.parse(stored); } catch(e) {}
 
@@ -1034,7 +1043,7 @@ function applyLang() {
   document.querySelector('.drop-logout').textContent = t('logout');
   document.getElementById('loadingText').textContent = t('loading');
   document.getElementById('newPostModalTitle').textContent = t('postModalTitle');
-  document.getElementById('attachImageText').textContent = t('attachImage');
+  document.getElementById('attachMediaText').textContent = t('attachMedia');
   document.getElementById('cancelBtn').textContent = t('cancel');
   document.getElementById('publishBtn').textContent = t('publish');
   document.getElementById('sortLatest').textContent = t('sortLatest');
@@ -1319,7 +1328,14 @@ function renderPost(p){
   const avatarHtml = p.user_avatar ? `<img src="${esc(p.user_avatar)}" alt="">` : esc(name.charAt(0).toUpperCase());
   const badgeCls   = p.user_role==='Admin' ? 'badge-admin' : 'badge-member';
   const canDel     = ME && (ME.role==='admin' || p.user_id==ME?.id);
-  const imgHtml    = p.image ? `<img class="card-img" src="${esc(p.image)}" loading="lazy" onerror="this.style.display='none'">` : '';
+  
+  // عرض الوسائط (صورة أو فيديو)
+  let mediaHtml = '';
+  if (p.video) {
+    mediaHtml = `<video class="card-video" controls style="max-height:400px;width:100%;object-fit:contain;background:#000;border-radius:8px;"><source src="${esc(p.video)}" type="video/mp4"></video>`;
+  } else if (p.image) {
+    mediaHtml = `<img class="card-img" src="${esc(p.image)}" loading="lazy" onerror="this.style.display='none'">`;
+  }
 
   const totalReactions = (p.reactions||[]).reduce((s,r)=>s+(r.count||0),0);
   const userR = p.userReaction;
@@ -1354,7 +1370,7 @@ function renderPost(p){
   </div>` : '';
 
   return `<div class="post-card" id="post-${p.id}">
-    ${imgHtml}
+    ${mediaHtml}
     <div class="card-body">
       <div class="pub-row">
         <div class="pub-info">
@@ -1404,36 +1420,59 @@ document.getElementById('searchInput').addEventListener('input', function(){
   renderFeed(sorted);
 });
 
-// ----- Post Editor -----
+// ----- Post Editor & Media Upload -----
 function openPostModal(){
   if(!ME){openAuth();return;}
   const ed=document.getElementById('postEditor');
   if(ed) ed.innerHTML='';
   document.getElementById('postErr').style.display='none';
-  document.getElementById('postImgPreviewWrap').style.display='none';
-  postImgBase64='';
+  document.getElementById('postMediaPreviewWrap').style.display='none';
+  postMediaBase64='';
+  postMediaType='';
   document.getElementById('postModal').classList.add('show');
   setTimeout(()=>document.getElementById('postEditor')?.focus(),100);
 }
 
-function onPostImg(e){
-  const f=e.target.files[0];
-  if(!f) return;
-  if(!f.type.match('image/jpeg')){ showToast('يُقبل JPG/JPEG فقط','error'); return; }
-  if(f.size > 5*1024*1024){ showToast('الصورة أكبر من 5MB','error'); return; }
-  const r=new FileReader();
-  r.onload=ev=>{
-    postImgBase64=ev.target.result;
-    document.getElementById('postImgPreview').src=postImgBase64;
-    document.getElementById('postImgPreviewWrap').style.display='block';
+function onPostMedia(e){
+  const f = e.target.files[0];
+  if (!f) return;
+  
+  // التحقق من الحجم
+  if (f.size > MAX_FILE_SIZE) {
+    showToast(t('fileTooLarge'), 'error');
+    e.target.value = '';
+    return;
+  }
+
+  const isImage = f.type === 'image/jpeg' || f.type === 'image/jpg';
+  const isVideo = f.type.startsWith('video/') && (f.type === 'video/mp4' || f.type === 'video/webm');
+  
+  if (!isImage && !isVideo) {
+    showToast(t('invalidFile'), 'error');
+    e.target.value = '';
+    return;
+  }
+
+  postMediaType = isImage ? 'image' : 'video';
+  const reader = new FileReader();
+  reader.onload = ev => {
+    postMediaBase64 = ev.target.result;
+    const preview = document.getElementById('postMediaPreview');
+    if (isImage) {
+      preview.innerHTML = `<img src="${postMediaBase64}" alt="معاينة الصورة">`;
+    } else {
+      preview.innerHTML = `<video controls style="max-height:200px;width:100%;"><source src="${postMediaBase64}" type="${f.type}"></video>`;
+    }
+    document.getElementById('postMediaPreviewWrap').style.display = 'block';
   };
-  r.readAsDataURL(f);
-  e.target.value='';
+  reader.readAsDataURL(f);
+  e.target.value = '';
 }
 
-function removePostImg(){
-  postImgBase64='';
-  document.getElementById('postImgPreviewWrap').style.display='none';
+function removePostMedia(){
+  postMediaBase64 = '';
+  postMediaType = '';
+  document.getElementById('postMediaPreviewWrap').style.display = 'none';
 }
 
 function fmt(cmd){ document.execCommand(cmd, false, null); document.getElementById('postEditor')?.focus(); }
@@ -1465,16 +1504,34 @@ async function submitPost(){
   const editor = document.getElementById('postEditor');
   const content = editor?.innerHTML?.trim();
   const errEl = document.getElementById('postErr'); errEl.style.display='none';
-  if((!content || content==='<br>') && !postImgBase64){ errEl.textContent='المحتوى أو الصورة مطلوبان'; errEl.style.display='block'; return; }
+  if((!content || content==='<br>') && !postMediaBase64){ errEl.textContent='المحتوى أو الملف مطلوب'; errEl.style.display='block'; return; }
   const btn=document.getElementById('postBtn'); btn.disabled=true; btn.textContent='...';
   try {
-    let imageUrl='';
-    if(postImgBase64){
-      const up=await apiFetch('/api/upload','POST',{image:postImgBase64});
-      if(up.url) imageUrl=up.url;
-      else { errEl.textContent='فشل رفع الصورة'; errEl.style.display='block'; btn.disabled=false; btn.innerHTML=`<span id="publishBtn">${t('publish')}</span>`; return; }
+    let imageUrl='', videoUrl='';
+    if(postMediaBase64){
+      let endpoint = '/api/upload';
+      let payload = { image: postMediaBase64 };
+      if (postMediaType === 'video') {
+        endpoint = '/api/upload/video';
+        payload = { video: postMediaBase64 };
+      }
+      const up = await apiFetch(endpoint, 'POST', payload);
+      if (up.url) {
+        if (postMediaType === 'image') imageUrl = up.url;
+        else videoUrl = up.url;
+      } else {
+        errEl.textContent='فشل رفع الملف';
+        errEl.style.display='block';
+        btn.disabled=false; btn.innerHTML=`<span id="publishBtn">${t('publish')}</span>`;
+        return;
+      }
     }
-    const d=await apiFetch('/api/records','POST',{content:content||'',image:imageUrl});
+    const d = await apiFetch('/api/records','POST',{
+      content: content || '',
+      image: imageUrl,
+      video: videoUrl,
+      media_type: postMediaType
+    });
     if(d.success){ closeModal('postModal'); await loadPosts(); }
     else { errEl.textContent=d.error||'فشل النشر'; errEl.style.display='block'; }
   } catch(e){ errEl.textContent='تعذر الاتصال'; errEl.style.display='block'; }
