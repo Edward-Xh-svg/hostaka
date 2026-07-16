@@ -1078,12 +1078,12 @@ function darkenHex(hex, pct) {
   return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
 }
 function applyTheme(themeName) {
-  const t = THEMES.find(x => x.name === themeName) || THEMES[0];
+  const theme = THEMES.find(x => x.name === themeName) || THEMES[0];
   const root = document.documentElement;
-  root.style.setProperty('--red', t.color);
-  root.style.setProperty('--red-h', lightenHex(t.color, 0.25));
-  root.style.setProperty('--mine-bg', hexToRgba(t.color, 0.18));
-  root.style.setProperty('--mine-border', hexToRgba(t.color, 0.28));
+  root.style.setProperty('--red', theme.color);
+  root.style.setProperty('--red-h', lightenHex(theme.color, 0.25));
+  root.style.setProperty('--mine-bg', hexToRgba(theme.color, 0.18));
+  root.style.setProperty('--mine-border', hexToRgba(theme.color, 0.28));
 }
 
 function applyBackground(bgId) {
@@ -1102,14 +1102,14 @@ async function api(url,method='GET',body=null){
 }
 
 function showToast(msg, type='success'){
-  let t = document.querySelector('.toast');
-  if(t) t.remove();
-  t = document.createElement('div');
-  t.className = 'toast toast-' + type;
-  t.textContent = msg;
-  document.body.appendChild(t);
-  requestAnimationFrame(()=>t.classList.add('show'));
-  setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),300); }, 3000);
+  let toastEl = document.querySelector('.toast');
+  if(toastEl) toastEl.remove();
+  toastEl = document.createElement('div');
+  toastEl.className = 'toast toast-' + type;
+  toastEl.textContent = msg;
+  document.body.appendChild(toastEl);
+  requestAnimationFrame(()=>toastEl.classList.add('show'));
+  setTimeout(()=>{ toastEl.classList.remove('show'); setTimeout(()=>toastEl.remove(),300); }, 3000);
 }
 
 (async function init() {
