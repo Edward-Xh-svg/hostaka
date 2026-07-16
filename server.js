@@ -7,7 +7,6 @@ const { q, initDB } = require('./database');
 // ===== استيراد form-data و node-fetch =====
 const FormData = require('form-data');
 const fetch = require('node-fetch');
-const { Readable } = require('stream');
 
 const app = express();
 app.use(express.json({ limit: '25mb' }));
@@ -154,7 +153,7 @@ app.post('/api/upload', requireAuth, async (req, res) => {
   }
 });
 
-// ===== رفع الفيديوهات عبر api.video (باستخدام form-data و node-fetch) =====
+// ===== رفع الفيديوهات عبر api.video (باستخدام form-data مع المفتاح المقدم) =====
 app.post('/api/upload/video', requireAuth, async (req, res) => {
   try {
     const { video } = req.body || {};
@@ -168,26 +167,23 @@ app.post('/api/upload/video', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'حجم الفيديو يتجاوز 25 ميجابايت' });
     }
 
-    const apiKey = process.env.API_VIDEO_API_KEY;
+    // استخدام المفتاح المقدم مباشرةً (أو من متغير البيئة)
+    const apiKey = process.env.API_VIDEO_API_KEY || 'aV37y9doznnRW6zOpOpzlcU9OcenWfTR2uJM1DB5UeR';
     if (!apiKey) {
-      console.error('❌ API_VIDEO_API_KEY is missing');
       return res.status(500).json({ error: 'API_VIDEO_API_KEY غير مُعدّ' });
     }
 
-    // تحويل Buffer إلى Stream (مطلوب لـ form-data)
-    const stream = Readable.from(buffer);
-    stream.path = 'video.mp4';
-
-    // إنشاء form-data وإضافة الملف
+    // إنشاء FormData مع الملف
     const form = new FormData();
-    form.append('file', stream, { filename: 'video.mp4', contentType: 'video/mp4' });
+    // استخدام Buffer مباشرةً مع تحديد اسم الملف ونوعه
+    form.append('file', buffer, { filename: 'video.mp4', contentType: 'video/mp4' });
 
     // إرسال الطلب إلى api.video
     const response = await fetch('https://ws.api.video/videos', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        ...form.getHeaders(), // هذا يضيف Content-Type مع الـ boundary الصحيح
+        ...form.getHeaders(),
       },
       body: form,
     });
