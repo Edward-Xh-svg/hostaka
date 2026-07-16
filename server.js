@@ -4,9 +4,9 @@ const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
 const { q, initDB } = require('./database');
 
-// ===== استيراد form-data و node-fetch =====
-const FormData = require('form-data');
-const fetch = require('node-fetch');
+// ===== استيراد node-fetch و crypto =====
+const fetch  = require('node-fetch');
+const crypto = require('crypto');
 
 const app = express();
 app.use(express.json({ limit: '25mb' }));
@@ -161,132 +161,44 @@ app.post('/api/upload', requireAuth, async (req, res) => {
   }
 });
 
-// ===== مصادقة api.video: تبديل الـ API key بـ access_token (Bearer) =====
-// api.video لا يقبل الـ API key مباشرة كـ Bearer token، لازم تبديله أولاً
-// عبر /auth/api-key، والتوكن صالح لمدة ساعة فقط لذلك نخزّنه مؤقتاً ونجدده.
-let _apiVideoToken = null;   // { access_token, expires_at }
-async function getApiVideoAccessToken() {
-  const apiKey = process.env.API_VIDEO_API_KEY;
-  if (!apiKey) return null;
-
-  if (_apiVideoToken && _apiVideoToken.expires_at > Date.now() + 30000) {
-    return _apiVideoToken.access_token;
+// ===== قراءة إعدادات Cloudinary: يدعم إما 3 متغيرات منفصلة، أو متغير واحد
+// CLOUDINARY_URL بصيغة cloudinary://API_KEY:API_SECRET@CLOUD_NAME =====
+function getCloudinaryConfig() {
+  if (process.env.CLOUDINARY_URL) {
+    const m = process.env.CLOUDINARY_URL.match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);
+    if (m) {
+      return { apiKey: m[1], apiSecret: m[2], cloudName: m[3] };
+    }
   }
-
-  const r = await fetch('https://ws.api.video/auth/api-key', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    body: JSON.stringify({ apiKey }),
-  });
-  const data = await r.json();
-  if (!r.ok || !data.access_token) {
-    console.error('❌ فشل مصادقة api.video:', data);
-    throw new Error(data.detail || data.title || 'فشل مصادقة api.video');
-  }
-  _apiVideoToken = {
-    access_token: data.access_token,
-    expires_at: Date.now() + (data.expires_in || 3600) * 1000,
+  return {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    apiSecret: process.env.CLOUDINARY_API_SECRET,
   };
-  return _apiVideoToken.access_token;
 }
 
-// ===== توكن رفع مباشر (Delegated Upload Token) =====
-// بدل ما نمرر الفيديو (base64) عبر السيرفرلس function عندنا (اللي عنده حد
-// أقصى ~4.5MB على Vercel)، نولّد توكن مؤقت ونخلي المتصفح يرفع الفيديو
-// مباشرة لـ api.video. هذا هو الحل الموصى به من api.video للرفع من المتصفح.
-app.post('/api/upload/video/token', requireAuth, async (req, res) => {
+// ===== رفع الفيديوهات عبر Cloudinary (Signed Direct Upload) =====
+// المتصفح يرفع الفيديو مباشرة إلى Cloudinary (مو عبر سيرفرنا)، وذلك لتفادي حد
+// Vercel على حجم الطلب (~4.5MB). سيرفرنا فقط يولّد "توقيع" (signature) مؤقت
+// باستخدام الـ API Secret (يبقى سري ولا يوصل للمتصفح إطلاقاً).
+app.post('/api/upload/video/signature', requireAuth, async (req, res) => {
   try {
-    if (!process.env.API_VIDEO_API_KEY) {
-      console.error('❌ API_VIDEO_API_KEY غير موجود في البيئة');
-      return res.status(500).json({ error: 'API_VIDEO_API_KEY غير مُعدّ على الخادم' });
+    const { cloudName, apiKey, apiSecret } = getCloudinaryConfig();
+    if (!cloudName || !apiKey || !apiSecret) {
+      console.error('❌ إعدادات Cloudinary ناقصة: حدّد إما CLOUDINARY_URL، أو الثلاثة CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET');
+      return res.status(500).json({ error: 'إعدادات Cloudinary غير مكتملة على الخادم' });
     }
-    let accessToken;
-    try {
-      accessToken = await getApiVideoAccessToken();
-    } catch (authErr) {
-      console.error('❌ api.video auth error:', authErr);
-      return res.status(500).json({ error: 'فشل التحقق من مفتاح api.video: ' + authErr.message });
-    }
-    const r = await fetch('https://ws.api.video/upload-tokens', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({ ttl: 3600 }),
-    });
-    const data = await r.json();
-    if (!r.ok || !data.token) {
-      console.error('❌ فشل إنشاء upload token:', data);
-      return res.status(500).json({ error: 'فشل تجهيز رفع الفيديو' });
-    }
-    res.json({ token: data.token });
+
+    const timestamp = Math.floor(Date.now() / 1000);
+    const folder = 'hostaka_videos';
+    // يجب توقيع نفس البارامترات بالضبط اللي رح تُرسل مع الرفع (بدون file/api_key)
+    const paramsToSign = `folder=${folder}&timestamp=${timestamp}`;
+    const signature = crypto.createHash('sha1').update(paramsToSign + apiSecret).digest('hex');
+
+    res.json({ cloudName, apiKey, timestamp, folder, signature });
   } catch (e) {
-    console.error('❌ Video token error:', e);
+    console.error('❌ Cloudinary signature error:', e);
     res.status(500).json({ error: 'خطأ في الخادم: ' + e.message });
-  }
-});
-
-// ===== رفع الفيديوهات عبر api.video (طريقة قديمة، تصلح فقط للفيديوهات
-// الصغيرة جداً بسبب حد Vercel على حجم الطلب — يُفضّل استخدام /token أعلاه) =====
-app.post('/api/upload/video', requireAuth, async (req, res) => {
-  try {
-    const { video } = req.body || {};
-    if (!video) return res.status(400).json({ error: 'لا يوجد فيديو' });
-
-    const base64Data = video.includes(',') ? video.split(',')[1] : video;
-    const buffer = Buffer.from(base64Data, 'base64');
-    const sizeMB = buffer.length / (1024 * 1024);
-    // ملاحظة مهمة: Vercel يفرض حداً أقصى ~4.5 ميجابايت على حجم الطلب (body) لكل
-    // Serverless Function، وترميز base64 يزيد حجم الفيديو نحو 33%. أي فيديو
-    // أكبر من ~3 ميجابايت تقريباً سيُرفض بواسطة Vercel قبل أن يصل الكود أصلاً
-    // (خطأ 413) بغض النظر عن هذا الحد الداخلي البالغ 25 ميجابايت.
-    if (sizeMB > 25) {
-      return res.status(400).json({ error: 'حجم الفيديو يتجاوز 25 ميجابايت' });
-    }
-
-    if (!process.env.API_VIDEO_API_KEY) {
-      console.error('❌ API_VIDEO_API_KEY غير موجود في البيئة');
-      return res.status(500).json({ error: 'API_VIDEO_API_KEY غير مُعدّ على الخادم' });
-    }
-
-    let accessToken;
-    try {
-      accessToken = await getApiVideoAccessToken();
-    } catch (authErr) {
-      console.error('❌ api.video auth error:', authErr);
-      return res.status(500).json({ error: 'فشل التحقق من مفتاح api.video: ' + authErr.message });
-    }
-
-    const form = new FormData();
-    form.append('file', buffer, { filename: 'video.mp4', contentType: 'video/mp4' });
-
-    const response = await fetch('https://ws.api.video/videos', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        ...form.getHeaders(),
-      },
-      body: form,
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('❌ api.video error:', data);
-      return res.status(response.status).json({ error: data.detail || data.title || 'فشل رفع الفيديو' });
-    }
-
-    if (!data.assets?.mp4) {
-      console.error('❌ No mp4 asset in response:', data);
-      return res.status(500).json({ error: 'لم يتم العثور على رابط الفيديو' });
-    }
-
-    res.json({ url: data.assets.mp4 });
-  } catch (error) {
-    console.error('❌ Video upload error:', error);
-    res.status(500).json({ error: 'خطأ في الخادم: ' + error.message });
   }
 });
 
