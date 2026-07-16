@@ -1,5 +1,3 @@
-require('dotenv').config(); // ⬅️ تمت الإضافة لتحميل المتغيرات من .env
-
 const express = require('express');
 const path    = require('path');
 const bcrypt  = require('bcryptjs');
@@ -155,13 +153,12 @@ app.post('/api/upload', requireAuth, async (req, res) => {
   }
 });
 
-// ===== رفع الفيديوهات عبر api.video (باستخدام المفتاح من البيئة فقط) =====
+// ===== رفع الفيديوهات عبر api.video (المفتاح من البيئة فقط) =====
 app.post('/api/upload/video', requireAuth, async (req, res) => {
   try {
     const { video } = req.body || {};
     if (!video) return res.status(400).json({ error: 'لا يوجد فيديو' });
 
-    // استخراج base64 وتحويله إلى Buffer
     const base64Data = video.includes(',') ? video.split(',')[1] : video;
     const buffer = Buffer.from(base64Data, 'base64');
     const sizeMB = buffer.length / (1024 * 1024);
@@ -169,18 +166,15 @@ app.post('/api/upload/video', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'حجم الفيديو يتجاوز 25 ميجابايت' });
     }
 
-    // 🔐 المفتاح يُقرأ من متغير البيئة فقط – لا قيمة افتراضية!
     const apiKey = process.env.API_VIDEO_API_KEY;
     if (!apiKey) {
       console.error('❌ API_VIDEO_API_KEY غير موجود في البيئة');
       return res.status(500).json({ error: 'API_VIDEO_API_KEY غير مُعدّ على الخادم' });
     }
 
-    // إنشاء FormData مع الملف
     const form = new FormData();
     form.append('file', buffer, { filename: 'video.mp4', contentType: 'video/mp4' });
 
-    // إرسال الطلب إلى api.video
     const response = await fetch('https://ws.api.video/videos', {
       method: 'POST',
       headers: {
