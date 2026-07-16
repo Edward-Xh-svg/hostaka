@@ -1429,9 +1429,12 @@ function openPostModal(){
   document.getElementById('postMediaPreviewWrap').style.display='none';
   postMediaBase64='';
   postMediaType='';
+  postMediaFileObj=null;
   document.getElementById('postModal').classList.add('show');
   setTimeout(()=>document.getElementById('postEditor')?.focus(),100);
 }
+
+let postMediaFileObj = null; // نحتفظ بملف الفيديو الأصلي لرفعه مباشرة لاحقاً
 
 function onPostMedia(e){
   const f = e.target.files[0];
@@ -1454,6 +1457,7 @@ function onPostMedia(e){
   }
 
   postMediaType = isImage ? 'image' : 'video';
+  postMediaFileObj = isVideo ? f : null;
   const reader = new FileReader();
   reader.onload = ev => {
     postMediaBase64 = ev.target.result;
@@ -1472,6 +1476,7 @@ function onPostMedia(e){
 function removePostMedia(){
   postMediaBase64 = '';
   postMediaType = '';
+  postMediaFileObj = null;
   document.getElementById('postMediaPreviewWrap').style.display = 'none';
 }
 
@@ -1508,19 +1513,37 @@ async function submitPost(){
   const btn=document.getElementById('postBtn'); btn.disabled=true; btn.textContent='...';
   try {
     let imageUrl='', videoUrl='';
-    if(postMediaBase64){
-      let endpoint = '/api/upload';
-      let payload = { image: postMediaBase64 };
-      if (postMediaType === 'video') {
-        endpoint = '/api/upload/video';
-        payload = { video: postMediaBase64 };
-      }
-      const up = await apiFetch(endpoint, 'POST', payload);
+    if(postMediaType === 'image' && postMediaBase64){
+      const up = await apiFetch('/api/upload', 'POST', { image: postMediaBase64 });
       if (up.url) {
-        if (postMediaType === 'image') imageUrl = up.url;
-        else videoUrl = up.url;
+        imageUrl = up.url;
       } else {
-        errEl.textContent='فشل رفع الملف';
+        errEl.textContent = up.error || 'فشل رفع الملف';
+        errEl.style.display='block';
+        btn.disabled=false; btn.innerHTML=`<span id="publishBtn">${t('publish')}</span>`;
+        return;
+      }
+    } else if (postMediaType === 'video' && postMediaFileObj) {
+      try {
+        // 1) نجيب توكن رفع مؤقت من السيرفر عندنا
+        const tokRes = await apiFetch('/api/upload/video/token', 'POST', {});
+        if (!tokRes.token) throw new Error(tokRes.error || 'تعذر تجهيز رفع الفيديو');
+
+        // 2) نرفع الفيديو مباشرة من المتصفح إلى api.video (بدون المرور
+        //    عبر سيرفرلس فنكشن عندنا، تفادياً لحد Vercel على حجم الطلب)
+        const fd = new FormData();
+        fd.append('file', postMediaFileObj);
+        const vRes = await fetch(`https://ws.api.video/upload?token=${encodeURIComponent(tokRes.token)}`, {
+          method: 'POST',
+          body: fd,
+        });
+        const vData = await vRes.json();
+        if (!vRes.ok || !vData.assets?.mp4) {
+          throw new Error(vData.detail || vData.title || 'فشل رفع الفيديو');
+        }
+        videoUrl = vData.assets.mp4;
+      } catch (upErr) {
+        errEl.textContent = upErr.message || 'فشل رفع الفيديو';
         errEl.style.display='block';
         btn.disabled=false; btn.innerHTML=`<span id="publishBtn">${t('publish')}</span>`;
         return;
