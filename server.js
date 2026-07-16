@@ -5,7 +5,7 @@ const jwt     = require('jsonwebtoken');
 const { q, initDB } = require('./database');
 
 const app = express();
-app.use(express.json({ limit: '15mb' }));
+app.use(express.json({ limit: '25mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 const JWT_SECRET  = process.env.JWT_SECRET  || 'hostaka-secret-2026';
@@ -77,14 +77,13 @@ app.post('/api/logout',(_,res)=>res.json({success:true}));
 // Profile
 app.get('/api/profile/:username', async (req, res) => {
   try {
-    // استخراج التوكن إذا وجد
     const token = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
     let viewerId = null;
     if (token) {
       try {
         const decoded = jwt.verify(token, JWT_SECRET);
         viewerId = decoded.id;
-      } catch (e) { /* تجاهل التوكن غير الصالح */ }
+      } catch (e) { /* تجاهل */ }
     }
     const user = await q.getPublicProfile(req.params.username, viewerId);
     if (!user) return res.status(404).json({ error: 'غير موجود' });
@@ -128,7 +127,9 @@ app.get('/api/user/:username/posts', async (req, res) => {
   }
 });
 
-// Upload
+// ============================================================
+// UPLOAD (Images & Videos)
+// ============================================================
 app.post('/api/upload', requireAuth, async (req, res) => {
   try {
     const { image } = req.body || {};
@@ -148,7 +149,52 @@ app.post('/api/upload', requireAuth, async (req, res) => {
   }
 });
 
+// رفع الفيديوهات عبر api.video (باستخدام API_VIDEO_API_KEY)
+app.post('/api/upload/video', requireAuth, async (req, res) => {
+  try {
+    const { video } = req.body || {};
+    if (!video) return res.status(400).json({ error: 'لا يوجد فيديو' });
+
+    const base64Data = video.includes(',') ? video.split(',')[1] : video;
+    const buffer = Buffer.from(base64Data, 'base64');
+    const sizeMB = buffer.length / (1024 * 1024);
+    if (sizeMB > 25) {
+      return res.status(400).json({ error: 'حجم الفيديو يتجاوز 25 ميجابايت' });
+    }
+
+    // ✅ استخدام المتغير البيئي الجديد
+    const apiKey = process.env.API_VIDEO_API_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'API_VIDEO_API_KEY غير مُعدّ' });
+
+    const formData = new FormData();
+    const blob = new Blob([buffer], { type: 'video/mp4' });
+    formData.append('file', blob, 'video.mp4');
+
+    const response = await fetch('https://ws.api.video/videos', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + apiKey,
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (!data.assets?.mp4) {
+      console.error('api.video upload error:', data);
+      return res.status(500).json({ error: 'فشل رفع الفيديو' });
+    }
+
+    const videoUrl = data.assets.mp4;
+    res.json({ url: videoUrl });
+  } catch (e) {
+    console.error('Video upload error:', e);
+    res.status(500).json({ error: 'خطأ: ' + e.message });
+  }
+});
+
+// ============================================================
 // Posts
+// ============================================================
 app.get('/api/records', async (req, res) => {
   try {
     const records = await q.listRecords();
@@ -182,20 +228,25 @@ app.get('/api/records', async (req, res) => {
 
 app.post('/api/records', requireAuth, async (req, res) => {
   try {
-    const { content, image } = req.body || {};
-    if (!content?.trim() && !image) return res.status(400).json({ error: 'المحتوى مطلوب' });
+    const { content, image, video } = req.body || {};
+    if (!content?.trim() && !image && !video) {
+      return res.status(400).json({ error: 'المحتوى أو الملف مطلوب' });
+    }
     const user = await q.getUserById(req.user.id);
     if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
+
     const result = await q.createRecord(
       user.id,
       user.display_name || user.username,
       user.role === 'admin' ? 'Admin' : 'Member',
       user.avatar || '',
       content?.trim() || '',
-      image || ''
+      image || '',
+      video || ''
     );
     res.json({ success: true, id: Number(result.lastInsertRowid) });
   } catch(e) {
+    console.error('Create record error:', e);
     res.status(500).json({ error: 'خطأ: ' + e.message });
   }
 });
@@ -269,7 +320,9 @@ app.delete('/api/comments/:id', requireAuth, async (req, res) => {
   }
 });
 
+// ============================================================
 // Verify
+// ============================================================
 app.post('/api/verify/request', requireAuth, async (req, res) => {
   try {
     const user = await q.getUserById(req.user.id);
@@ -342,14 +395,13 @@ app.delete('/api/follow/:username', requireAuth, async (req, res) => {
 
 app.get('/api/follow/status/:username', async (req, res) => {
   try {
-    // استخراج التوكن إذا وجد
     const token = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
     let viewerId = null;
     if (token) {
       try {
         const decoded = jwt.verify(token, JWT_SECRET);
         viewerId = decoded.id;
-      } catch (e) { /* تجاهل التوكن غير الصالح */ }
+      } catch (e) { /* تجاهل */ }
     }
     const user = await q.getPublicProfile(req.params.username, viewerId);
     if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
@@ -449,7 +501,6 @@ app.post('/api/messages/react/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Get reactions for multiple messages at once (for chat loading)
 app.get('/api/messages/reactions', requireAuth, async (req, res) => {
   try {
     const ids = (req.query.ids || '').split(',').map(Number).filter(Boolean);
