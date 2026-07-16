@@ -1528,23 +1528,27 @@ async function submitPost(){
       }
     } else if (postMediaType === 'video' && postMediaFileObj) {
       try {
-        // 1) نجيب توكن رفع مؤقت من السيرفر عندنا
-        const tokRes = await apiFetch('/api/upload/video/token', 'POST', {});
-        if (!tokRes.token) throw new Error(tokRes.error || 'تعذر تجهيز رفع الفيديو');
+        // 1) نجيب توقيع رفع مؤقت (signature) من السيرفر عندنا
+        const sig = await apiFetch('/api/upload/video/signature', 'POST', {});
+        if (!sig.signature) throw new Error(sig.error || 'تعذر تجهيز رفع الفيديو');
 
-        // 2) نرفع الفيديو مباشرة من المتصفح إلى api.video (بدون المرور
+        // 2) نرفع الفيديو مباشرة من المتصفح إلى Cloudinary (بدون المرور
         //    عبر سيرفرلس فنكشن عندنا، تفادياً لحد Vercel على حجم الطلب)
         const fd = new FormData();
         fd.append('file', postMediaFileObj);
-        const vRes = await fetch(`https://ws.api.video/upload?token=${encodeURIComponent(tokRes.token)}`, {
+        fd.append('api_key', sig.apiKey);
+        fd.append('timestamp', sig.timestamp);
+        fd.append('folder', sig.folder);
+        fd.append('signature', sig.signature);
+        const vRes = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/video/upload`, {
           method: 'POST',
           body: fd,
         });
         const vData = await vRes.json();
-        if (!vRes.ok || !vData.assets?.mp4) {
-          throw new Error(vData.detail || vData.title || 'فشل رفع الفيديو');
+        if (!vRes.ok || !vData.secure_url) {
+          throw new Error(vData.error?.message || 'فشل رفع الفيديو');
         }
-        videoUrl = vData.assets.mp4;
+        videoUrl = vData.secure_url;
       } catch (upErr) {
         errEl.textContent = upErr.message || 'فشل رفع الفيديو';
         errEl.style.display='block';
