@@ -149,12 +149,13 @@ app.post('/api/upload', requireAuth, async (req, res) => {
   }
 });
 
-// رفع الفيديوهات عبر api.video (باستخدام API_VIDEO_API_KEY)
+// ===== رفع الفيديوهات عبر api.video (مُحسّن) =====
 app.post('/api/upload/video', requireAuth, async (req, res) => {
   try {
     const { video } = req.body || {};
     if (!video) return res.status(400).json({ error: 'لا يوجد فيديو' });
 
+    // استخراج base64
     const base64Data = video.includes(',') ? video.split(',')[1] : video;
     const buffer = Buffer.from(base64Data, 'base64');
     const sizeMB = buffer.length / (1024 * 1024);
@@ -162,33 +163,43 @@ app.post('/api/upload/video', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'حجم الفيديو يتجاوز 25 ميجابايت' });
     }
 
-    // ✅ استخدام المتغير البيئي الجديد
     const apiKey = process.env.API_VIDEO_API_KEY;
-    if (!apiKey) return res.status(500).json({ error: 'API_VIDEO_API_KEY غير مُعدّ' });
+    if (!apiKey) {
+      console.error('❌ API_VIDEO_API_KEY is missing');
+      return res.status(500).json({ error: 'API_VIDEO_API_KEY غير مُعدّ' });
+    }
 
+    // إنشاء FormData
     const formData = new FormData();
     const blob = new Blob([buffer], { type: 'video/mp4' });
     formData.append('file', blob, 'video.mp4');
 
+    // إرسال إلى api.video
     const response = await fetch('https://ws.api.video/videos', {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer ' + apiKey,
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: formData,
     });
 
     const data = await response.json();
-    if (!data.assets?.mp4) {
-      console.error('api.video upload error:', data);
-      return res.status(500).json({ error: 'فشل رفع الفيديو' });
+
+    if (!response.ok) {
+      console.error('❌ api.video error:', data);
+      return res.status(response.status).json({ error: data.message || 'فشل رفع الفيديو' });
     }
 
-    const videoUrl = data.assets.mp4;
-    res.json({ url: videoUrl });
-  } catch (e) {
-    console.error('Video upload error:', e);
-    res.status(500).json({ error: 'خطأ: ' + e.message });
+    // التأكد من وجود رابط mp4
+    if (!data.assets?.mp4) {
+      console.error('❌ No mp4 asset in response:', data);
+      return res.status(500).json({ error: 'لم يتم العثور على رابط الفيديو' });
+    }
+
+    res.json({ url: data.assets.mp4 });
+  } catch (error) {
+    console.error('❌ Video upload error:', error);
+    res.status(500).json({ error: 'خطأ في الخادم: ' + error.message });
   }
 });
 
