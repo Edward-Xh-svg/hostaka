@@ -4,9 +4,8 @@ const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
 const { q, initDB } = require('./database');
 
-// ===== استيراد form-data و node-fetch =====
-const FormData = require('form-data');
-const fetch = require('node-fetch');
+// ===== استيراد العميل الرسمي لـ api.video =====
+const ApiVideoClient = require('@api.video/nodejs-client');
 
 const app = express();
 app.use(express.json({ limit: '25mb' }));
@@ -153,7 +152,7 @@ app.post('/api/upload', requireAuth, async (req, res) => {
   }
 });
 
-// ===== رفع الفيديوهات عبر api.video (باستخدام form-data) =====
+// ===== رفع الفيديوهات عبر api.video (باستخدام العميل الرسمي) =====
 app.post('/api/upload/video', requireAuth, async (req, res) => {
   try {
     const { video } = req.body || {};
@@ -173,33 +172,33 @@ app.post('/api/upload/video', requireAuth, async (req, res) => {
       return res.status(500).json({ error: 'API_VIDEO_API_KEY غير مُعدّ' });
     }
 
-    // إنشاء FormData مع الملف (باستخدام form-data من npm)
-    const form = new FormData();
-    form.append('file', buffer, { filename: 'video.mp4', contentType: 'video/mp4' });
+    // إنشاء عميل api.video
+    const client = new ApiVideoClient({ apiKey });
 
-    // إرسال إلى api.video مع رؤوس form-data
-    const response = await fetch('https://ws.api.video/videos', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        ...form.getHeaders(),
-      },
-      body: form,
-    });
+    // الخطوة 1: إنشاء حاوية الفيديو
+    const videoCreationPayload = {
+      title: `Hostaka Video ${Date.now()}`,
+      description: 'Uploaded from Hostaka platform',
+    };
+    const videoContainer = await client.videos.create(videoCreationPayload);
 
-    const data = await response.json();
+    // الخطوة 2: تحويل Buffer إلى Stream ورفع الفيديو
+    const { Readable } = require('stream');
+    const stream = Readable.from(buffer);
+    stream.path = 'video.mp4'; // اسم الملف مطلوب
 
-    if (!response.ok) {
-      console.error('❌ api.video error:', data);
-      return res.status(response.status).json({ error: data.detail || data.title || 'فشل رفع الفيديو' });
-    }
+    await client.videos.upload(videoContainer.videoId, stream);
 
-    if (!data.assets?.mp4) {
-      console.error('❌ No mp4 asset in response:', data);
+    // الحصول على رابط التشغيل
+    const videoData = await client.videos.get(videoContainer.videoId);
+    const videoUrl = videoData.assets?.mp4;
+
+    if (!videoUrl) {
+      console.error('❌ No mp4 asset in response:', videoData);
       return res.status(500).json({ error: 'لم يتم العثور على رابط الفيديو' });
     }
 
-    res.json({ url: data.assets.mp4 });
+    res.json({ url: videoUrl });
   } catch (error) {
     console.error('❌ Video upload error:', error);
     res.status(500).json({ error: 'خطأ في الخادم: ' + error.message });
