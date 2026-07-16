@@ -153,7 +153,75 @@ app.post('/api/upload', requireAuth, async (req, res) => {
   }
 });
 
-// ===== رفع الفيديوهات عبر api.video (المفتاح من البيئة فقط) =====
+// ===== مصادقة api.video: تبديل الـ API key بـ access_token (Bearer) =====
+// api.video لا يقبل الـ API key مباشرة كـ Bearer token، لازم تبديله أولاً
+// عبر /auth/api-key، والتوكن صالح لمدة ساعة فقط لذلك نخزّنه مؤقتاً ونجدده.
+let _apiVideoToken = null;   // { access_token, expires_at }
+async function getApiVideoAccessToken() {
+  const apiKey = process.env.API_VIDEO_API_KEY;
+  if (!apiKey) return null;
+
+  if (_apiVideoToken && _apiVideoToken.expires_at > Date.now() + 30000) {
+    return _apiVideoToken.access_token;
+  }
+
+  const r = await fetch('https://ws.api.video/auth/api-key', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ apiKey }),
+  });
+  const data = await r.json();
+  if (!r.ok || !data.access_token) {
+    console.error('❌ فشل مصادقة api.video:', data);
+    throw new Error(data.detail || data.title || 'فشل مصادقة api.video');
+  }
+  _apiVideoToken = {
+    access_token: data.access_token,
+    expires_at: Date.now() + (data.expires_in || 3600) * 1000,
+  };
+  return _apiVideoToken.access_token;
+}
+
+// ===== توكن رفع مباشر (Delegated Upload Token) =====
+// بدل ما نمرر الفيديو (base64) عبر السيرفرلس function عندنا (اللي عنده حد
+// أقصى ~4.5MB على Vercel)، نولّد توكن مؤقت ونخلي المتصفح يرفع الفيديو
+// مباشرة لـ api.video. هذا هو الحل الموصى به من api.video للرفع من المتصفح.
+app.post('/api/upload/video/token', requireAuth, async (req, res) => {
+  try {
+    if (!process.env.API_VIDEO_API_KEY) {
+      console.error('❌ API_VIDEO_API_KEY غير موجود في البيئة');
+      return res.status(500).json({ error: 'API_VIDEO_API_KEY غير مُعدّ على الخادم' });
+    }
+    let accessToken;
+    try {
+      accessToken = await getApiVideoAccessToken();
+    } catch (authErr) {
+      console.error('❌ api.video auth error:', authErr);
+      return res.status(500).json({ error: 'فشل التحقق من مفتاح api.video: ' + authErr.message });
+    }
+    const r = await fetch('https://ws.api.video/upload-tokens', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({ ttl: 3600 }),
+    });
+    const data = await r.json();
+    if (!r.ok || !data.token) {
+      console.error('❌ فشل إنشاء upload token:', data);
+      return res.status(500).json({ error: 'فشل تجهيز رفع الفيديو' });
+    }
+    res.json({ token: data.token });
+  } catch (e) {
+    console.error('❌ Video token error:', e);
+    res.status(500).json({ error: 'خطأ في الخادم: ' + e.message });
+  }
+});
+
+// ===== رفع الفيديوهات عبر api.video (طريقة قديمة، تصلح فقط للفيديوهات
+// الصغيرة جداً بسبب حد Vercel على حجم الطلب — يُفضّل استخدام /token أعلاه) =====
 app.post('/api/upload/video', requireAuth, async (req, res) => {
   try {
     const { video } = req.body || {};
@@ -162,14 +230,25 @@ app.post('/api/upload/video', requireAuth, async (req, res) => {
     const base64Data = video.includes(',') ? video.split(',')[1] : video;
     const buffer = Buffer.from(base64Data, 'base64');
     const sizeMB = buffer.length / (1024 * 1024);
+    // ملاحظة مهمة: Vercel يفرض حداً أقصى ~4.5 ميجابايت على حجم الطلب (body) لكل
+    // Serverless Function، وترميز base64 يزيد حجم الفيديو نحو 33%. أي فيديو
+    // أكبر من ~3 ميجابايت تقريباً سيُرفض بواسطة Vercel قبل أن يصل الكود أصلاً
+    // (خطأ 413) بغض النظر عن هذا الحد الداخلي البالغ 25 ميجابايت.
     if (sizeMB > 25) {
       return res.status(400).json({ error: 'حجم الفيديو يتجاوز 25 ميجابايت' });
     }
 
-    const apiKey = process.env.API_VIDEO_API_KEY;
-    if (!apiKey) {
+    if (!process.env.API_VIDEO_API_KEY) {
       console.error('❌ API_VIDEO_API_KEY غير موجود في البيئة');
       return res.status(500).json({ error: 'API_VIDEO_API_KEY غير مُعدّ على الخادم' });
+    }
+
+    let accessToken;
+    try {
+      accessToken = await getApiVideoAccessToken();
+    } catch (authErr) {
+      console.error('❌ api.video auth error:', authErr);
+      return res.status(500).json({ error: 'فشل التحقق من مفتاح api.video: ' + authErr.message });
     }
 
     const form = new FormData();
@@ -178,7 +257,7 @@ app.post('/api/upload/video', requireAuth, async (req, res) => {
     const response = await fetch('https://ws.api.video/videos', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${accessToken}`,
         ...form.getHeaders(),
       },
       body: form,
