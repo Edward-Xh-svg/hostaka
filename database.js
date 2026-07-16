@@ -37,6 +37,7 @@ async function initDB() {
       user_avatar TEXT DEFAULT '',
       content     TEXT NOT NULL,
       image       TEXT DEFAULT '',
+      video       TEXT DEFAULT '',
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -151,6 +152,7 @@ async function initDB() {
     "ALTER TABLE records ADD COLUMN user_role   TEXT DEFAULT 'Member'",
     "ALTER TABLE records ADD COLUMN user_avatar TEXT DEFAULT ''",
     "ALTER TABLE records ADD COLUMN image       TEXT DEFAULT ''",
+    "ALTER TABLE records ADD COLUMN video       TEXT DEFAULT ''",  // ✅ عمود الفيديو
     "ALTER TABLE record_comments ADD COLUMN display_name TEXT DEFAULT ''",
     "ALTER TABLE record_comments ADD COLUMN avatar       TEXT DEFAULT ''",
     "ALTER TABLE record_comments ADD COLUMN user_role    TEXT DEFAULT 'Member'",
@@ -168,14 +170,12 @@ async function initDB() {
   const ADMIN_PASS  = process.env.ADMIN_PASS  || 'hostaka-admin-2026';
   const hash = bcrypt.hashSync(ADMIN_PASS, 10);
 
-  // Find existing admin by username='admin' first, then by role
   let adminRes = await db.execute({ sql:"SELECT id, email FROM users WHERE username='admin' LIMIT 1", args:[] });
   if (adminRes.rows.length === 0) {
     adminRes = await db.execute({ sql:"SELECT id, email FROM users WHERE role='admin' LIMIT 1", args:[] });
   }
 
   if (adminRes.rows.length === 0) {
-    // No admin exists — create one
     try {
       await db.execute({
         sql:"INSERT INTO users (username,email,password,role,display_name) VALUES (?,?,?,?,?)",
@@ -183,7 +183,6 @@ async function initDB() {
       });
       console.log('✅ Admin user created');
     } catch (e) {
-      // If email exists, just log and continue
       if (e.message?.includes('UNIQUE constraint failed')) {
         console.log('⚠️ Admin email already exists in users table, skipping insert');
       } else {
@@ -191,7 +190,6 @@ async function initDB() {
       }
     }
   } else {
-    // Admin exists — update by ID (not by role, to avoid updating multiple rows)
     const adminId = adminRes.rows[0].id;
     try {
       await db.execute({
@@ -201,7 +199,6 @@ async function initDB() {
     } catch (e) {
       if (e.message?.includes('UNIQUE constraint failed')) {
         console.log('⚠️ Admin email conflicts with existing user, keeping current email');
-        // Just update password
         await db.execute({ sql:"UPDATE users SET password=? WHERE id=?", args:[hash, adminId] });
       } else {
         throw e;
@@ -219,7 +216,6 @@ const q = {
   getUserByEmail:   (email)    => db.execute({ sql:'SELECT * FROM users WHERE email=?', args:[email] }).then(first),
   getUserById:      (id)       => db.execute({ sql:'SELECT id,username,email,role,avatar,bio,game_id,display_name,cover,verified,created_at FROM users WHERE id=?', args:[id] }).then(first),
   getPublicProfile: (username, viewerId = null) => {
-    // إحصائيات المتابعات مع إمكانية معرفة إذا كان المشاهد يتابع هذا المستخدم
     return db.execute({ 
       sql: `
         SELECT 
@@ -251,11 +247,20 @@ const q = {
     LEFT JOIN users u ON (u.id = r.user_id) OR (r.user_id IS NULL AND u.username = r.publisher)
     ORDER BY r.created_at DESC
   `).then(rows),
-  createRecord: async (user_id,publisher,user_role,user_avatar,content,image) => {
+  createRecord: async (user_id, publisher, user_role, user_avatar, content, image, video) => {
+    // video هو معامل جديد (اختياري)
     try {
-      return await db.execute({ sql:'INSERT INTO records (user_id,publisher,user_role,user_avatar,content,image) VALUES (?,?,?,?,?,?)', args:[user_id,publisher,user_role,user_avatar,content,image] });
+      return await db.execute({
+        sql: 'INSERT INTO records (user_id,publisher,user_role,user_avatar,content,image,video) VALUES (?,?,?,?,?,?,?)',
+        args: [user_id, publisher, user_role, user_avatar, content, image || '', video || '']
+      });
     } catch(e) {
-      return await db.execute({ sql:'INSERT INTO records (publisher,content,image) VALUES (?,?,?)', args:[publisher,content,image] });
+      // إذا فشل (مثلاً لعدم وجود عمود video في الإصدارات القديمة)، نعيد المحاولة بدون video
+      console.warn('⚠️ Video column missing, falling back to old schema');
+      return await db.execute({
+        sql: 'INSERT INTO records (publisher,content,image) VALUES (?,?,?)',
+        args: [publisher, content, image || '']
+      });
     }
   },
   deleteRecord: (id) => db.execute({ sql:'DELETE FROM records WHERE id=?', args:[id] }),
@@ -351,8 +356,6 @@ const q = {
     WHERE f.follower_id = ?
     ORDER BY f.created_at DESC
   `, args:[userId] }).then(rows),
-
-  // تحويل getPublicProfile لدعم إحصائيات المتابعة (تم تعديله أعلاه)
 };
 
 module.exports = { db, q, initDB };
