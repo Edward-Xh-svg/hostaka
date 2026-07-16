@@ -159,7 +159,7 @@ app.post('/api/upload/video', requireAuth, async (req, res) => {
     const { video } = req.body || {};
     if (!video) return res.status(400).json({ error: 'لا يوجد فيديو' });
 
-    // تحويل base64 إلى Buffer
+    // استخراج base64 وتحويله إلى Buffer
     const base64Data = video.includes(',') ? video.split(',')[1] : video;
     const buffer = Buffer.from(base64Data, 'base64');
     const sizeMB = buffer.length / (1024 * 1024);
@@ -173,16 +173,16 @@ app.post('/api/upload/video', requireAuth, async (req, res) => {
       return res.status(500).json({ error: 'API_VIDEO_API_KEY غير مُعدّ' });
     }
 
-    // إنشاء FormData مع الملف
+    // إنشاء FormData مع الملف (باستخدام form-data من npm)
     const form = new FormData();
     form.append('file', buffer, { filename: 'video.mp4', contentType: 'video/mp4' });
 
-    // إرسال إلى api.video
+    // إرسال إلى api.video مع رؤوس form-data
     const response = await fetch('https://ws.api.video/videos', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        ...form.getHeaders(), // مهم جداً: إضافة رؤوس form-data
+        ...form.getHeaders(),
       },
       body: form,
     });
