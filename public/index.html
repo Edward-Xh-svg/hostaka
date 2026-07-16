@@ -5,10 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="icon" href="hostaka-icon.png" type="image/png">
   <title>Hostaka</title>
-  <script>
-    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-  </script>
-  <script defer src="/_vercel/insights/script.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -763,9 +759,11 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           <span class="drop-profile">الملف الشخصي</span>
         </button>
-        <button onclick="location.href='/chat'">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          <span class="drop-chat">الرسائل</span>
+        <!-- إزالة زر الرسائل لأنه موجود كأيقونة منفصلة -->
+        <!-- إضافة زر تحميل تطبيق الأندرويد -->
+        <button onclick="window.open('https://www.mediafire.com/file/q2rh47gjn0x2uej/Hostaka_V1.2.apk/file', '_blank')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span class="drop-download">تحميل تطبيق الأندرويد</span>
         </button>
         <button onclick="doLogout()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -907,7 +905,8 @@ const LANG = {
     reply: 'أضف تعليقاً...', verified: 'حساب موثق', member: 'Member', adminRole: 'Admin',
     copyLink: 'تم نسخ الرابط', verifyRequest: 'تم إرسال طلب التوثيق', verifyPending: 'طلبك قيد المراجعة',
     deleteConfirm: 'حذف هذا المنشور؟', deleteComment: 'حذف التعليق؟',
-    sortLatest: 'الأحدث', sortPopular: 'الأكثر تفاعلاً', sortRandom: 'عشوائي'
+    sortLatest: 'الأحدث', sortPopular: 'الأكثر تفاعلاً', sortRandom: 'عشوائي',
+    downloadAndroid: 'تحميل تطبيق الأندرويد'
   },
   en: {
     title: 'Hostaka', subtitle: 'An open social platform for everyone',
@@ -922,7 +921,8 @@ const LANG = {
     reply: 'Add a comment...', verified: 'Verified account', member: 'Member', adminRole: 'Admin',
     copyLink: 'Link copied', verifyRequest: 'Verification request sent', verifyPending: 'Your request is pending',
     deleteConfirm: 'Delete this post?', deleteComment: 'Delete this comment?',
-    sortLatest: 'Latest', sortPopular: 'Most Popular', sortRandom: 'Random'
+    sortLatest: 'Latest', sortPopular: 'Most Popular', sortRandom: 'Random',
+    downloadAndroid: 'Download Android App'
   },
   fr: {
     title: 'Hostaka', subtitle: 'Une plateforme sociale ouverte à tous',
@@ -937,13 +937,14 @@ const LANG = {
     reply: 'Ajouter un commentaire...', verified: 'Compte vérifié', member: 'Membre', adminRole: 'Admin',
     copyLink: 'Lien copié', verifyRequest: 'Demande envoyée', verifyPending: 'En attente',
     deleteConfirm: 'Supprimer ?', deleteComment: 'Supprimer ce commentaire ?',
-    sortLatest: 'Derniers', sortPopular: 'Plus populaires', sortRandom: 'Aléatoire'
+    sortLatest: 'Derniers', sortPopular: 'Plus populaires', sortRandom: 'Aléatoire',
+    downloadAndroid: 'Télécharger l\'app Android'
   },
   ru: {
     title: 'Hostaka', subtitle: 'Открытая социальная платформа для всех',
     search: 'Поиск...', newPost: 'Новый пост', login: 'Вход / Регистрация',
     loginTab: 'Вход', registerTab: 'Регистрация',
-    email: 'Э��. почта', password: 'Пароль', username: 'Имя пользователя',
+    email: 'Эл. почта', password: 'Пароль', username: 'Имя пользователя',
     loginSubmit: 'Войти', registerSubmit: 'Создать аккаунт',
     admin: 'Панель', profile: 'Профиль', chat: 'Сообщения', logout: 'Выйти',
     loading: 'Загрузка...', empty: 'Нет постов',
@@ -952,7 +953,8 @@ const LANG = {
     reply: 'Добавить комментарий...', verified: 'Верифицирован', member: 'Участник', adminRole: 'Админ',
     copyLink: 'Ссылка скопирована', verifyRequest: 'Запрос отправлен', verifyPending: 'На рассмотрении',
     deleteConfirm: 'Удалить пост?', deleteComment: 'Удалить комментарий?',
-    sortLatest: 'Новые', sortPopular: 'Популярные', sortRandom: 'Случайные'
+    sortLatest: 'Новые', sortPopular: 'Популярные', sortRandom: 'Случайные',
+    downloadAndroid: 'Скачать Android-приложение'
   },
   zh: {
     title: 'Hostaka', subtitle: '面向所有人的开放社交平台',
@@ -967,7 +969,8 @@ const LANG = {
     reply: '添加评论...', verified: '已验证', member: '成员', adminRole: '管理员',
     copyLink: '链接已复制', verifyRequest: '验证请求已发送', verifyPending: '审核中',
     deleteConfirm: '删除此帖子？', deleteComment: '删除此评论？',
-    sortLatest: '最新', sortPopular: '最受欢迎', sortRandom: '随机'
+    sortLatest: '最新', sortPopular: '最受欢迎', sortRandom: '随机',
+    downloadAndroid: '下载安卓应用'
   },
   ja: {
     title: 'Hostaka', subtitle: '誰でも参加できるオープンソーシャルプラットフォーム',
@@ -982,7 +985,8 @@ const LANG = {
     reply: 'コメントを追加...', verified: '認証済み', member: 'メンバー', adminRole: '管理者',
     copyLink: 'リンクをコピーしました', verifyRequest: '認証リクエストを送信しました', verifyPending: '審査中',
     deleteConfirm: 'この投稿を削除しますか？', deleteComment: 'このコメントを削除しますか？',
-    sortLatest: '最新', sortPopular: '人気順', sortRandom: 'ランダム'
+    sortLatest: '最新', sortPopular: '人気順', sortRandom: 'ランダム',
+    downloadAndroid: 'Androidアプリをダウンロード'
   }
 };
 
@@ -1026,7 +1030,7 @@ function applyLang() {
   document.getElementById('registerSubmitText').textContent = t('registerSubmit');
   document.querySelector('.drop-admin').textContent = t('admin');
   document.querySelector('.drop-profile').textContent = t('profile');
-  document.querySelector('.drop-chat').textContent = t('chat');
+  document.querySelector('.drop-download').textContent = t('downloadAndroid');
   document.querySelector('.drop-logout').textContent = t('logout');
   document.getElementById('loadingText').textContent = t('loading');
   document.getElementById('newPostModalTitle').textContent = t('postModalTitle');
