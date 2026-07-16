@@ -4,6 +4,10 @@ const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
 const { q, initDB } = require('./database');
 
+// ===== استيراد form-data و node-fetch =====
+const FormData = require('form-data');
+const fetch = require('node-fetch');
+
 const app = express();
 app.use(express.json({ limit: '25mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -149,13 +153,13 @@ app.post('/api/upload', requireAuth, async (req, res) => {
   }
 });
 
-// ===== رفع الفيديوهات عبر api.video (مُحسّن) =====
+// ===== رفع الفيديوهات عبر api.video (باستخدام form-data) =====
 app.post('/api/upload/video', requireAuth, async (req, res) => {
   try {
     const { video } = req.body || {};
     if (!video) return res.status(400).json({ error: 'لا يوجد فيديو' });
 
-    // استخراج base64
+    // تحويل base64 إلى Buffer
     const base64Data = video.includes(',') ? video.split(',')[1] : video;
     const buffer = Buffer.from(base64Data, 'base64');
     const sizeMB = buffer.length / (1024 * 1024);
@@ -169,28 +173,27 @@ app.post('/api/upload/video', requireAuth, async (req, res) => {
       return res.status(500).json({ error: 'API_VIDEO_API_KEY غير مُعدّ' });
     }
 
-    // إنشاء FormData
-    const formData = new FormData();
-    const blob = new Blob([buffer], { type: 'video/mp4' });
-    formData.append('file', blob, 'video.mp4');
+    // إنشاء FormData مع الملف
+    const form = new FormData();
+    form.append('file', buffer, { filename: 'video.mp4', contentType: 'video/mp4' });
 
     // إرسال إلى api.video
     const response = await fetch('https://ws.api.video/videos', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
+        ...form.getHeaders(), // مهم جداً: إضافة رؤوس form-data
       },
-      body: formData,
+      body: form,
     });
 
     const data = await response.json();
 
     if (!response.ok) {
       console.error('❌ api.video error:', data);
-      return res.status(response.status).json({ error: data.message || 'فشل رفع الفيديو' });
+      return res.status(response.status).json({ error: data.detail || data.title || 'فشل رفع الفيديو' });
     }
 
-    // التأكد من وجود رابط mp4
     if (!data.assets?.mp4) {
       console.error('❌ No mp4 asset in response:', data);
       return res.status(500).json({ error: 'لم يتم العثور على رابط الفيديو' });
