@@ -371,6 +371,7 @@ const q = {
   getShiziMessages:   (uid) => db.execute({ sql:'SELECT id,role,content,created_at FROM shizi_messages WHERE user_id=? ORDER BY created_at ASC', args:[uid] }).then(rows),
   addShiziMessage:    (uid,role,content) => db.execute({ sql:'INSERT INTO shizi_messages (user_id,role,content) VALUES (?,?,?)', args:[uid,role,content] }),
   clearShiziMessages: (uid) => db.execute({ sql:'DELETE FROM shizi_messages WHERE user_id=?', args:[uid] }),
+  countShiziUserMessagesLast24h: (uid) => db.execute({ sql:"SELECT COUNT(*) as cnt FROM shizi_messages WHERE user_id=? AND role='user' AND created_at >= datetime('now','-1 day')", args:[uid] }).then(first).then(r => r ? Number(r.cnt) : 0),
 };
 
 module.exports = { db, q, initDB };

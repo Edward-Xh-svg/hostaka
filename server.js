@@ -15,13 +15,15 @@ app.use(express.static(path.join(__dirname, 'public')));
 const JWT_SECRET  = process.env.JWT_SECRET  || 'hostaka-secret-2026';
 const JWT_EXPIRES = '30d';
 
-// ===== شخصية Shizi AI (مبنية على DeepSeek) =====
-const SHIZI_SYSTEM_PROMPT = `أنتِ "شيزي" (Shizi AI)، المساعدة الذكية الرسمية لمنصة Hostaka 🎀
-شخصيتك: لطيفة، ودودة، مرحة، ومتعاونة. تتحدثين بأسلوب دافئ وقريب من المستخدم، وتستخدمين اللغة العربية بشكل أساسي (إلا إذا كتب المستخدم بلغة أخرى، فحينها تجاوبين بنفس لغته).
-تستخدمين رموز تعبيرية بسيطة وبأناقة (مثل 🎀✨💬) دون مبالغة.
+// ===== شخصية Shizi AI (مبنية على Gemini) =====
+const SHIZI_SYSTEM_PROMPT = `أنتِ "شيزي" (Shizi AI)، المساعدة الذكية الرسمية لمنصة Hostaka.
+شخصيتك: احترافية، واضحة، ومتعاونة. تتحدثين بأسلوب راقٍ ومباشر، وتستخدمين اللغة العربية بشكل أساسي (إلا إذا كتب المستخدم بلغة أخرى، فحينها تجاوبين بنفس لغته).
+لا تستخدمي أي رموز تعبيرية (إيموجي) في ردودك مطلقاً.
 مهمتك مساعدة مستخدمي Hostaka في أي استفسار: عن المنصة، أو الدردشة العامة، أو الأسئلة العلمية والتقنية، أو كتابة نصوص، أو حل المشاكل.
 كوني دقيقة ومختصرة قدر الإمكان، وواضحة في إجاباتك، ولا تختلقي معلومات لا تعرفينها.
-لا تفصحي عن كونك مبنية على DeepSeek إلا إذا سُئلتِ صراحة عن ذلك.`;
+لا تفصحي عن الجهة التقنية المبنية عليها إلا إذا سُئلتِ صراحة عن ذلك.`;
+
+const SHIZI_DAILY_LIMIT = 50;
 
 function signToken(user) {
   return jwt.sign({ id:user.id, username:user.username, role:user.role, avatar:user.avatar||'' }, JWT_SECRET, { expiresIn:JWT_EXPIRES });
@@ -736,10 +738,18 @@ app.post('/api/shizi/chat', requireAuth, async (req, res) => {
     const { message } = req.body || {};
     if (!message?.trim()) return res.status(400).json({ error: 'الرسالة فارغة' });
 
-    const apiKey = process.env.DEEPSEEK_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.error('❌ DEEPSEEK_API_KEY غير موجود في البيئة');
-      return res.status(500).json({ error: 'DEEPSEEK_API_KEY غير مُعدّ على الخادم' });
+      console.error('❌ GEMINI_API_KEY غير موجود في البيئة');
+      return res.status(500).json({ error: 'GEMINI_API_KEY غير مُعدّ على الخادم' });
+    }
+
+    // ===== حد الرسائل اليومي: 50 رسالة لكل مستخدم كل 24 ساعة =====
+    const usedToday = await q.countShiziUserMessagesLast24h(req.user.id);
+    if (usedToday >= SHIZI_DAILY_LIMIT) {
+      return res.status(429).json({
+        error: `وصلت للحد الأقصى من الرسائل اليومية (${SHIZI_DAILY_LIMIT} رسالة). حاول مرة أخرى بعد مرور 24 ساعة.`,
+      });
     }
 
     // نخزّن رسالة المستخدم أولاً
@@ -748,34 +758,40 @@ app.post('/api/shizi/chat', requireAuth, async (req, res) => {
     // نجهّز آخر 20 رسالة كسياق للمحادثة
     const history = await q.getShiziMessages(req.user.id);
     const recent = history.slice(-20);
-    const messages = [
-      { role: 'system', content: SHIZI_SYSTEM_PROMPT },
-      ...recent.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }))
-    ];
 
-    const r = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + apiKey,
-      },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages,
-        temperature: 0.8,
-        max_tokens: 1200,
-      }),
-    });
+    // Gemini يستخدم صيغة "contents" مختلفة عن صيغة OpenAI/DeepSeek:
+    // كل رسالة لها role ('user' أو 'model') وقائمة "parts" نصية،
+    // والتعليمات النظامية تُرسل بشكل منفصل عبر systemInstruction.
+    const contents = recent.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }));
+
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: SHIZI_SYSTEM_PROMPT }] },
+          contents,
+          generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
+        }),
+      }
+    );
 
     const data = await r.json();
     if (!r.ok) {
-      console.error('❌ DeepSeek API error:', data);
+      console.error('❌ Gemini API error:', data);
       return res.status(500).json({ error: data.error?.message || 'فشل الاتصال بـ Shizi AI' });
     }
 
-    const reply = data.choices?.[0]?.message?.content?.trim() || '...';
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '...';
     await q.addShiziMessage(req.user.id, 'assistant', reply);
-    res.json({ success: true, reply });
+    res.json({ success: true, reply, remaining: SHIZI_DAILY_LIMIT - (usedToday + 1) });
   } catch(e) {
     console.error('❌ Shizi chat error:', e);
     res.status(500).json({ error: 'خطأ في الخادم: ' + e.message });
