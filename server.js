@@ -801,8 +801,8 @@ app.post('/api/shizi/chat', requireAuth, async (req, res) => {
       generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
     };
 
-    // استدعاء الدالة الذكية المحدثة
-    const result = await fetchGeminiWithRetry(apiKey, bodyData);
+    // استدعاء الدالة الذكية المحدثة 
+    const result = await fetchGeminiWithRetry(apiKey, bodyData, 4, 20000);
 
     if (!result.ok) {
       console.error('❌ Gemini API error:', result.data);
