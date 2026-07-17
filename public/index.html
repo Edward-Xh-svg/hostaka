@@ -15,7 +15,6 @@
       --border: #e5e5e5;
       --text: #1a1a1a;
       --muted: #6b7280;
-      /* اللون الأساسي للثيم (فاتح) */
       --primary: #000000;
       --primary-h: #333333;
       --primary-light: rgba(0,0,0,0.08);
@@ -35,7 +34,6 @@
       --sort-btn-bg: rgba(128,128,128,0.06);
       --badge-verified-fill: var(--primary);
       --badge-verified-check: #ffffff;
-      /* زجاجية / الخلفية */
       --glass-bg: rgba(255,255,255,0.68);
       --glass-bg-strong: rgba(255,255,255,0.82);
       --glass-border: rgba(255,255,255,0.5);
@@ -50,7 +48,6 @@
       --border: #2a2a2a;
       --text: #e5e5e5;
       --muted: #8d8d8d;
-      /* اللون الأساسي للثيم (داكن) */
       --primary: #ffffff;
       --primary-h: #dddddd;
       --primary-light: rgba(255,255,255,0.08);
@@ -70,7 +67,6 @@
       --sort-btn-bg: rgba(255,255,255,0.05);
       --badge-verified-fill: var(--primary);
       --badge-verified-check: #000000;
-      /* زجاجية / الخلفية */
       --glass-bg: rgba(20,20,20,0.62);
       --glass-bg-strong: rgba(18,18,18,0.8);
       --glass-border: rgba(255,255,255,0.1);
@@ -88,7 +84,6 @@
       -webkit-font-smoothing:antialiased;
       transition:background 0.3s ease, color 0.3s ease;
     }
-    /* ===== خلفية المنصة (Wallpaper) ===== */
     .wallpaper-bg{
       position:fixed;inset:0;z-index:-2;
       background-image:var(--wallpaper-img);
@@ -103,7 +98,6 @@
       pointer-events:none;
       transition:background 0.6s ease;
     }
-    /* عندما تكون هناك خلفية مخصّصة: عناصر الواجهة تتحول لزجاجية (Glassmorphism) */
     html.has-wallpaper .topbar{background:var(--glass-bg-strong)!important;backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-bottom-color:var(--glass-border);}
     html.has-wallpaper .topbar.scrolled{background:var(--glass-bg-strong)!important;}
     html.has-wallpaper .post-card{background:var(--glass-bg);backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-color:var(--glass-border);}
@@ -116,7 +110,6 @@
     html.has-wallpaper .btn-post{background:var(--glass-bg);}
     html.has-wallpaper body{background:transparent;}
 
-    /* ===== Topbar ===== */
     .topbar{
       position:fixed;
       top:0;
@@ -176,16 +169,8 @@
       border:2px solid var(--black);
     }
 
-    /* ===== زر Shizi AI - التعديل المطلوب ===== */
-    .shizi-btn {
-      background: linear-gradient(145deg, rgba(236,72,153,0.12), rgba(168,85,247,0.12)) !important;
-      border-color: rgba(236,72,153,0.25) !important;
-      color: #ec4899 !important;
-    }
-    .shizi-btn:hover {
-      background: linear-gradient(145deg, rgba(236,72,153,0.2), rgba(168,85,247,0.2)) !important;
-      border-color: rgba(236,72,153,0.4) !important;
-    }
+    /* زر Shizi AI أصبح عادياً مثل باقي الأزرار (لا ألوان خاصة) */
+    /* تم حذف كلاس shizi-btn نهائياً */
 
     .lang-selector{position:relative;}
     .lang-menu{
@@ -279,7 +264,6 @@
     .user-dropdown button:hover{background:rgba(128,128,128,0.08);color:var(--text);padding-right:22px;}
     .user-dropdown button svg{flex-shrink:0;width:16px;height:16px;}
 
-    /* ===== Page Header ===== */
     .page-header{padding:100px 20px 40px;text-align:center;position:relative;}
     .page-header::before{
       content:'';
@@ -312,7 +296,6 @@
     .search-icon{position:absolute;left:18px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;}
     .search-icon svg{width:17px;height:17px;}
 
-    /* ===== Sort & Post Bar ===== */
     .action-bar{
       max-width:820px;margin:0 auto;padding:0 24px;
       display:flex;align-items:center;justify-content:space-between;
@@ -347,10 +330,8 @@
     .btn-post:hover{background:var(--primary-mid);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.1);}
     .btn-post svg{width:15px;height:15px;}
 
-    /* ===== Feed ===== */
     .feed{max-width:820px;margin:20px auto 80px;padding:0 24px;display:flex;flex-direction:column;gap:20px;}
 
-    /* ===== Post Card ===== */
     .post-card{
       background:var(--post-bg);
       border:1px solid var(--border);
@@ -502,7 +483,13 @@
     .c-bubble{background:rgba(128,128,128,0.06);border-radius:14px;padding:10px 14px;flex:1;min-width:0;transition:background 0.2s;}
     .c-bubble:hover{background:rgba(128,128,128,0.08);}
     .c-name{font-weight:700;font-size:0.82rem;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
-    .c-text{font-size:0.88rem;color:var(--muted);line-height:1.7;word-break:break-word;}
+    .c-text{
+      font-size:0.88rem;
+      color:var(--muted);
+      line-height:1.7;
+      word-break:break-word;
+      /* إزالة الإيموجيات من النص عبر CSS ليس ممكناً، سنقوم بتنظيفها في JavaScript */
+    }
     .c-del{
       background:none;border:none;color:var(--muted);
       cursor:pointer;padding:3px 6px;border-radius:6px;
@@ -540,7 +527,6 @@
     .empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:0.95rem;}
     .empty svg{width:48px;height:48px;margin-bottom:12px;opacity:0.3;}
 
-    /* ===== Splash / Welcome Screen ===== */
     html.splash-seen .splash-screen{display:none!important;}
     .splash-screen{
       position:fixed;inset:0;z-index:3000;
@@ -589,7 +575,6 @@
       .splash-avatar{width:72px;height:72px;font-size:1.7rem;}
     }
 
-    /* ===== Modals ===== */
     .modal-bd{
       position:fixed;inset:0;
       background:rgba(0,0,0,0.85);
@@ -867,8 +852,8 @@
     <button class="icon-btn" id="verifyBtn" onclick="requestVerify()" title="طلب التوثيق" style="display:none;">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
     </button>
-    <!-- زر Shizi AI المعدّل (بدون أنماط مدمجة) -->
-    <a href="/shiziai" class="icon-btn shizi-btn" id="shiziBtn" title="Shizi AI">
+    <!-- زر Shizi AI أصبح عادياً (لا ألوان خاصة) -->
+    <a href="/shiziai" class="icon-btn" id="shiziBtn" title="Shizi AI">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/>
         <path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/>
@@ -1570,6 +1555,12 @@ function setSort(mode) {
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDate(s){ if(!s) return ''; return new Date(s).toLocaleDateString(currentLang === 'ar' ? 'ar-SA' : 'en-US', {year:'numeric', month:'short', day:'numeric'}); }
 
+// دالة لإزالة الإيموجيات من النص
+function stripEmojis(text) {
+  // تعبير regex يطابق جميع رموز الإيموجي (Unicode Emoji)
+  return text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FEFF}\u{1F1E0}-\u{1F1FF}]/gu, '');
+}
+
 async function apiFetch(url, method='GET', body=null){
   const token = localStorage.getItem('hostaka_token') || '';
   const opts = { method, headers:{'Content-Type':'application/json','Authorization':'Bearer '+token} };
@@ -1786,11 +1777,13 @@ function renderPost(p){
     const ca = c.avatar ? `<img src="${esc(c.avatar)}" alt="">` : esc((c.display_name||c.username||'?').charAt(0).toUpperCase());
     const cBadge = c.user_role==='Admin' ? `<span class="role-badge badge-admin">${t('adminRole')}</span>` : '';
     const canDelC = ME && (ME.role==='admin' || c.user_id==ME?.id);
+    // إزالة الإيموجيات من نص التعليق
+    const cleanContent = stripEmojis(esc(c.content));
     return `<div class="comment" id="cmt-${c.id}">
       <div class="c-avatar">${ca}</div>
       <div class="c-bubble">
         <div class="c-name">${esc(c.display_name||c.username)} ${cBadge} ${canDelC?`<button class="c-del" onclick="delComment(${c.id},${p.id})">${SVG.delete}</button>`:''}</div>
-        <div class="c-text">${esc(c.content)}</div>
+        <div class="c-text">${cleanContent}</div>
       </div>
     </div>`;
   }).join('');
