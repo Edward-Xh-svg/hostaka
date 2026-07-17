@@ -35,6 +35,13 @@
       --sort-btn-bg: rgba(128,128,128,0.06);
       --badge-verified-fill: var(--primary);
       --badge-verified-check: #ffffff;
+      /* زجاجية / الخلفية */
+      --glass-bg: rgba(255,255,255,0.68);
+      --glass-bg-strong: rgba(255,255,255,0.82);
+      --glass-border: rgba(255,255,255,0.5);
+      --glass-blur: 22px;
+      --wallpaper-img: none;
+      --wallpaper-overlay: rgba(255,255,255,0);
     }
     [data-theme="dark"] {
       --black: #0d0d0d;
@@ -63,6 +70,13 @@
       --sort-btn-bg: rgba(255,255,255,0.05);
       --badge-verified-fill: var(--primary);
       --badge-verified-check: #000000;
+      /* زجاجية / الخلفية */
+      --glass-bg: rgba(20,20,20,0.62);
+      --glass-bg-strong: rgba(18,18,18,0.8);
+      --glass-border: rgba(255,255,255,0.1);
+      --glass-blur: 22px;
+      --wallpaper-img: none;
+      --wallpaper-overlay: rgba(0,0,0,0);
     }
     *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
     html{scroll-behavior:smooth;}
@@ -74,6 +88,33 @@
       -webkit-font-smoothing:antialiased;
       transition:background 0.3s ease, color 0.3s ease;
     }
+    /* ===== خلفية المنصة (Wallpaper) ===== */
+    .wallpaper-bg{
+      position:fixed;inset:0;z-index:-2;
+      background-image:var(--wallpaper-img);
+      background-size:cover;background-position:center;background-repeat:no-repeat;
+      opacity:0;transition:opacity 0.6s ease;
+      transform:scale(1.02);
+    }
+    html.has-wallpaper .wallpaper-bg{opacity:1;}
+    .wallpaper-overlay{
+      position:fixed;inset:0;z-index:-1;
+      background:var(--wallpaper-overlay);
+      pointer-events:none;
+      transition:background 0.6s ease;
+    }
+    /* عندما تكون هناك خلفية مخصّصة: عناصر الواجهة تتحول لزجاجية (Glassmorphism) */
+    html.has-wallpaper .topbar{background:var(--glass-bg-strong)!important;backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-bottom-color:var(--glass-border);}
+    html.has-wallpaper .topbar.scrolled{background:var(--glass-bg-strong)!important;}
+    html.has-wallpaper .post-card{background:var(--glass-bg);backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-color:var(--glass-border);}
+    html.has-wallpaper .modal-box{background:var(--glass-bg-strong);backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-color:var(--glass-border);}
+    html.has-wallpaper .lang-menu,
+    html.has-wallpaper .user-dropdown,
+    html.has-wallpaper .react-menu,
+    html.has-wallpaper .comment-input{background:var(--glass-bg-strong);backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-color:var(--glass-border);}
+    html.has-wallpaper .icon-btn{background:var(--glass-bg);border-color:var(--glass-border);}
+    html.has-wallpaper .btn-post{background:var(--glass-bg);}
+    html.has-wallpaper body{background:transparent;}
 
     /* ===== Topbar ===== */
     .topbar{
@@ -165,7 +206,8 @@
       text-align:right;
     }
     .lang-menu button:hover{background:rgba(128,128,128,0.08);}
-    .lang-menu button .flag{font-size:1.1rem;}
+    .lang-menu button .flag{display:inline-flex;width:16px;height:16px;flex-shrink:0;}
+    .lang-menu button .flag svg{width:100%;height:100%;border-radius:50%;}
 
     .btn-login{
       display:flex;
@@ -352,8 +394,10 @@
 
     .post-text{
       font-family:'Noto Naskh Arabic',serif;
-      line-height:2;color:var(--text);font-size:1rem;
+      line-height:1.95;color:var(--text);font-size:1.03rem;
+      letter-spacing:0.1px;
       white-space:pre-wrap;margin-bottom:16px;word-break:break-word;
+      text-wrap:pretty;
     }
     .post-html h2{font-size:1.2rem;font-weight:800;color:var(--text);margin:10px 0 6px;}
     .post-html h3{font-size:1rem;font-weight:700;color:var(--text);margin:8px 0 4px;}
@@ -705,6 +749,9 @@
 </head>
 <body>
 
+<div class="wallpaper-bg" id="wallpaperBg"></div>
+<div class="wallpaper-overlay" id="wallpaperOverlayEl"></div>
+
 <header class="topbar" id="topbar">
   <div class="topbar-left">
     <img src="hostaka-icon.png" class="topbar-logo" style="width:auto;height:34px;border-radius:6px;object-fit:contain;" onerror="this.style.display='none'" alt="Hostaka">
@@ -724,6 +771,13 @@
         <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
       </svg>
     </button>
+    <button class="icon-btn" id="wallpaperToggle" onclick="openWallpaperModal()" title="خلفية المنصة">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <path d="M21 15l-5-5L5 21"/>
+      </svg>
+    </button>
     <div class="lang-selector icon-btn" id="langToggle" onclick="toggleLangMenu()" title="تغيير اللغة">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/>
@@ -731,18 +785,18 @@
         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
       </svg>
       <div class="lang-menu" id="langMenu">
-        <button onclick="setLang('ar')"><span class="flag">🇸🇦</span> العربية</button>
-        <button onclick="setLang('en')"><span class="flag">🇬🇧</span> English</button>
-        <button onclick="setLang('fr')"><span class="flag">🇫🇷</span> Français</button>
-        <button onclick="setLang('ru')"><span class="flag">🇷🇺</span> Русский</button>
-        <button onclick="setLang('zh')"><span class="flag">🇨🇳</span> 中文</button>
-        <button onclick="setLang('ja')"><span class="flag">🇯🇵</span> 日本語</button>
+        <button onclick="setLang('ar')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-ar"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-ar)"><rect width="20" height="20" fill="#006c35"/><rect x="4" y="9" width="12" height="2" rx="1" fill="#fff"/></g></svg></span> العربية</button>
+        <button onclick="setLang('en')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-en"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-en)"><rect width="20" height="20" fill="#012169"/><path d="M0 0L20 20M20 0L0 20" stroke="#fff" stroke-width="3"/><path d="M10 0V20M0 10H20" stroke="#fff" stroke-width="4"/><path d="M10 0V20M0 10H20" stroke="#C8102E" stroke-width="1.6"/></g></svg></span> English</button>
+        <button onclick="setLang('fr')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-fr"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-fr)"><rect width="6.7" height="20" fill="#0055A4"/><rect x="6.7" width="6.6" height="20" fill="#fff"/><rect x="13.3" width="6.7" height="20" fill="#EF4135"/></g></svg></span> Français</button>
+        <button onclick="setLang('ru')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-ru"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-ru)"><rect width="20" height="6.7" fill="#fff"/><rect y="6.7" width="20" height="6.6" fill="#0039A6"/><rect y="13.3" width="20" height="6.7" fill="#D52B1E"/></g></svg></span> Русский</button>
+        <button onclick="setLang('zh')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-zh"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-zh)"><rect width="20" height="20" fill="#DE2910"/><path d="M6 4l1 3h3l-2.5 2 1 3-2.5-2-2.5 2 1-3-2.5-2h3z" fill="#FFDE00"/></g></svg></span> 中文</button>
+        <button onclick="setLang('ja')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-ja"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-ja)"><rect width="20" height="20" fill="#fff"/><circle cx="10" cy="10" r="5.5" fill="#BC002D"/></g></svg></span> 日本語</button>
       </div>
     </div>
     <button class="icon-btn" id="verifyBtn" onclick="requestVerify()" title="طلب التوثيق" style="display:none;">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
     </button>
-    <a href="/shiziai" class="icon-btn" id="shiziBtn" title="Shizi AI 🎀" style="background:linear-gradient(145deg,rgba(236,72,153,0.12),rgba(168,85,247,0.12));border-color:rgba(236,72,153,0.25);color:#ec4899;">
+    <a href="/shiziai" class="icon-btn" id="shiziBtn" title="Shizi AI" style="background:linear-gradient(145deg,rgba(236,72,153,0.12),rgba(168,85,247,0.12));border-color:rgba(236,72,153,0.25);color:#ec4899;">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/></svg>
     </a>
     <a href="/chat" class="icon-btn" id="chatBtn" title="الرسائل">
@@ -887,6 +941,54 @@
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeModal('postModal')"><span id="cancelBtn">إلغاء</span></button>
       <button class="btn-submit" style="width:auto;padding:10px 26px;" id="postBtn" onclick="submitPost()"><span id="publishBtn">نشر</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bd" id="wallpaperModal">
+  <div class="modal-box">
+    <div class="modal-t">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+      <span>خلفية المنصة</span>
+    </div>
+    <p style="color:var(--muted);font-size:0.82rem;line-height:1.7;margin-bottom:16px;">اختر صورة خلفية خاصة بك، مثل خلفية سطح المكتب — يتحول شكل المنصور بطاقات ونوافذ زجاجية، ويتكيّف الثيم تلقائيًا مع ألوان الصورة.</p>
+
+    <div id="wallpaperPreviewBox" style="width:100%;height:120px;border-radius:16px;border:1px solid var(--border);background:var(--input-bg);background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:0.8rem;margin-bottom:16px;overflow:hidden;">
+      <span id="wallpaperPreviewEmpty">لا توجد خلفية محددة</span>
+    </div>
+
+    <input type="file" id="wallpaperFile" accept="image/*" style="display:none;" onchange="onWallpaperFile(event)">
+    <button class="btn-post" style="width:100%;justify-content:center;margin-bottom:10px;" onclick="document.getElementById('wallpaperFile').click()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span>رفع صورة خلفية</span>
+    </button>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0 6px;">
+      <label style="font-size:0.82rem;color:var(--muted);display:flex;align-items:center;gap:6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 2v10l7 4"/></svg>
+        تمويه الخلفية
+      </label>
+      <input type="range" id="wallpaperBlurRange" min="0" max="30" value="6" oninput="updateWallpaperTuning()" style="flex:1;">
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px;">
+      <label style="font-size:0.82rem;color:var(--muted);display:flex;align-items:center;gap:6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+        إضاءة التراكب
+      </label>
+      <input type="range" id="wallpaperDimRange" min="0" max="80" value="35" oninput="updateWallpaperTuning()" style="flex:1;">
+    </div>
+
+    <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:var(--muted);margin-bottom:18px;cursor:pointer;">
+      <input type="checkbox" id="wallpaperAutoTheme" checked onchange="updateWallpaperTuning()">
+      تغيير الثيم تلقائيًا حسب ألوان الخلفية
+    </label>
+
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="removeWallpaper()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:4px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        إزالة الخلفية
+      </button>
+      <button class="btn-submit" style="width:auto;padding:10px 26px;" onclick="closeModal('wallpaperModal')">تم</button>
     </div>
   </div>
 </div>
@@ -1065,18 +1167,170 @@ function getEmptySvg() {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>`;
 }
 
-function toggleTheme() {
+const THEME_ICON_DARK = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+const THEME_ICON_LIGHT = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+
+function setTheme(theme){
   const html = document.documentElement;
-  if (currentTheme === 'light') {
+  if(theme === 'dark'){
     html.setAttribute('data-theme', 'dark');
-    currentTheme = 'dark';
-    document.getElementById('themeToggle').innerHTML = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+    document.getElementById('themeToggle').innerHTML = THEME_ICON_DARK;
   } else {
     html.removeAttribute('data-theme');
-    currentTheme = 'light';
-    document.getElementById('themeToggle').innerHTML = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+    document.getElementById('themeToggle').innerHTML = THEME_ICON_LIGHT;
   }
+  currentTheme = theme;
   localStorage.setItem('hostaka_theme', currentTheme);
+}
+
+function toggleTheme() {
+  userSetTheme = true;
+  localStorage.setItem('hostaka_theme_manual', '1');
+  setTheme(currentTheme === 'light' ? 'dark' : 'light');
+}
+
+// ============================================================
+//  WALLPAPER (خلفية المنصة الشخصية + ثيم متكيّف)
+// ============================================================
+let wallpaperData = null; // { img, blur, dim, auto }
+let userSetTheme = localStorage.getItem('hostaka_theme_manual') === '1';
+
+function loadWallpaperState(){
+  try{
+    const raw = localStorage.getItem('hostaka_wallpaper');
+    if(raw) wallpaperData = JSON.parse(raw);
+  }catch(e){ wallpaperData = null; }
+}
+
+function saveWallpaperState(){
+  if(wallpaperData) localStorage.setItem('hostaka_wallpaper', JSON.stringify(wallpaperData));
+  else localStorage.removeItem('hostaka_wallpaper');
+}
+
+function openWallpaperModal(){
+  document.getElementById('wallpaperModal').classList.add('show');
+  const box = document.getElementById('wallpaperPreviewBox');
+  const empty = document.getElementById('wallpaperPreviewEmpty');
+  if(wallpaperData && wallpaperData.img){
+    box.style.backgroundImage = `url(${wallpaperData.img})`;
+    empty.style.display = 'none';
+    document.getElementById('wallpaperBlurRange').value = wallpaperData.blur ?? 6;
+    document.getElementById('wallpaperDimRange').value = wallpaperData.dim ?? 35;
+    document.getElementById('wallpaperAutoTheme').checked = wallpaperData.auto !== false;
+  } else {
+    box.style.backgroundImage = 'none';
+    empty.style.display = 'inline';
+  }
+}
+
+function onWallpaperFile(evt){
+  const file = evt.target.files && evt.target.files[0];
+  if(!file) return;
+  if(file.size > 8*1024*1024){ alert('الصورة كبيرة جدًا، الرجاء اختيار صورة أصغر من 8MB'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      // ضغط الصورة داخل canvas قبل الحفظ
+      const canvas = document.createElement('canvas');
+      const maxW = 1600;
+      const scale = Math.min(1, maxW / img.width);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+
+      wallpaperData = {
+        img: dataUrl,
+        blur: parseInt(document.getElementById('wallpaperBlurRange').value) || 6,
+        dim: parseInt(document.getElementById('wallpaperDimRange').value) || 35,
+        auto: document.getElementById('wallpaperAutoTheme').checked
+      };
+      saveWallpaperState();
+      applyWallpaper();
+      document.getElementById('wallpaperPreviewBox').style.backgroundImage = `url(${dataUrl})`;
+      document.getElementById('wallpaperPreviewEmpty').style.display = 'none';
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function updateWallpaperTuning(){
+  if(!wallpaperData) return;
+  wallpaperData.blur = parseInt(document.getElementById('wallpaperBlurRange').value) || 0;
+  wallpaperData.dim = parseInt(document.getElementById('wallpaperDimRange').value) || 0;
+  wallpaperData.auto = document.getElementById('wallpaperAutoTheme').checked;
+  saveWallpaperState();
+  applyWallpaper();
+}
+
+function removeWallpaper(){
+  wallpaperData = null;
+  saveWallpaperState();
+  applyWallpaper();
+  const box = document.getElementById('wallpaperPreviewBox');
+  box.style.backgroundImage = 'none';
+  document.getElementById('wallpaperPreviewEmpty').style.display = 'inline';
+}
+
+// يحسب متوسط سطوع ولون الصورة لضبط الثيم تلقائيًا (فاتح/داكن + لون أساسي)
+function analyzeWallpaperColors(dataUrl, cb){
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    const size = 40;
+    c.width = size; c.height = size;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0, size, size);
+    let r=0,g=0,b=0,count=0;
+    try{
+      const data = ctx.getImageData(0,0,size,size).data;
+      for(let i=0;i<data.length;i+=4){ r+=data[i]; g+=data[i+1]; b+=data[i+2]; count++; }
+      r=Math.round(r/count); g=Math.round(g/count); b=Math.round(b/count);
+    }catch(e){ cb(null); return; }
+    const brightness = (r*299 + g*587 + b*114) / 1000; // 0-255
+    cb({ r, g, b, brightness });
+  };
+  img.onerror = () => cb(null);
+  img.src = dataUrl;
+}
+
+function applyWallpaper(){
+  const html = document.documentElement;
+  const bg = document.getElementById('wallpaperBg');
+  const overlay = document.getElementById('wallpaperOverlayEl');
+
+  if(!wallpaperData || !wallpaperData.img){
+    html.classList.remove('has-wallpaper');
+    html.style.removeProperty('--wallpaper-img');
+    html.style.removeProperty('--wallpaper-overlay');
+    bg.style.filter = '';
+    return;
+  }
+
+  html.classList.add('has-wallpaper');
+  html.style.setProperty('--wallpaper-img', `url(${wallpaperData.img})`);
+  bg.style.filter = `blur(${wallpaperData.blur ?? 6}px)`;
+
+  const dim = (wallpaperData.dim ?? 35) / 100;
+  const darkBase = currentTheme === 'dark' ? '0,0,0' : '0,0,0';
+  html.style.setProperty('--wallpaper-overlay', `rgba(${darkBase},${dim})`);
+
+  if(wallpaperData.auto !== false){
+    analyzeWallpaperColors(wallpaperData.img, (info) => {
+      if(!info) return;
+      // ثيم فاتح إن كانت الخلفية فاتحة، داكن إن كانت غامقة — فقط إن لم يتدخل المستخدم يدويًا
+      if(!userSetTheme){
+        const shouldBeDark = info.brightness < 130;
+        if(shouldBeDark && currentTheme !== 'dark'){ setTheme('dark'); }
+        else if(!shouldBeDark && currentTheme !== 'light'){ setTheme('light'); }
+      }
+      // لون تراكب مستمد من الخلفية لإحساس أكثر انسجامًا
+      html.style.setProperty('--wallpaper-overlay', `rgba(${info.r},${info.g},${info.b},${dim*0.55})`);
+    });
+  }
 }
 
 function toggleLangMenu() {
@@ -1633,8 +1887,11 @@ async function delComment(commentId, postId){
 (async function init() {
   if (currentTheme === 'dark') {
     document.documentElement.setAttribute('data-theme', 'dark');
-    document.getElementById('themeToggle').innerHTML = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+    document.getElementById('themeToggle').innerHTML = THEME_ICON_DARK;
   }
+
+  loadWallpaperState();
+  applyWallpaper();
 
   window.addEventListener('scroll',()=>{
     document.getElementById('topbar').classList.toggle('scrolled', window.scrollY > 10);
