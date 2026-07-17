@@ -26,6 +26,9 @@ Hostaka هي منصة تواصل اجتماعي ناشئة (وليست منصة 
 
 const SHIZI_DAILY_LIMIT = 50;
 
+// دالة مساعدة للانتظار (تستخدم عند إعادة المحاولة للـ API)
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 function signToken(user) {
   return jwt.sign({ id:user.id, username:user.username, role:user.role, avatar:user.avatar||'' }, JWT_SECRET, { expiresIn:JWT_EXPIRES });
 }
@@ -50,7 +53,7 @@ app.post('/api/login', async(req,res)=>{
     const{email,password}=req.body||{};
     if(!email||!password) return res.status(400).json({error:'البريد وكلمة المرور مطلوبان'});
     const user=await q.getUserByEmail(email.trim().toLowerCase());
-    if(!user||!bcrypt.compareSync(password,user.password)) return res.status(401).json({error:'البريد أو كلمة المرور غير صحيحة'});
+    if(!user||!bcrypt.compareSync(password,user.password)) return res.status(401).json({error:'البريد أو كلمة المرور غير صريحة'});
     res.json({success:true,token:signToken(user),username:user.username,role:user.role,avatar:user.avatar||'',id:user.id});
   }catch(e){res.status(500).json({error:'خطأ في الخادم'});}
 });
@@ -164,8 +167,6 @@ app.post('/api/upload', requireAuth, async (req, res) => {
   }
 });
 
-// ===== قراءة إعدادات Cloudinary: يدعم إما 3 متغيرات منفصلة، أو متغير واحد
-// CLOUDINARY_URL بصيغة cloudinary://API_KEY:API_SECRET@CLOUD_NAME =====
 function getCloudinaryConfig() {
   if (process.env.CLOUDINARY_URL) {
     const m = process.env.CLOUDINARY_URL.match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);
@@ -180,10 +181,6 @@ function getCloudinaryConfig() {
   };
 }
 
-// ===== رفع الفيديوهات عبر Cloudinary (Signed Direct Upload) =====
-// المتصفح يرفع الفيديو مباشرة إلى Cloudinary (مو عبر سيرفرنا)، وذلك لتفادي حد
-// Vercel على حجم الطلب (~4.5MB). سيرفرنا فقط يولّد "توقيع" (signature) مؤقت
-// باستخدام الـ API Secret (يبقى سري ولا يوصل للمتصفح إطلاقاً).
 app.post('/api/upload/video/signature', requireAuth, async (req, res) => {
   try {
     const { cloudName, apiKey, apiSecret } = getCloudinaryConfig();
@@ -194,7 +191,6 @@ app.post('/api/upload/video/signature', requireAuth, async (req, res) => {
 
     const timestamp = Math.floor(Date.now() / 1000);
     const folder = 'hostaka_videos';
-    // يجب توقيع نفس البارامترات بالضبط اللي رح تُرسل مع الرفع (بدون file/api_key)
     const paramsToSign = `folder=${folder}&timestamp=${timestamp}`;
     const signature = crypto.createHash('sha1').update(paramsToSign + apiSecret).digest('hex');
 
@@ -715,7 +711,7 @@ app.get('/api/groups/:id/messages/reactions', requireAuth, async (req, res) => {
 });
 
 // ============================================================
-// Shizi AI (DeepSeek)
+// Shizi AI (Gemini)
 // ============================================================
 app.get('/api/shizi/history', requireAuth, async (req, res) => {
   try {
@@ -734,6 +730,42 @@ app.delete('/api/shizi/history', requireAuth, async (req, res) => {
   }
 });
 
+// دالة مخصصة لإرسال الطلب لـ Gemini مع آلية إعادة المحاولة عند حدوث الأخطاء المؤقتة (429 و 503)
+async function fetchGeminiWithRetry(apiKey, bodyData, retries = 3, delayTime = 5000) {
+  for (let i = 0; i < retries; i++) {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify(bodyData),
+      }
+    );
+
+    const data = await r.json();
+
+    if (r.ok) {
+      return { ok: true, data };
+    }
+
+    // إذا كان الخطأ بسبب تخطي المعدل (429) أو عدم توفر الخدمة مؤقتاً (503)
+    if (r.status === 429 || r.status === 503 || data.error?.code === 429 || data.error?.code === 503) {
+      console.warn(`⚠️ Gemini API واجه خطأ ${r.status}. محاولة ${i + 1} من أصل ${retries}. جاري الانتظار...`);
+      // ننتظر المدة المحددة (مثلاً 5 ثوانٍ) قبل إعادة المحاولة
+      await delay(delayTime);
+      continue;
+    }
+
+    // إذا كان خطأ آخر غير قابل للإصلاح تلقائياً (مثل مفتاح خطأ أو بارامترات خاطئة)
+    return { ok: false, data };
+  }
+  
+  return { ok: false, data: { error: { message: 'تم تجاوز الحد الأقصى لمحاولات الاتصال بـ Gemini API بسبب الضغط العالي.' } } };
+}
+
 app.post('/api/shizi/chat', requireAuth, async (req, res) => {
   try {
     const { message } = req.body || {};
@@ -745,7 +777,7 @@ app.post('/api/shizi/chat', requireAuth, async (req, res) => {
       return res.status(500).json({ error: 'GEMINI_API_KEY غير مُعدّ على الخادم' });
     }
 
-    // ===== حد الرسائل اليومي: 50 رسالة لكل مستخدم كل 24 ساعة =====
+    // ===== حد الرسائل اليومي =====
     const usedToday = await q.countShiziUserMessagesLast24h(req.user.id);
     if (usedToday >= SHIZI_DAILY_LIMIT) {
       return res.status(429).json({
@@ -753,44 +785,31 @@ app.post('/api/shizi/chat', requireAuth, async (req, res) => {
       });
     }
 
-    // نخزّن رسالة المستخدم أولاً
     await q.addShiziMessage(req.user.id, 'user', message.trim());
 
-    // نجهّز آخر 20 رسالة كسياق للمحادثة
     const history = await q.getShiziMessages(req.user.id);
     const recent = history.slice(-20);
 
-    // Gemini يستخدم صيغة "contents" مختلفة عن صيغة OpenAI/DeepSeek:
-    // كل رسالة لها role ('user' أو 'model') وقائمة "parts" نصية،
-    // والتعليمات النظامية تُرسل بشكل منفصل عبر systemInstruction.
     const contents = recent.map(m => ({
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.content }],
     }));
 
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: SHIZI_SYSTEM_PROMPT }] },
-          contents,
-          generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
-        }),
-      }
-    );
+    const bodyData = {
+      system_instruction: { parts: [{ text: SHIZI_SYSTEM_PROMPT }] },
+      contents,
+      generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
+    };
 
-    const data = await r.json();
-    if (!r.ok) {
-      console.error('❌ Gemini API error:', data);
-      return res.status(500).json({ error: data.error?.message || 'فشل الاتصال بـ Shizi AI' });
+    // استدعاء الدالة الذكية المحدثة
+    const result = await fetchGeminiWithRetry(apiKey, bodyData);
+
+    if (!result.ok) {
+      console.error('❌ Gemini API error:', result.data);
+      return res.status(500).json({ error: result.data.error?.message || 'فشل الاتصال بـ Shizi AI' });
     }
 
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '...';
+    const reply = result.data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '...';
     await q.addShiziMessage(req.user.id, 'assistant', reply);
     res.json({ success: true, reply, remaining: SHIZI_DAILY_LIMIT - (usedToday + 1) });
   } catch(e) {
