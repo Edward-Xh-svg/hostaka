@@ -14,18 +14,18 @@
       --border: #e5e5e5;
       --text: #1a1a1a;
       --muted: #6b7280;
-      --pink: #ec4899;
-      --pink-h: #db2777;
-      --accent: #ec4899;
+      --pink: #000000;
+      --pink-h: #333333;
+      --accent: #000000;
       --mine-bg: rgba(0,0,0,0.06);
       --mine-border: rgba(0,0,0,0.1);
-      --shizi-bg: rgba(236,72,153,0.08);
-      --shizi-border: rgba(236,72,153,0.18);
+      --shizi-bg: rgba(0,0,0,0.05);
+      --shizi-border: rgba(0,0,0,0.14);
       --topbar-bg: rgba(255,255,255,0.85);
       --input-bg: #f7f7f8;
       --modal-bg: #ffffff;
       --shadow: 0 10px 30px rgba(0,0,0,0.4);
-      --shizi-gradient: linear-gradient(145deg, #ec4899, #a855f7);
+      --shizi-gradient: linear-gradient(145deg, #000000, #333333);
     }
     [data-theme="dark"] {
       --black: #0d0d0d;
@@ -34,23 +34,23 @@
       --border: #2a2a2a;
       --text: #e5e5e5;
       --muted: #8d8d8d;
-      --pink: #f472b6;
-      --pink-h: #f9a8d4;
-      --accent: #f472b6;
+      --pink: #ffffff;
+      --pink-h: #dddddd;
+      --accent: #ffffff;
       --mine-bg: rgba(255,255,255,0.06);
       --mine-border: rgba(255,255,255,0.1);
-      --shizi-bg: rgba(244,114,182,0.1);
-      --shizi-border: rgba(244,114,182,0.22);
+      --shizi-bg: rgba(255,255,255,0.08);
+      --shizi-border: rgba(255,255,255,0.18);
       --topbar-bg: rgba(13,13,13,0.85);
       --input-bg: #222222;
       --modal-bg: #1a1a1a;
       --shadow: 0 10px 30px rgba(0,0,0,0.7);
-      --shizi-gradient: linear-gradient(145deg, #f472b6, #a855f7);
+      --shizi-gradient: linear-gradient(145deg, #ffffff, #dddddd);
     }
     *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
     html,body{height:100%;overflow:hidden;}
     body{
-      background:radial-gradient(circle at 18% 16%,rgba(236,72,153,0.06),transparent 22%),var(--black);
+      background:radial-gradient(circle at 18% 16%,rgba(128,128,128,0.06),transparent 22%),var(--black);
       color:var(--text);
       font-family:'Cairo',sans-serif;
       display:flex;flex-direction:column;
@@ -82,8 +82,8 @@
       width:34px;height:34px;border-radius:50%;
       background:var(--shizi-gradient);
       display:flex;align-items:center;justify-content:center;
-      font-weight:800;font-size:1rem;color:#fff;flex-shrink:0;
-      box-shadow:0 4px 14px rgba(236,72,153,0.35);
+      font-weight:800;font-size:1rem;color:var(--black);flex-shrink:0;
+      box-shadow:0 4px 14px rgba(0,0,0,0.25);
     }
     .shizi-name{font-weight:800;font-size:0.92rem;color:var(--text);white-space:nowrap;}
     .shizi-status{font-size:0.68rem;color:var(--pink);font-weight:700;display:flex;align-items:center;gap:4px;}
@@ -132,8 +132,8 @@
       width:76px;height:76px;border-radius:50%;
       background:var(--shizi-gradient);
       display:flex;align-items:center;justify-content:center;
-      font-weight:800;font-size:2rem;color:#fff;
-      box-shadow:0 10px 30px rgba(236,72,153,0.35);
+      font-weight:800;font-size:2rem;color:var(--black);
+      box-shadow:0 10px 30px rgba(0,0,0,0.25);
     }
     .welcome h2{font-size:1.15rem;color:var(--text);font-weight:800;}
     .welcome p{font-size:0.85rem;max-width:320px;line-height:1.7;}
@@ -154,7 +154,7 @@
       display:flex;align-items:center;justify-content:center;
       font-weight:700;font-size:0.75rem;color:#fff;flex-shrink:0;overflow:hidden;
     }
-    .msg-av.shizi{background:var(--shizi-gradient);}
+    .msg-av.shizi{background:var(--shizi-gradient);color:var(--black);}
     .msg-av.user{background:linear-gradient(145deg,#333,#111);}
     .bubble-wrap{display:flex;flex-direction:column;max-width:74%;min-width:0;}
     .msg-row.mine .bubble-wrap{align-items:flex-end;}
@@ -189,13 +189,13 @@
       resize:none;max-height:120px;line-height:1.5;
       transition:all 0.2s;
     }
-    .msg-input:focus{outline:none;box-shadow:0 0 0 3px rgba(236,72,153,0.12);}
+    .msg-input:focus{outline:none;box-shadow:0 0 0 3px var(--shizi-border);}
     .msg-input::placeholder{color:var(--muted);}
     .send-btn{
       width:42px;height:42px;border-radius:50%;flex-shrink:0;
       background:var(--shizi-gradient);border:none;cursor:pointer;
       display:flex;align-items:center;justify-content:center;
-      transition:all 0.2s;box-shadow:0 4px 14px rgba(236,72,153,0.3);
+      transition:all 0.2s;box-shadow:0 4px 14px rgba(0,0,0,0.25);
     }
     .send-btn:hover{transform:translateY(-2px);}
     .send-btn:active{transform:translateY(0);}
@@ -211,7 +211,7 @@
     .not-logged p{color:var(--muted);font-size:0.85rem;max-width:280px;}
     .btn-go{
       margin-top:6px;display:inline-flex;align-items:center;gap:8px;
-      background:var(--shizi-gradient);color:#fff;padding:10px 22px;
+      background:var(--shizi-gradient);color:var(--black);padding:10px 22px;
       border-radius:12px;text-decoration:none;font-weight:700;font-size:0.85rem;
     }
 
@@ -259,7 +259,7 @@
     <div class="shizi-brand">
       <div class="shizi-av">S</div>
       <div>
-        <div class="shizi-name">Shizi AI 🎀</div>
+        <div class="shizi-name">Shizi AI</div>
         <div class="shizi-status"><span class="dot"></span><span id="statusText">متصلة الآن</span></div>
       </div>
     </div>
@@ -299,55 +299,55 @@
 </div>
 
 <div class="input-area" id="inputArea" style="display:none;">
-  <textarea class="msg-input" id="msgInput" placeholder="اكتبي رسالتك لشيزي..." rows="1" onkeydown="onKey(event)" oninput="autoResize(this)"></textarea>
+  <textarea class="msg-input" id="msgInput" placeholder="اكتب رسالتك..." rows="1" onkeydown="onKey(event)" oninput="autoResize(this)"></textarea>
   <button class="send-btn" id="sendBtn" onclick="sendMsg()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="var(--black)" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
   </button>
 </div>
 
 <script>
 const LANG = {
   ar: {
-    back:'Hostaka', status:'متصلة الآن', placeholder:'اكتبي رسالتك لشيزي...',
-    welcomeTitle:'أهلاً، أنا شيزي 🎀', welcomeText:'مساعدتك الذكية في منصة Hostaka. اسأليني أي شيء وبقدر أساعدك فيه!',
+    back:'Hostaka', status:'متصلة الآن', placeholder:'اكتب رسالتك...', remainingLabel:'متصلة الآن · باقي {n} رسالة اليوم',
+    welcomeTitle:'أهلاً، أنا شيزي', welcomeText:'مساعدتك الذكية في منصة Hostaka. اسأليني أي شيء وبقدر أساعدك فيه!',
     s1:'ما هي منصة Hostaka؟', s2:'اقترح علي فكرة منشور', s3:'ساعدني في كتابة وصف بروفايل', s4:'أخبرني نكتة لطيفة',
     loginRequired:'يجب تسجيل الدخول', loginText:'سجّلي الدخول لبدء الدردشة مع شيزي', home:'الرئيسية',
-    clearedMsg:'بدأنا محادثة جديدة ✨', errorMsg:'حدث خطأ، حاولي مرة أخرى', notConfigured:'لم يتم إعداد Shizi AI بعد'
+    clearedMsg:'بدأنا محادثة جديدة', errorMsg:'حدث خطأ، حاولي مرة أخرى', notConfigured:'لم يتم إعداد Shizi AI بعد'
   },
   en: {
-    back:'Hostaka', status:'Online now', placeholder:'Type a message to Shizi...',
-    welcomeTitle:"Hi, I'm Shizi 🎀", welcomeText:'Your smart assistant on Hostaka. Ask me anything!',
+    back:'Hostaka', status:'Online now', placeholder:'Type a message to Shizi...', remainingLabel:'Online now · {n} messages left today',
+    welcomeTitle:"Hi, I'm Shizi", welcomeText:'Your smart assistant on Hostaka. Ask me anything!',
     s1:'What is Hostaka?', s2:'Suggest a post idea', s3:'Help me write a bio', s4:'Tell me a fun fact',
     loginRequired:'Login required', loginText:'Please login to chat with Shizi', home:'Home',
-    clearedMsg:'Started a new chat ✨', errorMsg:'Something went wrong, try again', notConfigured:'Shizi AI is not configured yet'
+    clearedMsg:'Started a new chat', errorMsg:'Something went wrong, try again', notConfigured:'Shizi AI is not configured yet'
   },
   fr: {
-    back:'Hostaka', status:'En ligne', placeholder:'Écrivez à Shizi...',
-    welcomeTitle:'Salut, je suis Shizi 🎀', welcomeText:'Votre assistante intelligente sur Hostaka. Demandez-moi tout !',
+    back:'Hostaka', status:'En ligne', placeholder:'Écrivez à Shizi...', remainingLabel:'En ligne · {n} messages restants aujourd\'hui',
+    welcomeTitle:'Salut, je suis Shizi', welcomeText:'Votre assistante intelligente sur Hostaka. Demandez-moi tout !',
     s1:"Qu'est-ce que Hostaka ?", s2:'Suggère une idée de post', s3:'Aide-moi à écrire ma bio', s4:'Raconte-moi une anecdote',
     loginRequired:'Connexion requise', loginText:'Connectez-vous pour discuter avec Shizi', home:'Accueil',
-    clearedMsg:'Nouvelle discussion ✨', errorMsg:'Une erreur est survenue', notConfigured:"Shizi AI n'est pas encore configurée"
+    clearedMsg:'Nouvelle discussion', errorMsg:'Une erreur est survenue', notConfigured:"Shizi AI n'est pas encore configurée"
   },
   ru: {
-    back:'Hostaka', status:'В сети', placeholder:'Напишите Shizi...',
-    welcomeTitle:'Привет, я Shizi 🎀', welcomeText:'Ваш умный помощник на Hostaka. Спросите меня о чём угодно!',
+    back:'Hostaka', status:'В сети', placeholder:'Напишите Shizi...', remainingLabel:'В сети · осталось {n} сообщений сегодня',
+    welcomeTitle:'Привет, я Shizi', welcomeText:'Ваш умный помощник на Hostaka. Спросите меня о чём угодно!',
     s1:'Что такое Hostaka?', s2:'Предложи идею для поста', s3:'Помоги написать био', s4:'Расскажи интересный факт',
     loginRequired:'Требуется вход', loginText:'Войдите, чтобы общаться с Shizi', home:'Главная',
-    clearedMsg:'Новый чат ✨', errorMsg:'Произошла ошибка', notConfigured:'Shizi AI ещё не настроена'
+    clearedMsg:'Новый чат', errorMsg:'Произошла ошибка', notConfigured:'Shizi AI ещё не настроена'
   },
   zh: {
-    back:'Hostaka', status:'在线', placeholder:'给 Shizi 发消息...',
-    welcomeTitle:'嗨，我是 Shizi 🎀', welcomeText:'Hostaka 平台的智能助手。问我任何问题！',
+    back:'Hostaka', status:'在线', placeholder:'给 Shizi 发消息...', remainingLabel:'在线 · 今日剩余 {n} 条消息',
+    welcomeTitle:'嗨，我是 Shizi', welcomeText:'Hostaka 平台的智能助手。问我任何问题！',
     s1:'Hostaka 是什么？', s2:'给我一个发帖灵感', s3:'帮我写个人简介', s4:'讲个有趣的事实',
     loginRequired:'需要登录', loginText:'请登录以与 Shizi 聊天', home:'首页',
-    clearedMsg:'开始新对话 ✨', errorMsg:'出错了，请重试', notConfigured:'Shizi AI 尚未配置'
+    clearedMsg:'开始新对话', errorMsg:'出错了，请重试', notConfigured:'Shizi AI 尚未配置'
   },
   ja: {
-    back:'Hostaka', status:'オンライン', placeholder:'Shiziにメッセージを送る...',
-    welcomeTitle:'こんにちは、Shiziです 🎀', welcomeText:'Hostakaのスマートアシスタントです。何でも聞いてください！',
+    back:'Hostaka', status:'オンライン', placeholder:'Shiziにメッセージを送る...', remainingLabel:'オンライン · 本日の残り {n} 件',
+    welcomeTitle:'こんにちは、Shiziです', welcomeText:'Hostakaのスマートアシスタントです。何でも聞いてください！',
     s1:'Hostakaとは？', s2:'投稿アイデアを提案して', s3:'プロフィール文を手伝って', s4:'面白い豆知識を教えて',
     loginRequired:'ログインが必要です', loginText:'Shiziとチャットするにはログインしてください', home:'ホーム',
-    clearedMsg:'新しいチャットを開始しました ✨', errorMsg:'エラーが発生しました', notConfigured:'Shizi AIはまだ設定されていません'
+    clearedMsg:'新しいチャットを開始しました', errorMsg:'エラーが発生しました', notConfigured:'Shizi AIはまだ設定されていません'
   }
 };
 
@@ -490,6 +490,13 @@ async function loadHistory(){
   }
 }
 
+function updateRemainingBadge(remaining){
+  const el = document.getElementById('statusText');
+  if (!el) return;
+  const n = Math.max(0, remaining);
+  el.textContent = t('remainingLabel').replace('{n}', n);
+}
+
 function onKey(e){ if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); } }
 function autoResize(el){ el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }
 
@@ -512,12 +519,20 @@ async function sendMsg(){
     if (d.reply){
       messages.push({ role:'assistant', content: d.reply, created_at: new Date().toISOString() });
     }
+    if (typeof d.remaining === 'number') updateRemainingBadge(d.remaining);
     renderMsgs();
   } catch(e){
     sending = false;
-    console.error('sendMsg failed:', e);
+    messages.pop(); // نتراجع عن الرسالة المضافة محلياً لأنها لم تُحفظ فعلياً
     renderMsgs();
-    showToast(e.message && e.message.includes('DEEPSEEK') ? t('notConfigured') : t('errorMsg'), 'error');
+    console.error('sendMsg failed:', e);
+    if (e.status === 429) {
+      showToast(e.message, 'error');
+    } else if (e.message && e.message.includes('GEMINI')) {
+      showToast(t('notConfigured'), 'error');
+    } else {
+      showToast(t('errorMsg'), 'error');
+    }
   }
   document.getElementById('sendBtn').disabled = false;
 }
