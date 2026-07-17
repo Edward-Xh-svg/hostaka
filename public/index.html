@@ -104,8 +104,8 @@
       transition:background 0.6s ease;
     }
     /* عندما تكون هناك خلفية مخصّصة: عناصر الواجهة تتحول لزجاجية (Glassmorphism) */
-    html.has-wallpaper .topbar{background:var(--topbar-bg)!important;border-bottom-color:var(--glass-border);}
-    html.has-wallpaper .topbar.scrolled{background:var(--topbar-bg)!important;}
+    html.has-wallpaper .topbar{background:var(--glass-bg-strong)!important;backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-bottom-color:var(--glass-border);}
+    html.has-wallpaper .topbar.scrolled{background:var(--glass-bg-strong)!important;}
     html.has-wallpaper .post-card{background:var(--glass-bg);backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-color:var(--glass-border);}
     html.has-wallpaper .modal-box{background:var(--glass-bg-strong);backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-color:var(--glass-border);}
     html.has-wallpaper .lang-menu,
@@ -124,6 +124,8 @@
       right:0;
       height:60px;
       background:var(--topbar-bg);
+      backdrop-filter:blur(20px) saturate(1.2);
+      -webkit-backdrop-filter:blur(20px) saturate(1.2);
       border-bottom:1px solid var(--border);
       display:flex;
       align-items:center;
@@ -132,7 +134,7 @@
       z-index:100;
       transition:background 0.3s ease, border-color 0.3s ease;
     }
-    .topbar.scrolled{background:var(--topbar-bg);}
+    .topbar.scrolled{background:var(--black);}
     .topbar-left{display:flex;align-items:center;gap:10px;}
     .topbar-logo{width:34px;height:34px;border-radius:50%;object-fit:cover;}
     .topbar-title{font-weight:800;font-size:0.95rem;color:var(--text);white-space:nowrap;}
@@ -527,6 +529,55 @@
     .empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:0.95rem;}
     .empty svg{width:48px;height:48px;margin-bottom:12px;opacity:0.3;}
 
+    /* ===== Splash / Welcome Screen ===== */
+    html.splash-seen .splash-screen{display:none!important;}
+    .splash-screen{
+      position:fixed;inset:0;z-index:3000;
+      background:radial-gradient(circle at 18% 16%,rgba(128,128,128,0.05),transparent 22%),var(--black);
+      display:flex;align-items:center;justify-content:center;
+      padding:24px;text-align:center;
+      opacity:1;visibility:visible;
+      transition:opacity 0.45s ease, visibility 0.45s ease;
+    }
+    .splash-screen.dismissed{opacity:0;visibility:hidden;pointer-events:none;}
+    html.has-wallpaper .splash-screen{
+      background:var(--glass-bg-strong);
+      backdrop-filter:blur(var(--glass-blur)) saturate(1.5);
+      -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);
+    }
+    .splash-inner{max-width:400px;width:100%;animation:splashPop 0.55s cubic-bezier(0.16,1,0.3,1);}
+    @keyframes splashPop{from{opacity:0;transform:translateY(16px) scale(0.96);}to{opacity:1;transform:translateY(0) scale(1);}}
+    .splash-avatar{
+      width:84px;height:84px;border-radius:50%;
+      background:var(--avatar-gradient);
+      display:flex;align-items:center;justify-content:center;
+      font-size:2rem;font-weight:800;color:var(--black);
+      margin:0 auto 24px;overflow:hidden;
+      box-shadow:var(--shadow);
+    }
+    .splash-avatar img{width:100%;height:100%;object-fit:cover;}
+    .splash-greeting{font-size:1.5rem;font-weight:800;color:var(--text);margin-bottom:10px;line-height:1.45;}
+    .splash-sub{color:var(--muted);font-size:0.92rem;margin-bottom:28px;line-height:1.6;}
+    .splash-actions{display:flex;flex-direction:column;gap:10px;}
+    .splash-btn-primary{
+      width:100%;padding:14px;background:var(--primary);color:var(--black);
+      font-weight:800;border:none;border-radius:12px;cursor:pointer;
+      font-family:'Cairo',sans-serif;font-size:0.94rem;transition:all 0.2s;
+    }
+    .splash-btn-primary:hover{background:var(--primary-h);transform:translateY(-1px);}
+    .splash-btn-secondary{
+      width:100%;padding:14px;background:rgba(128,128,128,0.08);color:var(--text);
+      font-weight:700;border:1px solid var(--border);border-radius:12px;cursor:pointer;
+      font-family:'Cairo',sans-serif;font-size:0.9rem;transition:all 0.2s;
+    }
+    .splash-btn-secondary:hover{background:rgba(128,128,128,0.15);}
+    .splash-hint{margin-top:24px;color:var(--muted);font-size:0.8rem;}
+    .splash-skip{background:none;border:none;color:var(--muted);font-size:0.82rem;cursor:pointer;text-decoration:underline;font-family:'Cairo',sans-serif;}
+    @media (max-width:480px){
+      .splash-greeting{font-size:1.3rem;}
+      .splash-avatar{width:72px;height:72px;font-size:1.7rem;}
+    }
+
     /* ===== Modals ===== */
     .modal-bd{
       position:fixed;inset:0;
@@ -746,6 +797,17 @@
   </style>
 </head>
 <body>
+<script>if(sessionStorage.getItem('hostaka_splash_seen')) document.documentElement.classList.add('splash-seen');</script>
+
+<div class="splash-screen" id="splashScreen">
+  <div class="splash-inner" id="splashInner">
+    <div class="splash-avatar" id="splashAvatar">H</div>
+    <div class="splash-greeting" id="splashGreeting"></div>
+    <div class="splash-sub" id="splashSub"></div>
+    <div class="splash-actions" id="splashActions"></div>
+    <div class="splash-hint" id="splashHint"></div>
+  </div>
+</div>
 
 <div class="wallpaper-bg" id="wallpaperBg"></div>
 <div class="wallpaper-overlay" id="wallpaperOverlayEl"></div>
@@ -794,7 +856,7 @@
     <button class="icon-btn" id="verifyBtn" onclick="requestVerify()" title="طلب التوثيق" style="display:none;">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
     </button>
-    <a href="/shiziai" class="icon-btn shizi-btn" id="shiziBtn" title="Shizi AI">
+    <a href="/shiziai" class="icon-btn" id="shiziBtn" title="Shizi AI" style="background:linear-gradient(145deg,rgba(236,72,153,0.12),rgba(168,85,247,0.12));border-color:rgba(236,72,153,0.25);color:#ec4899;">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/></svg>
     </a>
     <a href="/chat" class="icon-btn" id="chatBtn" title="الرسائل">
@@ -1011,7 +1073,10 @@ const LANG = {
     deleteConfirm: 'حذف هذا المنشور؟', deleteComment: 'حذف التعليق؟',
     sortLatest: 'الأحدث', sortPopular: 'الأكثر تفاعلاً', sortRandom: 'عشوائي',
     downloadAndroid: 'تحميل تطبيق الأندرويد', fileTooLarge: 'حجم الملف يتجاوز 25 ميغابايت',
-    invalidFile: 'يُقبل JPG للصور و MP4 للفيديوهات'
+    invalidFile: 'يُقبل JPG للصور و MP4 للفيديوهات',
+    splashWelcomeTitle: '👋 أهلاً بك في Hostaka', splashWelcomeSub: 'سجّل دخولك أو أنشئ حسابًا جديدًا للانضمام إلى المجتمع',
+    splashLoginBtn: 'تسجيل الدخول', splashRegisterBtn: 'إنشاء حساب جديد', splashSkip: 'تصفّح كزائر',
+    splashSubLoggedIn: 'فيه منشورات جديدة بانتظارك', splashContinue: 'متابعة', splashTapHint: 'اضغط في أي مكان للمتابعة'
   },
   en: {
     title: 'Hostaka', subtitle: 'An open social platform for everyone',
@@ -1028,7 +1093,10 @@ const LANG = {
     deleteConfirm: 'Delete this post?', deleteComment: 'Delete this comment?',
     sortLatest: 'Latest', sortPopular: 'Most Popular', sortRandom: 'Random',
     downloadAndroid: 'Download Android App', fileTooLarge: 'File exceeds 25MB limit',
-    invalidFile: 'Only JPG images and MP4 videos are allowed'
+    invalidFile: 'Only JPG images and MP4 videos are allowed',
+    splashWelcomeTitle: '👋 Welcome to Hostaka', splashWelcomeSub: 'Log in or create a new account to join the community',
+    splashLoginBtn: 'Log In', splashRegisterBtn: 'Create Account', splashSkip: 'Browse as guest',
+    splashSubLoggedIn: 'New posts are waiting for you', splashContinue: 'Continue', splashTapHint: 'Tap anywhere to continue'
   },
   fr: {
     title: 'Hostaka', subtitle: 'Une plateforme sociale ouverte à tous',
@@ -1045,7 +1113,10 @@ const LANG = {
     deleteConfirm: 'Supprimer ?', deleteComment: 'Supprimer ce commentaire ?',
     sortLatest: 'Derniers', sortPopular: 'Plus populaires', sortRandom: 'Aléatoire',
     downloadAndroid: 'Télécharger l\'app Android', fileTooLarge: 'Fichier dépasse 25 Mo',
-    invalidFile: 'Seules les images JPG et vidéos MP4 sont autorisées'
+    invalidFile: 'Seules les images JPG et vidéos MP4 sont autorisées',
+    splashWelcomeTitle: '👋 Bienvenue sur Hostaka', splashWelcomeSub: 'Connectez-vous ou créez un compte pour rejoindre la communauté',
+    splashLoginBtn: 'Connexion', splashRegisterBtn: 'Créer un compte', splashSkip: 'Parcourir en invité',
+    splashSubLoggedIn: 'De nouvelles publications vous attendent', splashContinue: 'Continuer', splashTapHint: 'Touchez n\'importe où pour continuer'
   },
   ru: {
     title: 'Hostaka', subtitle: 'Открытая социальная платформа для всех',
@@ -1062,7 +1133,10 @@ const LANG = {
     deleteConfirm: 'Удалить пост?', deleteComment: 'Удалить комментарий?',
     sortLatest: 'Новые', sortPopular: 'Популярные', sortRandom: 'Случайные',
     downloadAndroid: 'Скачать Android-приложение', fileTooLarge: 'Файл превышает 25 МБ',
-    invalidFile: 'Разрешены только JPG и MP4'
+    invalidFile: 'Разрешены только JPG и MP4',
+    splashWelcomeTitle: '👋 Добро пожаловать в Hostaka', splashWelcomeSub: 'Войдите или создайте новый аккаунт, чтобы присоединиться',
+    splashLoginBtn: 'Войти', splashRegisterBtn: 'Создать аккаунт', splashSkip: 'Смотреть как гость',
+    splashSubLoggedIn: 'Вас ждут новые посты', splashContinue: 'Продолжить', splashTapHint: 'Нажмите в любом месте, чтобы продолжить'
   },
   zh: {
     title: 'Hostaka', subtitle: '面向所有人的开放社交平台',
@@ -1079,7 +1153,10 @@ const LANG = {
     deleteConfirm: '删除此帖子？', deleteComment: '删除此评论？',
     sortLatest: '最新', sortPopular: '最受欢迎', sortRandom: '随机',
     downloadAndroid: '下载安卓应用', fileTooLarge: '文件超过25MB',
-    invalidFile: '仅允许 JPG 图片和 MP4 视频'
+    invalidFile: '仅允许 JPG 图片和 MP4 视频',
+    splashWelcomeTitle: '👋 欢迎来到 Hostaka', splashWelcomeSub: '登录或创建新账户以加入社区',
+    splashLoginBtn: '登录', splashRegisterBtn: '创建账户', splashSkip: '以访客身份浏览',
+    splashSubLoggedIn: '有新帖子在等着你', splashContinue: '继续', splashTapHint: '点击任意位置继续'
   },
   ja: {
     title: 'Hostaka', subtitle: '誰でも参加できるオープンソーシャルプラットフォーム',
@@ -1096,9 +1173,93 @@ const LANG = {
     deleteConfirm: 'この投稿を削除しますか？', deleteComment: 'このコメントを削除しますか？',
     sortLatest: '最新', sortPopular: '人気順', sortRandom: 'ランダム',
     downloadAndroid: 'Androidアプリをダウンロード', fileTooLarge: 'ファイルが25MBを超えています',
-    invalidFile: 'JPG画像とMP4動画のみ許可されています'
+    invalidFile: 'JPG画像とMP4動画のみ許可されています',
+    splashWelcomeTitle: '👋 Hostakaへようこそ', splashWelcomeSub: 'ログインするか、新しいアカウントを作成してコミュニティに参加しましょう',
+    splashLoginBtn: 'ログイン', splashRegisterBtn: 'アカウント作成', splashSkip: 'ゲストとして閲覧',
+    splashSubLoggedIn: '新しい投稿があなたを待っています', splashContinue: '続ける', splashTapHint: 'どこかをタップして続ける'
   }
 };
+
+// ============================================================
+//  SPLASH / WELCOME SCREEN GREETINGS (time-aware, per-user)
+// ============================================================
+const SPLASH_GREETINGS = {
+  ar: {
+    night:   ['🌙 لسا صاحي يا {name}؟', 'سهران يا {name}؟ الليل طويل 🌌', '🌃 نور الليل يا {name}'],
+    morning: ['☀️ صباح الخير يا {name}', 'يوم جديد يا {name}، جاهز؟', '🌅 صباحك سعيد يا {name}'],
+    noon:    ['👋 أهلاً يا {name}', 'وحشتنا يا {name}!', 'شو أخبارك يا {name}؟'],
+    evening: ['🌆 مساء الخير يا {name}', 'مساك نور يا {name}', 'أهلاً بعودتك يا {name}']
+  },
+  en: {
+    night:   ['🌙 Up late, {name}?', 'Still awake, {name}?', '🌃 Burning the midnight oil, {name}?'],
+    morning: ['☀️ Good morning, {name}', 'New day, {name} — ready?', '🌅 Rise and shine, {name}'],
+    noon:    ['👋 Hey there, {name}', 'Good to see you, {name}!', "What's up, {name}?"],
+    evening: ['🌆 Good evening, {name}', 'Welcome back, {name}', '🌙 Evening, {name}']
+  }
+};
+
+function pickSplashGreeting(name){
+  const pool = SPLASH_GREETINGS[currentLang === 'ar' ? 'ar' : 'en'];
+  const h = new Date().getHours();
+  let period = 'noon';
+  if (h >= 0 && h < 5) period = 'night';
+  else if (h >= 5 && h < 12) period = 'morning';
+  else if (h >= 12 && h < 17) period = 'noon';
+  else if (h >= 17 && h < 21) period = 'evening';
+  else period = 'night';
+  const arr = pool[period];
+  const tmpl = arr[Math.floor(Math.random() * arr.length)];
+  return tmpl.replace('{name}', name);
+}
+
+function showSplashLoggedIn(user){
+  const avatarEl = document.getElementById('splashAvatar');
+  if (avatarEl) avatarEl.innerHTML = user.avatar ? `<img src="${esc(user.avatar)}" alt="">` : esc((user.username||'?').charAt(0).toUpperCase());
+  const gEl = document.getElementById('splashGreeting');
+  if (gEl) gEl.textContent = pickSplashGreeting(user.username || '');
+  const sEl = document.getElementById('splashSub');
+  if (sEl) sEl.textContent = t('splashSubLoggedIn');
+  const aEl = document.getElementById('splashActions');
+  if (aEl) aEl.innerHTML = `<button class="splash-btn-primary" onclick="dismissSplash()">${t('splashContinue')}</button>`;
+  const hEl = document.getElementById('splashHint');
+  if (hEl) hEl.textContent = t('splashTapHint');
+  const splash = document.getElementById('splashScreen');
+  if (splash) splash.addEventListener('click', splashClickToDismiss);
+  setTimeout(() => dismissSplash(), 2400);
+}
+
+function showSplashGuest(){
+  const avatarEl = document.getElementById('splashAvatar');
+  if (avatarEl) avatarEl.innerHTML = `<img src="hostaka-icon.png" alt="" onerror="this.parentElement.textContent='H'">`;
+  const gEl = document.getElementById('splashGreeting');
+  if (gEl) gEl.textContent = t('splashWelcomeTitle');
+  const sEl = document.getElementById('splashSub');
+  if (sEl) sEl.textContent = t('splashWelcomeSub');
+  const aEl = document.getElementById('splashActions');
+  if (aEl) aEl.innerHTML = `
+    <button class="splash-btn-primary" onclick="splashOpenAuth('login')">${t('splashLoginBtn')}</button>
+    <button class="splash-btn-secondary" onclick="splashOpenAuth('register')">${t('splashRegisterBtn')}</button>
+  `;
+  const hEl = document.getElementById('splashHint');
+  if (hEl) hEl.innerHTML = `<button class="splash-skip" onclick="dismissSplash()">${t('splashSkip')}</button>`;
+}
+
+function splashOpenAuth(tab){
+  dismissSplash();
+  switchTab(tab === 'login' ? 'login' : 'register');
+  openAuth();
+}
+
+function splashClickToDismiss(e){
+  if (e.target && e.target.id === 'splashScreen') dismissSplash();
+}
+
+function dismissSplash(){
+  const splash = document.getElementById('splashScreen');
+  if (!splash || splash.classList.contains('dismissed')) return;
+  splash.classList.add('dismissed');
+  try { sessionStorage.setItem('hostaka_splash_seen', '1'); } catch(e){}
+}
 
 let currentLang = localStorage.getItem('hostaka_lang') || 'ar';
 let currentTheme = localStorage.getItem('hostaka_theme') || 'light';
@@ -1918,6 +2079,11 @@ async function delComment(commentId, postId){
       }
     } catch(e) { if (ME) setLoggedInUI(ME); }
   }
+
+  if (!document.documentElement.classList.contains('splash-seen')) {
+    if (ME) showSplashLoggedIn(ME); else showSplashGuest();
+  }
+
   await loadPosts();
   if (ME && TOKEN) loadUnread();
 
