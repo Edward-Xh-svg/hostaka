@@ -104,8 +104,8 @@
       transition:background 0.6s ease;
     }
     /* عندما تكون هناك خلفية مخصّصة: عناصر الواجهة تتحول لزجاجية (Glassmorphism) */
-    html.has-wallpaper .topbar{background:var(--glass-bg-strong)!important;backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-bottom-color:var(--glass-border);}
-    html.has-wallpaper .topbar.scrolled{background:var(--glass-bg-strong)!important;}
+    html.has-wallpaper .topbar{background:var(--topbar-bg)!important;border-bottom-color:var(--glass-border);}
+    html.has-wallpaper .topbar.scrolled{background:var(--topbar-bg)!important;}
     html.has-wallpaper .post-card{background:var(--glass-bg);backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-color:var(--glass-border);}
     html.has-wallpaper .modal-box{background:var(--glass-bg-strong);backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-color:var(--glass-border);}
     html.has-wallpaper .lang-menu,
@@ -124,8 +124,6 @@
       right:0;
       height:60px;
       background:var(--topbar-bg);
-      backdrop-filter:blur(20px) saturate(1.2);
-      -webkit-backdrop-filter:blur(20px) saturate(1.2);
       border-bottom:1px solid var(--border);
       display:flex;
       align-items:center;
@@ -134,7 +132,7 @@
       z-index:100;
       transition:background 0.3s ease, border-color 0.3s ease;
     }
-    .topbar.scrolled{background:var(--black);}
+    .topbar.scrolled{background:var(--topbar-bg);}
     .topbar-left{display:flex;align-items:center;gap:10px;}
     .topbar-logo{width:34px;height:34px;border-radius:50%;object-fit:cover;}
     .topbar-title{font-weight:800;font-size:0.95rem;color:var(--text);white-space:nowrap;}
@@ -796,7 +794,7 @@
     <button class="icon-btn" id="verifyBtn" onclick="requestVerify()" title="طلب التوثيق" style="display:none;">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
     </button>
-    <a href="/shiziai" class="icon-btn" id="shiziBtn" title="Shizi AI" style="background:linear-gradient(145deg,rgba(236,72,153,0.12),rgba(168,85,247,0.12));border-color:rgba(236,72,153,0.25);color:#ec4899;">
+    <a href="/shiziai" class="icon-btn shizi-btn" id="shiziBtn" title="Shizi AI">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/></svg>
     </a>
     <a href="/chat" class="icon-btn" id="chatBtn" title="الرسائل">
