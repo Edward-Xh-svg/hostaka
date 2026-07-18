@@ -29,6 +29,56 @@ const SHIZI_DAILY_LIMIT = 50;
 // دالة مساعدة للانتظار (تستخدم عند إعادة المحاولة للـ API)
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// ============================================================
+// تأكيد البريد الإلكتروني عبر Resend — لمنع الحسابات الوهمية
+// ============================================================
+const CODE_TTL_MINUTES   = 10;   // صلاحية الكود بالدقائق
+const RESEND_COOLDOWN_S  = 45;   // مدة الانتظار قبل إعادة إرسال الكود (ثواني)
+const MAX_CODE_ATTEMPTS  = 5;    // أقصى عدد محاولات لإدخال الكود
+
+function generateCode() {
+  return String(crypto.randomInt(100000, 999999)); // كود من 6 أرقام
+}
+
+// يحوّل نص تاريخ SQLite (UTC, "YYYY-MM-DD HH:MM:SS") إلى Date صحيح
+function parseSqliteUTC(str) {
+  return new Date(String(str).replace(' ', 'T') + 'Z');
+}
+
+async function sendVerificationEmail(email, username, code) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error('RESEND_API_KEY غير مُعدّ على الخادم');
+  const from = process.env.RESEND_FROM_EMAIL || 'Hostaka <onboarding@resend.dev>';
+
+  const html = `
+  <div style="font-family:'Cairo',Tahoma,sans-serif;background:#f7f7f8;padding:32px 0;direction:rtl">
+    <div style="max-width:420px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px;border:1px solid #eee">
+      <h2 style="margin:0 0 8px;color:#111;font-size:20px;">أهلاً ${username} 👋</h2>
+      <p style="margin:0 0 20px;color:#555;font-size:14px;line-height:1.7">
+        شكراً لتسجيلك في <b>Hostaka</b>. لإكمال إنشاء حسابك، استخدم كود التأكيد التالي:
+      </p>
+      <div style="text-align:center;margin:20px 0;">
+        <span style="display:inline-block;background:#f5f5f5;border-radius:12px;padding:14px 28px;font-size:30px;font-weight:800;letter-spacing:8px;color:#111;">${code}</span>
+      </div>
+      <p style="margin:0;color:#888;font-size:13px;">
+        هذا الكود صالح لمدة ${CODE_TTL_MINUTES} دقائق. إذا لم تطلب إنشاء حساب، يمكنك تجاهل هذه الرسالة.
+      </p>
+    </div>
+  </div>`;
+
+  const r = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to: [email], subject: `كود تأكيد حسابك في Hostaka: ${code}`, html }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    console.error('❌ Resend error:', data);
+    throw new Error(data?.message || 'تعذر إرسال بريد التأكيد');
+  }
+  return data;
+}
+
 function signToken(user) {
   return jwt.sign({ id:user.id, username:user.username, role:user.role, avatar:user.avatar||'' }, JWT_SECRET, { expiresIn:JWT_EXPIRES });
 }
@@ -104,18 +154,119 @@ app.post('/api/login', async(req,res)=>{
   }catch(e){res.status(500).json({error:'خطأ في الخادم'});}
 });
 
-app.post('/api/register', async(req,res)=>{
-  try{
-    const{username,email,password}=req.body||{};
-    if(!username||!email||!password) return res.status(400).json({error:'جميع الحقول مطلوبة'});
-    if(password.length<6) return res.status(400).json({error:'كلمة المرور 6 أحرف على الأقل'});
-    const hash=bcrypt.hashSync(password,10);
-    const result=await q.createUser(username.trim(),email.trim().toLowerCase(),hash);
-    const user={id:Number(result.lastInsertRowid),username:username.trim(),role:'user',avatar:''};
-    res.json({success:true,token:signToken(user),username:user.username,role:user.role,avatar:'',id:user.id});
-  }catch(e){
-    if(e.message?.includes('UNIQUE')) return res.status(400).json({error:'البريد أو اسم المستخدم مستخدم مسبقاً'});
-    res.status(500).json({error:'خطأ في الخادم'});
+// هذا المسار القديم أصبح معطلاً، التسجيل الآن يتم عبر تأكيد البريد (انظر /api/auth/register/*)
+app.post('/api/register', (req,res)=>{
+  res.status(410).json({ error:'الرجاء استخدام صفحة التسجيل الجديدة على /login لإنشاء حساب' });
+});
+
+// ============================================================
+// التسجيل مع تأكيد البريد عبر كود (Resend) — /login الصفحة الجديدة
+// ============================================================
+
+// الخطوة 1: استلام البيانات وإرسال كود التأكيد للبريد
+app.post('/api/auth/register/start', async (req, res) => {
+  try {
+    const { username, email, password } = req.body || {};
+    const uname = String(username||'').trim();
+    const mail  = String(email||'').trim().toLowerCase();
+    if (!uname || !mail || !password) return res.status(400).json({ error:'جميع الحقول مطلوبة' });
+    if (uname.length < 3 || uname.length > 32) return res.status(400).json({ error:'اسم المستخدم يجب أن يكون بين 3 و32 حرفاً' });
+    if (!/^[A-Za-z0-9_\u0600-\u06FF]+$/.test(uname)) return res.status(400).json({ error:'اسم المستخدم يحتوي على رموز غير مسموحة' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) return res.status(400).json({ error:'البريد الإلكتروني غير صحيح' });
+    if (password.length < 6) return res.status(400).json({ error:'كلمة المرور 6 أحرف على الأقل' });
+
+    const existingEmail = await q.getUserByEmail(mail);
+    if (existingEmail) return res.status(400).json({ error:'البريد الإلكتروني مستخدم مسبقاً' });
+    const existingUser = await q.getUserByUsername(uname);
+    if (existingUser) return res.status(400).json({ error:'اسم المستخدم مستخدم مسبقاً' });
+
+    const pending = await q.getPendingRegistrationByEmail(mail);
+    if (pending) {
+      const secsSinceLastSend = (Date.now() - parseSqliteUTC(pending.last_sent_at).getTime()) / 1000;
+      if (secsSinceLastSend < RESEND_COOLDOWN_S) {
+        return res.status(429).json({ error:`الرجاء الانتظار ${Math.ceil(RESEND_COOLDOWN_S - secsSinceLastSend)} ثانية قبل طلب كود جديد` });
+      }
+    }
+
+    const code = generateCode();
+    const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES*60000).toISOString().replace('T',' ').slice(0,19);
+    const hash = bcrypt.hashSync(password, 10);
+
+    await sendVerificationEmail(mail, uname, code);
+    await q.upsertPendingRegistration(mail, uname, hash, code, expiresAt);
+
+    res.json({ success:true, email: mail, message:'تم إرسال كود التأكيد إلى بريدك الإلكتروني' });
+  } catch(e) {
+    console.error('❌ register/start error:', e);
+    res.status(500).json({ error: e.message || 'تعذر إرسال كود التأكيد' });
+  }
+});
+
+// الخطوة 2: إعادة إرسال الكود (مع مهلة بين كل طلب وآخر)
+app.post('/api/auth/register/resend', async (req, res) => {
+  try {
+    const mail = String(req.body?.email||'').trim().toLowerCase();
+    if (!mail) return res.status(400).json({ error:'البريد الإلكتروني مطلوب' });
+    const pending = await q.getPendingRegistrationByEmail(mail);
+    if (!pending) return res.status(404).json({ error:'لا يوجد طلب تسجيل بهذا البريد، ابدأ من جديد' });
+
+    const secsSinceLastSend = (Date.now() - parseSqliteUTC(pending.last_sent_at).getTime()) / 1000;
+    if (secsSinceLastSend < RESEND_COOLDOWN_S) {
+      return res.status(429).json({ error:`الرجاء الانتظار ${Math.ceil(RESEND_COOLDOWN_S - secsSinceLastSend)} ثانية قبل طلب كود جديد` });
+    }
+
+    const code = generateCode();
+    const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES*60000).toISOString().replace('T',' ').slice(0,19);
+    await sendVerificationEmail(mail, pending.username, code);
+    await q.bumpPendingRegistrationCode(mail, code, expiresAt);
+
+    res.json({ success:true, message:'تم إرسال كود جديد إلى بريدك الإلكتروني' });
+  } catch(e) {
+    console.error('❌ register/resend error:', e);
+    res.status(500).json({ error: e.message || 'تعذر إعادة إرسال الكود' });
+  }
+});
+
+// الخطوة 3: تأكيد الكود وإنشاء الحساب فعلياً
+app.post('/api/auth/register/verify', async (req, res) => {
+  try {
+    const mail = String(req.body?.email||'').trim().toLowerCase();
+    const code = String(req.body?.code||'').trim();
+    if (!mail || !code) return res.status(400).json({ error:'البريد والكود مطلوبان' });
+
+    const pending = await q.getPendingRegistrationByEmail(mail);
+    if (!pending) return res.status(404).json({ error:'لا يوجد طلب تسجيل بهذا البريد، ابدأ من جديد' });
+
+    if (parseSqliteUTC(pending.expires_at).getTime() < Date.now()) {
+      await q.deletePendingRegistration(mail);
+      return res.status(410).json({ error:'انتهت صلاحية الكود، الرجاء طلب كود جديد', expired:true });
+    }
+    if (pending.attempts >= MAX_CODE_ATTEMPTS) {
+      await q.deletePendingRegistration(mail);
+      return res.status(429).json({ error:'تم تجاوز عدد المحاولات المسموحة، الرجاء البدء من جديد', expired:true });
+    }
+    if (pending.code !== code) {
+      await q.incrementPendingRegistrationAttempts(mail);
+      return res.status(400).json({ error:'كود التأكيد غير صحيح' });
+    }
+
+    let result;
+    try {
+      result = await q.createVerifiedUser(pending.username, mail, pending.password);
+    } catch(e) {
+      if (e.message?.includes('UNIQUE')) {
+        await q.deletePendingRegistration(mail);
+        return res.status(400).json({ error:'البريد أو اسم المستخدم أصبح مستخدماً، الرجاء المحاولة باسم آخر' });
+      }
+      throw e;
+    }
+    await q.deletePendingRegistration(mail);
+
+    const user = { id: Number(result.lastInsertRowid), username: pending.username, role:'user', avatar:'' };
+    res.json({ success:true, token: signToken(user), username:user.username, role:user.role, avatar:'', id:user.id });
+  } catch(e) {
+    console.error('❌ register/verify error:', e);
+    res.status(500).json({ error: e.message || 'تعذر تأكيد الحساب' });
   }
 });
 
@@ -1105,6 +1256,7 @@ app.post('/api/admin/notifications', requireAdmin, async (req, res) => {
 // ============================================================
 // Pages
 // ============================================================
+app.get('/login',   (_, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/admin',   (_, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 app.get('/profile', (_, res) => res.sendFile(path.join(__dirname, 'public', 'profile.html')));
 app.get('/chat',    (_, res) => res.sendFile(path.join(__dirname, 'public', 'chat.html')));

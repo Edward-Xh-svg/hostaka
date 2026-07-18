@@ -193,6 +193,19 @@ async function initDB() {
       updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status, created_at DESC);
+
+    -- ===== جدول طلبات التسجيل المعلّقة (بانتظار تأكيد كود البريد) =====
+    CREATE TABLE IF NOT EXISTS pending_registrations (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      email        TEXT NOT NULL UNIQUE,
+      username     TEXT NOT NULL,
+      password     TEXT NOT NULL,
+      code         TEXT NOT NULL,
+      attempts     INTEGER NOT NULL DEFAULT 0,
+      expires_at   TEXT NOT NULL,
+      last_sent_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   // Migrations — إضافة أعمدة مفقودة
@@ -205,6 +218,7 @@ async function initDB() {
     "ALTER TABLE users ADD COLUMN verified     INTEGER DEFAULT 0",
     "ALTER TABLE users ADD COLUMN suspended      INTEGER DEFAULT 0",
     "ALTER TABLE users ADD COLUMN suspend_reason TEXT DEFAULT ''",
+    "ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 1",
     "ALTER TABLE records ADD COLUMN user_id     INTEGER",
     "ALTER TABLE records ADD COLUMN user_role   TEXT DEFAULT 'Member'",
     "ALTER TABLE records ADD COLUMN user_avatar TEXT DEFAULT ''",
@@ -218,6 +232,7 @@ async function initDB() {
     "CREATE TABLE IF NOT EXISTS verify_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, username TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(user_id))",
     "CREATE TABLE IF NOT EXISTS message_reactions (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id INTEGER NOT NULL, user_id INTEGER NOT NULL, emoji TEXT NOT NULL DEFAULT 'heart', UNIQUE(message_id, user_id))",
     "CREATE TABLE IF NOT EXISTS shizi_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, role TEXT NOT NULL DEFAULT 'user', content TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))",
+    "CREATE TABLE IF NOT EXISTS pending_registrations (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL UNIQUE, username TEXT NOT NULL, password TEXT NOT NULL, code TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, expires_at TEXT NOT NULL, last_sent_at TEXT NOT NULL DEFAULT (datetime('now')), created_at TEXT NOT NULL DEFAULT (datetime('now')))",
   ];
   for (const sql of migrations) {
     try { await db.execute(sql); } catch(e) { /* column/table already exists */ }
@@ -288,6 +303,8 @@ const q = {
     }).then(first);
   },
   createUser:       (username,email,password) => db.execute({ sql:'INSERT INTO users (username,email,password) VALUES (?,?,?)', args:[username,email,password] }),
+  createVerifiedUser: (username,email,password) => db.execute({ sql:'INSERT INTO users (username,email,password,email_verified) VALUES (?,?,?,1)', args:[username,email,password] }),
+  getUserByUsername: (username) => db.execute({ sql:'SELECT * FROM users WHERE username=?', args:[username] }).then(first),
   updateProfile:    (display_name,bio,game_id,avatar,cover,id) => db.execute({ sql:'UPDATE users SET display_name=?,bio=?,game_id=?,avatar=?,cover=? WHERE id=?', args:[display_name,bio,game_id,avatar,cover,id] }),
   listUsers:        () => db.execute('SELECT id,username,email,role,avatar,display_name,verified,suspended,suspend_reason,created_at FROM users ORDER BY created_at DESC').then(rows),
   listPublicUsers:  () => db.execute('SELECT id,username,display_name,avatar,role,verified FROM users ORDER BY username ASC').then(rows),
@@ -470,6 +487,27 @@ const q = {
   getReportsByUser: (uid) => db.execute({ sql:'SELECT * FROM reports WHERE reporter_id=? ORDER BY created_at DESC', args:[uid] }).then(rows),
   updateReport:     (id, status, admin_reply) => db.execute({ sql:"UPDATE reports SET status=?, admin_reply=?, updated_at=datetime('now') WHERE id=?", args:[status, admin_reply||'', id] }),
   countPendingReports: () => db.execute("SELECT COUNT(*) as count FROM reports WHERE status='pending'").then(first).then(r => r ? r.count : 0),
+
+  // ── Pending Registrations (تأكيد البريد عبر كود) ──
+  getPendingRegistrationByEmail: (email) => db.execute({ sql:'SELECT * FROM pending_registrations WHERE email=?', args:[email] }).then(first),
+  upsertPendingRegistration: (email, username, password, code, expiresAt) => db.execute({
+    sql: `INSERT INTO pending_registrations (email,username,password,code,attempts,expires_at,last_sent_at)
+          VALUES (?,?,?,?,0,?,datetime('now'))
+          ON CONFLICT(email) DO UPDATE SET
+            username=excluded.username,
+            password=excluded.password,
+            code=excluded.code,
+            attempts=0,
+            expires_at=excluded.expires_at,
+            last_sent_at=datetime('now')`,
+    args: [email, username, password, code, expiresAt]
+  }),
+  bumpPendingRegistrationCode: (email, code, expiresAt) => db.execute({
+    sql: `UPDATE pending_registrations SET code=?, attempts=0, expires_at=?, last_sent_at=datetime('now') WHERE email=?`,
+    args: [code, expiresAt, email]
+  }),
+  incrementPendingRegistrationAttempts: (email) => db.execute({ sql:'UPDATE pending_registrations SET attempts=attempts+1 WHERE email=?', args:[email] }),
+  deletePendingRegistration: (email) => db.execute({ sql:'DELETE FROM pending_registrations WHERE email=?', args:[email] }),
 };
 
 module.exports = { db, q, initDB };
