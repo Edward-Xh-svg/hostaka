@@ -26,6 +26,8 @@ async function initDB() {
       display_name TEXT DEFAULT '',
       cover        TEXT DEFAULT '',
       verified     INTEGER DEFAULT 0,
+      suspended       INTEGER DEFAULT 0,
+      suspend_reason  TEXT DEFAULT '',
       created_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -164,6 +166,33 @@ async function initDB() {
       created_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
+
+    -- ===== جدول الحظر بين المستخدمين =====
+    CREATE TABLE IF NOT EXISTS blocks (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(user_id, blocked_id)
+    );
+
+    -- ===== جدول البلاغات وطلبات الدعم =====
+    CREATE TABLE IF NOT EXISTS reports (
+      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+      reporter_id        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      reporter_name      TEXT DEFAULT '',
+      type               TEXT NOT NULL DEFAULT 'general', -- post | comment | message | user | general
+      target_id          INTEGER,
+      target_owner_id    INTEGER,
+      target_owner_name  TEXT DEFAULT '',
+      subject            TEXT DEFAULT '',
+      reason             TEXT DEFAULT '',
+      status             TEXT NOT NULL DEFAULT 'pending', -- pending | resolved | dismissed
+      admin_reply        TEXT DEFAULT '',
+      created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status, created_at DESC);
   `);
 
   // Migrations — إضافة أعمدة مفقودة
@@ -174,6 +203,8 @@ async function initDB() {
     "ALTER TABLE users ADD COLUMN display_name TEXT DEFAULT ''",
     "ALTER TABLE users ADD COLUMN cover        TEXT DEFAULT ''",
     "ALTER TABLE users ADD COLUMN verified     INTEGER DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN suspended      INTEGER DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN suspend_reason TEXT DEFAULT ''",
     "ALTER TABLE records ADD COLUMN user_id     INTEGER",
     "ALTER TABLE records ADD COLUMN user_role   TEXT DEFAULT 'Member'",
     "ALTER TABLE records ADD COLUMN user_avatar TEXT DEFAULT ''",
@@ -241,7 +272,7 @@ async function initDB() {
 const q = {
   // ── Users ──
   getUserByEmail:   (email)    => db.execute({ sql:'SELECT * FROM users WHERE email=?', args:[email] }).then(first),
-  getUserById:      (id)       => db.execute({ sql:'SELECT id,username,email,role,avatar,bio,game_id,display_name,cover,verified,created_at FROM users WHERE id=?', args:[id] }).then(first),
+  getUserById:      (id)       => db.execute({ sql:'SELECT id,username,email,role,avatar,bio,game_id,display_name,cover,verified,suspended,suspend_reason,created_at FROM users WHERE id=?', args:[id] }).then(first),
   getPublicProfile: (username, viewerId = null) => {
     return db.execute({ 
       sql: `
@@ -258,11 +289,13 @@ const q = {
   },
   createUser:       (username,email,password) => db.execute({ sql:'INSERT INTO users (username,email,password) VALUES (?,?,?)', args:[username,email,password] }),
   updateProfile:    (display_name,bio,game_id,avatar,cover,id) => db.execute({ sql:'UPDATE users SET display_name=?,bio=?,game_id=?,avatar=?,cover=? WHERE id=?', args:[display_name,bio,game_id,avatar,cover,id] }),
-  listUsers:        () => db.execute('SELECT id,username,email,role,avatar,display_name,verified,created_at FROM users ORDER BY created_at DESC').then(rows),
+  listUsers:        () => db.execute('SELECT id,username,email,role,avatar,display_name,verified,suspended,suspend_reason,created_at FROM users ORDER BY created_at DESC').then(rows),
   listPublicUsers:  () => db.execute('SELECT id,username,display_name,avatar,role,verified FROM users ORDER BY username ASC').then(rows),
   deleteUser:       (id) => db.execute({ sql:"DELETE FROM users WHERE id=? AND role!='admin'", args:[id] }),
   updateUserRole:   (role,id) => db.execute({ sql:'UPDATE users SET role=? WHERE id=?', args:[role,id] }),
   searchUsers:      (q) => db.execute({ sql:"SELECT id,username,display_name,avatar,role,verified FROM users WHERE username LIKE ? OR display_name LIKE ? LIMIT 15", args:['%'+q+'%','%'+q+'%'] }).then(rows),
+  suspendUser:      (id,reason) => db.execute({ sql:"UPDATE users SET suspended=1,suspend_reason=? WHERE id=? AND role!='admin'", args:[reason||'',id] }),
+  unsuspendUser:    (id) => db.execute({ sql:"UPDATE users SET suspended=0,suspend_reason='' WHERE id=?", args:[id] }),
 
   // ── Records ──
   listRecords: () => db.execute(`
@@ -410,6 +443,33 @@ const q = {
   addShiziMessage:    (uid,role,content) => db.execute({ sql:'INSERT INTO shizi_messages (user_id,role,content) VALUES (?,?,?)', args:[uid,role,content] }),
   clearShiziMessages: (uid) => db.execute({ sql:'DELETE FROM shizi_messages WHERE user_id=?', args:[uid] }),
   countShiziUserMessagesLast24h: (uid) => db.execute({ sql:"SELECT COUNT(*) as cnt FROM shizi_messages WHERE user_id=? AND role='user' AND created_at >= datetime('now','-1 day')", args:[uid] }).then(first).then(r => r ? Number(r.cnt) : 0),
+
+  // ── Blocks ──
+  blockUser:      (uid, blockedId) => db.execute({ sql:'INSERT OR IGNORE INTO blocks (user_id,blocked_id) VALUES (?,?)', args:[uid, blockedId] }),
+  unblockUser:    (uid, blockedId) => db.execute({ sql:'DELETE FROM blocks WHERE user_id=? AND blocked_id=?', args:[uid, blockedId] }),
+  isBlocked:      (uid, blockedId) => db.execute({ sql:'SELECT 1 FROM blocks WHERE user_id=? AND blocked_id=?', args:[uid, blockedId] }).then(first).then(r => !!r),
+  isBlockedEitherWay: async (a, b) => {
+    const r = await db.execute({ sql:'SELECT 1 FROM blocks WHERE (user_id=? AND blocked_id=?) OR (user_id=? AND blocked_id=?)', args:[a,b,b,a] }).then(first);
+    return !!r;
+  },
+  getBlockedUsers: (uid) => db.execute({ sql:`
+    SELECT u.id, u.username, u.display_name, u.avatar
+    FROM blocks b JOIN users u ON u.id = b.blocked_id
+    WHERE b.user_id = ? ORDER BY b.created_at DESC
+  `, args:[uid] }).then(rows),
+
+  // ── Reports (بلاغات وطلبات دعم) ──
+  createReport: (reporter_id, reporter_name, type, target_id, target_owner_id, target_owner_name, subject, reason) => db.execute({
+    sql: 'INSERT INTO reports (reporter_id,reporter_name,type,target_id,target_owner_id,target_owner_name,subject,reason) VALUES (?,?,?,?,?,?,?,?)',
+    args: [reporter_id||null, reporter_name||'', type||'general', target_id||null, target_owner_id||null, target_owner_name||'', subject||'', reason||'']
+  }),
+  getReportsByStatus: (status) => status
+    ? db.execute({ sql:'SELECT * FROM reports WHERE status=? ORDER BY created_at DESC', args:[status] }).then(rows)
+    : db.execute('SELECT * FROM reports ORDER BY created_at DESC').then(rows),
+  getReportById:    (id) => db.execute({ sql:'SELECT * FROM reports WHERE id=?', args:[id] }).then(first),
+  getReportsByUser: (uid) => db.execute({ sql:'SELECT * FROM reports WHERE reporter_id=? ORDER BY created_at DESC', args:[uid] }).then(rows),
+  updateReport:     (id, status, admin_reply) => db.execute({ sql:"UPDATE reports SET status=?, admin_reply=?, updated_at=datetime('now') WHERE id=?", args:[status, admin_reply||'', id] }),
+  countPendingReports: () => db.execute("SELECT COUNT(*) as count FROM reports WHERE status='pending'").then(first).then(r => r ? r.count : 0),
 };
 
 module.exports = { db, q, initDB };

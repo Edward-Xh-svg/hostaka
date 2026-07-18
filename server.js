@@ -37,9 +37,14 @@ function verifyToken(req) {
   if (!token) return null;
   try { return jwt.verify(token, JWT_SECRET); } catch(e) { return null; }
 }
-function requireAuth(req,res,next) {
+async function requireAuth(req,res,next) {
   const u=verifyToken(req); if(!u) return res.status(401).json({error:'غير مصرح'});
-  req.user=u; next();
+  try {
+    const dbUser = await q.getUserById(u.id);
+    if (!dbUser) return res.status(401).json({error:'غير مصرح'});
+    if (dbUser.suspended) return res.status(403).json({ error:'تم تعليق حسابك' + (dbUser.suspend_reason ? ': ' + dbUser.suspend_reason : ''), suspended:true, reason: dbUser.suspend_reason||'' });
+    req.user=u; next();
+  } catch(e) { res.status(500).json({error:'خطأ في الخادم'}); }
 }
 function requireAdmin(req,res,next) {
   const u=verifyToken(req); if(!u) return res.status(401).json({error:'غير مصرح'});
@@ -94,6 +99,7 @@ app.post('/api/login', async(req,res)=>{
     if(!email||!password) return res.status(400).json({error:'البريد وكلمة المرور مطلوبان'});
     const user=await q.getUserByEmail(email.trim().toLowerCase());
     if(!user||!bcrypt.compareSync(password,user.password)) return res.status(401).json({error:'البريد أو كلمة المرور غير صريحة'});
+    if(user.suspended) return res.status(403).json({ error:'تم تعليق حسابك' + (user.suspend_reason ? ': ' + user.suspend_reason : ''), suspended:true, reason:user.suspend_reason||'' });
     res.json({success:true,token:signToken(user),username:user.username,role:user.role,avatar:user.avatar||'',id:user.id});
   }catch(e){res.status(500).json({error:'خطأ في الخادم'});}
 });
@@ -547,6 +553,107 @@ app.get('/api/following/:username', async (req, res) => {
 });
 
 // ============================================================
+// Blocks
+// ============================================================
+app.post('/api/block/:username', requireAuth, async (req, res) => {
+  try {
+    const target = await q.getPublicProfile(req.params.username);
+    if (!target) return res.status(404).json({ error: 'المستخدم غير موجود' });
+    if (target.id === req.user.id) return res.status(400).json({ error: 'لا يمكنك حظر نفسك' });
+    await q.blockUser(req.user.id, target.id);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+app.delete('/api/block/:username', requireAuth, async (req, res) => {
+  try {
+    const target = await q.getPublicProfile(req.params.username);
+    if (!target) return res.status(404).json({ error: 'المستخدم غير موجود' });
+    await q.unblockUser(req.user.id, target.id);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+app.get('/api/block/list', requireAuth, async (req, res) => {
+  try {
+    res.json(await q.getBlockedUsers(req.user.id));
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+app.get('/api/block/status/:username', requireAuth, async (req, res) => {
+  try {
+    const target = await q.getPublicProfile(req.params.username);
+    if (!target) return res.status(404).json({ error: 'المستخدم غير موجود' });
+    const iBlocked = await q.isBlocked(req.user.id, target.id);
+    const blockedMe = await q.isBlocked(target.id, req.user.id);
+    res.json({ blocked: iBlocked, blockedMe });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+// ============================================================
+// Reports & Support (البلاغات وطلبات الدعم)
+// ============================================================
+app.post('/api/reports', requireAuth, async (req, res) => {
+  try {
+    const { type, target_id, target_owner_username, subject, reason } = req.body || {};
+    if (!reason?.trim()) return res.status(400).json({ error: 'الرجاء كتابة تفاصيل البلاغ' });
+    const me = await q.getUserById(req.user.id);
+    let ownerId = null, ownerName = '';
+    if (target_owner_username) {
+      const owner = await q.getPublicProfile(target_owner_username);
+      if (owner) { ownerId = owner.id; ownerName = owner.display_name || owner.username; }
+    }
+    await q.createReport(
+      me.id, me.display_name || me.username,
+      type || 'general', target_id || null, ownerId, ownerName,
+      subject?.trim() || '', reason.trim()
+    );
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+app.get('/api/reports/mine', requireAuth, async (req, res) => {
+  try {
+    res.json(await q.getReportsByUser(req.user.id));
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+app.get('/api/admin/reports', requireAdmin, async (req, res) => {
+  try {
+    res.json(await q.getReportsByStatus(req.query.status));
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+app.put('/api/admin/reports/:id', requireAdmin, async (req, res) => {
+  try {
+    const { status, admin_reply } = req.body || {};
+    const report = await q.getReportById(req.params.id);
+    if (!report) return res.status(404).json({ error: 'البلاغ غير موجود' });
+    await q.updateReport(req.params.id, status || report.status, admin_reply ?? report.admin_reply);
+    if (admin_reply?.trim() && report.reporter_id) {
+      const admin = await q.getUserById(req.user.id);
+      await q.createNotification(
+        report.reporter_id, 'report_reply', admin.id,
+        admin.display_name || admin.username, admin.avatar || '',
+        null, null, admin_reply.trim().slice(0, 140), '/support'
+      );
+    }
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+// ============================================================
 // Messages
 // ============================================================
 app.get('/api/messages/unread', requireAuth, async (req, res) => {
@@ -579,6 +686,9 @@ app.post('/api/messages/:username', requireAuth, async (req, res) => {
     if (!content?.trim() && !image) return res.status(400).json({ error: 'فارغة' });
     const other = await q.getPublicProfile(req.params.username);
     if (!other) return res.status(404).json({ error: 'غير موجود' });
+    if (await q.isBlockedEitherWay(req.user.id, other.id)) {
+      return res.status(403).json({ error: 'لا يمكن إرسال رسالة، يوجد حظر بينكما' });
+    }
     const me = await q.getUserById(req.user.id);
     await q.sendMessage(
       me.id,
@@ -949,6 +1059,24 @@ app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
   }
 });
 
+app.put('/api/admin/users/:id/suspend', requireAdmin, async (req, res) => {
+  try {
+    const { reason } = req.body || {};
+    await q.suspendUser(req.params.id, reason || '');
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+app.put('/api/admin/users/:id/unsuspend', requireAdmin, async (req, res) => {
+  try {
+    await q.unsuspendUser(req.params.id);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
 // أداة إرسال إشعارات للأعضاء من لوحة الإدارة
 app.post('/api/admin/notifications', requireAdmin, async (req, res) => {
   try {
@@ -982,6 +1110,7 @@ app.get('/profile', (_, res) => res.sendFile(path.join(__dirname, 'public', 'pro
 app.get('/chat',    (_, res) => res.sendFile(path.join(__dirname, 'public', 'chat.html')));
 app.get('/group',   (_, res) => res.sendFile(path.join(__dirname, 'public', 'group.html')));
 app.get('/shiziai', (_, res) => res.sendFile(path.join(__dirname, 'public', 'shiziai.html')));
+app.get('/support', (_, res) => res.sendFile(path.join(__dirname, 'public', 'support.html')));
 app.get('*',        (_, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // ============================================================
