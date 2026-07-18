@@ -1349,8 +1349,7 @@ function showSplashGuest(){
 
 function splashOpenAuth(tab){
   dismissSplash();
-  switchTab(tab === 'login' ? 'login' : 'register');
-  openAuth();
+  location.href = '/login' + (tab === 'register' ? '?tab=register' : '');
 }
 
 function splashClickToDismiss(e){
@@ -1738,7 +1737,7 @@ function clearUser(){
 function toggleDrop(){ dropVisible=!dropVisible; document.getElementById('userDrop').classList.toggle('show',dropVisible); }
 document.addEventListener('click', e=>{ if(!document.getElementById('userBadgeWrap').contains(e.target)){ document.getElementById('userDrop').classList.remove('show'); dropVisible=false; } });
 
-function openAuth(){ document.getElementById('authModal').classList.add('show'); }
+function openAuth(){ location.href = '/login'; }
 function closeModal(id){ document.getElementById(id).classList.remove('show'); }
 document.querySelectorAll('.modal-bd').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('show'); }));
 
