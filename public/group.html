@@ -496,6 +496,12 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       <span id="settingsTitle">إعدادات المجموعة</span>
     </div>
+    <div style="display:flex;justify-content:center;margin-bottom:14px;">
+      <div id="gsAvatarPreview" onclick="document.getElementById('gsAvatarFile').click()" style="width:76px;height:76px;border-radius:50%;background:var(--avatar-gradient);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;font-weight:800;font-size:1.6rem;color:#fff;position:relative;border:2px solid var(--border);">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;bottom:2px;left:2px;background:rgba(0,0,0,0.55);border-radius:50%;padding:4px;color:#fff;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </div>
+      <input type="file" id="gsAvatarFile" accept="image/*" style="display:none;" onchange="onGroupAvatarFile(event)">
+    </div>
     <input class="m-input" type="text" id="gsName" placeholder="اسم المجموعة *">
     <input class="m-input" type="text" id="gsDesc" placeholder="وصف المجموعة (اختياري)">
     <div class="m-footer">
@@ -1041,12 +1047,40 @@ async function removeMember(uid){
 // ============================================================
 //  إعدادات المجموعة
 // ============================================================
+let pendingGroupAvatar = '';
+
+function renderGsAvatarPreview(url){
+  const box = document.getElementById('gsAvatarPreview');
+  const camIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;bottom:2px;left:2px;background:rgba(0,0,0,0.55);border-radius:50%;padding:4px;color:#fff;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
+  box.innerHTML = (url ? `<img src="${esc(url)}" style="width:100%;height:100%;object-fit:cover;">` : (group?.name||'?').charAt(0).toUpperCase()) + camIcon;
+}
+
+function onGroupAvatarFile(evt){
+  const f = evt.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    const base64 = ev.target.result;
+    renderGsAvatarPreview(base64);
+    try {
+      const up = await apiFetch('/api/upload', 'POST', { image: base64 });
+      if (up.url) { pendingGroupAvatar = up.url; }
+      else { showToast(t('error'), 'error'); renderGsAvatarPreview(group?.avatar || ''); }
+    } catch(e) { showToast(t('error'), 'error'); renderGsAvatarPreview(group?.avatar || ''); }
+  };
+  reader.readAsDataURL(f);
+  evt.target.value = '';
+}
+
 function openGroupSettings(){
   document.getElementById('gsName').value = group.name || '';
   document.getElementById('gsDesc').value = group.description || '';
   document.getElementById('gsName').disabled = myRole === 'member';
   document.getElementById('gsDesc').disabled = myRole === 'member';
   document.getElementById('gsSaveBtn').style.display = myRole === 'member' ? 'none' : 'inline-flex';
+  pendingGroupAvatar = '';
+  renderGsAvatarPreview(group.avatar || '');
+  document.getElementById('gsAvatarFile').disabled = myRole === 'member';
   openModal('groupSettingsModal');
 }
 
@@ -1054,13 +1088,14 @@ async function saveGroupSettings(){
   const name = document.getElementById('gsName').value.trim();
   if (!name){ showToast(t('error'), 'error'); return; }
   const description = document.getElementById('gsDesc').value.trim();
+  const avatar = pendingGroupAvatar || group.avatar || '';
   const btn = document.getElementById('gsSaveBtn');
   btn.disabled = true;
   try {
     await apiFetch('/api/groups/' + GROUP_ID, 'PUT', {
-      name, description, avatar: group.avatar || '', theme: group.theme || 'default', background: group.background || 'default'
+      name, description, avatar, theme: group.theme || 'default', background: group.background || 'default'
     });
-    group.name = name; group.description = description;
+    group.name = name; group.description = description; group.avatar = avatar;
     renderTopbar();
     closeModal('groupSettingsModal');
     showToast(t('settingsSaved'));

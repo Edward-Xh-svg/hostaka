@@ -169,6 +169,49 @@
       border:2px solid var(--black);
     }
 
+    .notif-dropdown{
+      position:absolute;top:50px;left:0;
+      background:var(--modal-bg);
+      backdrop-filter:blur(24px);
+      -webkit-backdrop-filter:blur(24px);
+      border:1px solid var(--border);
+      border-radius:16px;
+      min-width:300px;max-width:340px;
+      max-height:420px;
+      display:flex;flex-direction:column;
+      opacity:0;visibility:hidden;
+      transform:translateY(-10px) scale(0.96);
+      transition:all 0.22s cubic-bezier(0.16,1,0.3,1);
+      z-index:30;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .notif-dropdown.show{opacity:1;visibility:visible;transform:translateY(0) scale(1);}
+    .notif-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);font-size:0.85rem;font-weight:700;color:var(--text);flex-shrink:0;}
+    .notif-markall{background:none;border:none;color:var(--primary);font-family:'Cairo',sans-serif;font-size:0.72rem;font-weight:600;cursor:pointer;}
+    .notif-markall:hover{text-decoration:underline;}
+    .notif-list{overflow-y:auto;max-height:370px;}
+    .notif-item{display:flex;gap:10px;padding:11px 16px;cursor:pointer;transition:background 0.15s;border-bottom:1px solid var(--border);position:relative;}
+    .notif-item:last-child{border-bottom:none;}
+    .notif-item:hover{background:rgba(128,128,128,0.06);}
+    .notif-item.unread{background:rgba(0,150,255,0.05);}
+    .notif-item.unread::before{content:'';position:absolute;top:16px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--primary);}
+    .notif-avatar{width:36px;height:36px;border-radius:50%;background:var(--avatar-gradient);color:var(--black);font-weight:800;display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:0.9rem;flex-shrink:0;}
+    .notif-avatar img{width:100%;height:100%;object-fit:cover;}
+    .notif-body{flex:1;min-width:0;}
+    .notif-text{font-size:0.82rem;color:var(--text);line-height:1.5;}
+    .notif-text b{font-weight:800;}
+    .notif-time{font-size:0.7rem;color:var(--muted);margin-top:3px;}
+    .notif-del{background:none;border:none;color:var(--muted);cursor:pointer;flex-shrink:0;padding:2px;opacity:0;transition:opacity 0.15s;}
+    .notif-item:hover .notif-del{opacity:1;}
+    .notif-del:hover{color:var(--text);}
+    .notif-del svg{width:13px;height:13px;}
+
+    .mention-tag{color:var(--primary);font-weight:700;text-decoration:none;cursor:pointer;}
+    .mention-tag:hover{text-decoration:underline;}
+    .hashtag-tag{color:var(--primary);font-weight:700;text-decoration:none;cursor:pointer;}
+    .hashtag-tag:hover{text-decoration:underline;}
+
     .lang-selector{position:relative;}
     .lang-menu{
       position:absolute;
@@ -864,6 +907,21 @@
         <path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/>
       </svg>
     </a>
+    <div class="notif-wrap" id="notifWrap" style="position:relative;display:none;">
+      <button class="icon-btn" id="notifBtn" onclick="toggleNotifDrop()" title="الإشعارات">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="badge" id="notifUnread"></span>
+      </button>
+      <div class="notif-dropdown" id="notifDrop">
+        <div class="notif-head">
+          <span>الإشعارات</span>
+          <button class="notif-markall" onclick="markAllNotifRead()">تعليم الكل كمقروء</button>
+        </div>
+        <div class="notif-list" id="notifList">
+          <div style="text-align:center;padding:26px 10px;color:var(--muted);font-size:0.82rem;">لا توجد إشعارات</div>
+        </div>
+      </div>
+    </div>
     <a href="/chat" class="icon-btn" id="chatBtn" title="الرسائل">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       <span class="badge" id="chatUnread"></span>
@@ -1606,6 +1664,7 @@ function setLoggedInUI(user){
   if(ab) ab.style.display = user.role==='admin' ? 'flex' : 'none';
   document.getElementById('actionBar').style.display = 'flex';
   checkVerifyStatus();
+  loadNotifCount();
 }
 
 function clearUser(){
@@ -1616,6 +1675,7 @@ function clearUser(){
   document.getElementById('btnLogin').style.display = 'flex';
   document.getElementById('userBadgeWrap').style.display = 'none';
   document.getElementById('actionBar').style.display = 'none';
+  document.getElementById('notifWrap').style.display = 'none';
 }
 
 function toggleDrop(){ dropVisible=!dropVisible; document.getElementById('userDrop').classList.toggle('show',dropVisible); }
@@ -1697,6 +1757,158 @@ async function loadUnread(){
     if(d?.count>0){ el.style.display='flex'; el.textContent = d.count > 9 ? '9+' : d.count; }
     else { el.style.display='none'; }
   } catch(e){}
+}
+
+// ----- Notifications -----
+let notifDropVisible = false;
+let notifCache = [];
+
+function timeAgo(dateStr){
+  if(!dateStr) return '';
+  const diff = (Date.now() - new Date(dateStr.replace(' ','T')+'Z').getTime())/1000;
+  if(diff < 60) return 'الآن';
+  if(diff < 3600) return Math.floor(diff/60) + ' د';
+  if(diff < 86400) return Math.floor(diff/3600) + ' س';
+  if(diff < 2592000) return Math.floor(diff/86400) + ' يوم';
+  return fmtDate(dateStr);
+}
+
+function notifMessage(n){
+  const actor = `<b>${esc(n.actor_name || 'مستخدم')}</b>`;
+  switch(n.type){
+    case 'mention_post':    return `${actor} أشار إليك في منشور`;
+    case 'mention_comment':  return `${actor} أشار إليك في تعليق`;
+    case 'comment':          return `${actor} علّق على منشورك`;
+    case 'admin':            return `${actor}: ${esc(n.content||'')}`;
+    default:                 return `${actor} ${esc(n.content||'')}`;
+  }
+}
+
+async function loadNotifCount(){
+  if(!ME || !getToken()) return;
+  try {
+    const d = await apiFetch('/api/notifications/unread');
+    const el = document.getElementById('notifUnread');
+    const wrap = document.getElementById('notifWrap');
+    if(wrap) wrap.style.display = 'block';
+    if(el){
+      if(d?.count>0){ el.style.display='flex'; el.textContent = d.count > 9 ? '9+' : d.count; }
+      else { el.style.display='none'; }
+    }
+  } catch(e){}
+}
+
+async function loadNotifications(){
+  const list = document.getElementById('notifList');
+  try {
+    const data = await apiFetch('/api/notifications');
+    notifCache = Array.isArray(data) ? data : [];
+    if(!notifCache.length){
+      list.innerHTML = '<div style="text-align:center;padding:26px 10px;color:var(--muted);font-size:0.82rem;">لا توجد إشعارات</div>';
+      return;
+    }
+    list.innerHTML = notifCache.map(n => `
+      <div class="notif-item ${n.read?'':'unread'}" onclick="onNotifClick(${n.id}, ${n.record_id||'null'}, '${esc(n.link||'')}')">
+        <div class="notif-avatar">${n.actor_avatar ? `<img src="${esc(n.actor_avatar)}" alt="">` : esc((n.actor_name||'?').charAt(0).toUpperCase())}</div>
+        <div class="notif-body">
+          <div class="notif-text">${notifMessage(n)}</div>
+          <div class="notif-time">${timeAgo(n.created_at)}</div>
+        </div>
+        <button class="notif-del" onclick="event.stopPropagation();delNotif(${n.id})" title="حذف">${SVG.delete}</button>
+      </div>
+    `).join('');
+  } catch(e){
+    list.innerHTML = '<div style="text-align:center;padding:26px 10px;color:var(--muted);font-size:0.82rem;">تعذر تحميل الإشعارات</div>';
+  }
+}
+
+function toggleNotifDrop(){
+  if(!ME){ openAuth(); return; }
+  notifDropVisible = !notifDropVisible;
+  document.getElementById('notifDrop').classList.toggle('show', notifDropVisible);
+  if(notifDropVisible) loadNotifications();
+}
+
+document.addEventListener('click', e=>{
+  const wrap = document.getElementById('notifWrap');
+  if(wrap && !wrap.contains(e.target)){ document.getElementById('notifDrop')?.classList.remove('show'); notifDropVisible=false; }
+});
+
+async function markAllNotifRead(){
+  try {
+    await apiFetch('/api/notifications/read-all', 'PUT');
+    notifCache.forEach(n=>n.read=1);
+    loadNotifications();
+    loadNotifCount();
+  } catch(e){}
+}
+
+async function delNotif(id){
+  try {
+    await apiFetch('/api/notifications/'+id, 'DELETE');
+    notifCache = notifCache.filter(n=>n.id!==id);
+    loadNotifications();
+    loadNotifCount();
+  } catch(e){}
+}
+
+function onNotifClick(id, recordId, link){
+  apiFetch('/api/notifications/'+id+'/read', 'PUT').catch(()=>{});
+  document.getElementById('notifDrop').classList.remove('show');
+  notifDropVisible = false;
+  loadNotifCount();
+  if(link){ window.location = link; }
+  else if(recordId){ window.location = '/?p=' + recordId; }
+}
+
+// ----- الإشارة (@) والهاشتاغ (#) -----
+function linkifyContent(html){
+  try {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    const walker = document.createTreeWalker(wrapper, NodeFilter.SHOW_TEXT);
+    const textNodes = [];
+    let node;
+    while((node = walker.nextNode())) textNodes.push(node);
+    const re = /(^|[\s(])([@#])([A-Za-z0-9_\u0600-\u06FF]{2,32})/gu;
+    textNodes.forEach(tn=>{
+      const text = tn.nodeValue;
+      if(!text || !/[@#]/.test(text)) return;
+      let last = 0, m, changed = false;
+      const frag = document.createDocumentFragment();
+      re.lastIndex = 0;
+      while((m = re.exec(text))){
+        changed = true;
+        const [full, pre, sym, word] = m;
+        const start = m.index;
+        if(start > last) frag.appendChild(document.createTextNode(text.slice(last, start)));
+        if(pre) frag.appendChild(document.createTextNode(pre));
+        const a = document.createElement('a');
+        a.textContent = sym + word;
+        if(sym === '@'){
+          a.className = 'mention-tag';
+          a.href = '/profile?u=' + encodeURIComponent(word);
+        } else {
+          a.className = 'hashtag-tag';
+          a.href = 'javascript:void(0)';
+          a.onclick = (ev)=>{ ev.preventDefault(); ev.stopPropagation(); filterByHashtag(word); };
+        }
+        frag.appendChild(a);
+        last = start + full.length;
+      }
+      if(!changed) return;
+      if(last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      tn.parentNode.replaceChild(frag, tn);
+    });
+    return wrapper.innerHTML;
+  } catch(e){ return html; }
+}
+
+function filterByHashtag(tag){
+  const input = document.getElementById('searchInput');
+  input.value = '#' + tag;
+  input.dispatchEvent(new Event('input'));
+  window.scrollTo({ top: document.getElementById('feed').offsetTop - 120, behavior:'smooth' });
 }
 
 async function checkVerifyStatus(){
@@ -1782,8 +1994,8 @@ function renderPost(p){
     const ca = c.avatar ? `<img src="${esc(c.avatar)}" alt="">` : esc((c.display_name||c.username||'?').charAt(0).toUpperCase());
     const cBadge = c.user_role==='Admin' ? `<span class="role-badge badge-admin">${t('adminRole')}</span>` : '';
     const canDelC = ME && (ME.role==='admin' || c.user_id==ME?.id);
-    // إزالة الإيموجيات من نص التعليق
-    const cleanContent = stripEmojis(esc(c.content));
+    // إزالة الإيموجيات من نص التعليق + تفعيل الإشارة (@) والهاشتاغ (#)
+    const cleanContent = linkifyContent(stripEmojis(esc(c.content)));
     return `<div class="comment" id="cmt-${c.id}">
       <div class="c-avatar">${ca}</div>
       <div class="c-bubble">
@@ -1819,7 +2031,7 @@ function renderPost(p){
           ${canDel ? `<button class="btn-icon" onclick="delPost(${p.id})" title="${t('delete')}">${SVG.delete}</button>` : ''}
         </div>
       </div>
-      <div class="post-text post-html">${p.content}</div>
+      <div class="post-text post-html">${linkifyContent(p.content)}</div>
       <div class="reactions-row">
         ${reactionHtml}
         <button class="react-btn" onclick="toggleComments(${p.id})" id="cmtToggle-${p.id}">
@@ -2098,7 +2310,11 @@ async function delComment(commentId, postId){
   }
 
   await loadPosts();
-  if (ME && TOKEN) loadUnread();
+  if (ME && TOKEN) {
+    loadUnread();
+    loadNotifCount();
+    setInterval(()=>{ loadUnread(); loadNotifCount(); }, 30000);
+  }
 
   const urlPostId = new URLSearchParams(location.search).get('p');
   if(urlPostId){
