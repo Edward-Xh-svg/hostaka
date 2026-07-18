@@ -147,6 +147,23 @@ async function initDB() {
       content    TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    -- ===== جدول الإشعارات =====
+    CREATE TABLE IF NOT EXISTS notifications (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type         TEXT NOT NULL,
+      actor_id     INTEGER REFERENCES users(id),
+      actor_name   TEXT DEFAULT '',
+      actor_avatar TEXT DEFAULT '',
+      record_id    INTEGER,
+      comment_id   INTEGER,
+      content      TEXT DEFAULT '',
+      link         TEXT DEFAULT '',
+      read         INTEGER NOT NULL DEFAULT 0,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
   `);
 
   // Migrations — إضافة أعمدة مفقودة
@@ -366,6 +383,27 @@ const q = {
     WHERE f.follower_id = ?
     ORDER BY f.created_at DESC
   `, args:[userId] }).then(rows),
+
+  // ── Notifications ──
+  getUserIdByUsername: (username) => db.execute({ sql:'SELECT id FROM users WHERE username=?', args:[username] }).then(first).then(r => r ? r.id : null),
+  listAllUserIds:      () => db.execute('SELECT id FROM users').then(rows).then(rs => rs.map(r => r.id)),
+  createNotification:  (user_id, type, actor_id, actor_name, actor_avatar, record_id, comment_id, content, link) => db.execute({
+    sql: 'INSERT INTO notifications (user_id,type,actor_id,actor_name,actor_avatar,record_id,comment_id,content,link) VALUES (?,?,?,?,?,?,?,?,?)',
+    args: [user_id, type, actor_id||null, actor_name||'', actor_avatar||'', record_id||null, comment_id||null, content||'', link||'']
+  }),
+  createNotificationsBulk: async (userIds, type, actor_id, actor_name, actor_avatar, content, link) => {
+    for (const uid of userIds) {
+      await db.execute({
+        sql: 'INSERT INTO notifications (user_id,type,actor_id,actor_name,actor_avatar,content,link) VALUES (?,?,?,?,?,?,?)',
+        args: [uid, type, actor_id||null, actor_name||'', actor_avatar||'', content||'', link||'']
+      });
+    }
+  },
+  getNotifications:    (uid, limit=50) => db.execute({ sql:'SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT ?', args:[uid, limit] }).then(rows),
+  getUnreadNotifCount: (uid) => db.execute({ sql:'SELECT COUNT(*) as count FROM notifications WHERE user_id=? AND read=0', args:[uid] }).then(first),
+  markNotifRead:       (id,uid) => db.execute({ sql:'UPDATE notifications SET read=1 WHERE id=? AND user_id=?', args:[id,uid] }),
+  markAllNotifRead:    (uid) => db.execute({ sql:'UPDATE notifications SET read=1 WHERE user_id=?', args:[uid] }),
+  deleteNotification:  (id,uid) => db.execute({ sql:'DELETE FROM notifications WHERE id=? AND user_id=?', args:[id,uid] }),
 
   // ── Shizi AI ──
   getShiziMessages:   (uid) => db.execute({ sql:'SELECT id,role,content,created_at FROM shizi_messages WHERE user_id=? ORDER BY created_at ASC', args:[uid] }).then(rows),

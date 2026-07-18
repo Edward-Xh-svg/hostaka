@@ -47,6 +47,46 @@ function requireAdmin(req,res,next) {
   req.user=u; next();
 }
 
+// ============================================================
+// نظام الإشعارات — الإشارة (@) والتنبيهات
+// ============================================================
+// يستخرج أسماء المستخدمين المذكورين بـ @ من نص/HTML المنشور أو التعليق
+function extractMentions(html) {
+  if (!html) return [];
+  const text = String(html).replace(/<[^>]*>/g, ' '); // إزالة وسوم HTML أولاً
+  const matches = text.match(/@([A-Za-z0-9_\u0600-\u06FF]{2,32})/g) || [];
+  return [...new Set(matches.map(m => m.slice(1)))];
+}
+
+// ينشئ إشعارات لكل مستخدم تم ذكره في النص (باستثناء الناشر نفسه)
+async function notifyMentions(content, actorUser, recordId, commentId, link) {
+  try {
+    const usernames = extractMentions(content);
+    const notified = new Set();
+    for (const uname of usernames) {
+      if (uname.toLowerCase() === String(actorUser.username||'').toLowerCase()) continue;
+      const uid = await q.getUserIdByUsername(uname);
+      if (!uid || notified.has(uid)) continue;
+      notified.add(uid);
+      await q.createNotification(
+        uid,
+        commentId ? 'mention_comment' : 'mention_post',
+        actorUser.id,
+        actorUser.display_name || actorUser.username,
+        actorUser.avatar || '',
+        recordId || null,
+        commentId || null,
+        '',
+        link || ''
+      );
+    }
+    return notified;
+  } catch(e) {
+    console.error('notifyMentions error:', e);
+    return new Set();
+  }
+}
+
 // Auth
 app.post('/api/login', async(req,res)=>{
   try{
@@ -253,7 +293,9 @@ app.post('/api/records', requireAuth, async (req, res) => {
       image || '',
       video || ''
     );
-    res.json({ success: true, id: Number(result.lastInsertRowid) });
+    const recordId = Number(result.lastInsertRowid);
+    notifyMentions(content, user, recordId, null, '/?p=' + recordId);
+    res.json({ success: true, id: recordId });
   } catch(e) {
     console.error('Create record error:', e);
     res.status(500).json({ error: 'خطأ: ' + e.message });
@@ -304,8 +346,9 @@ app.post('/api/records/:id/comments', requireAuth, async (req, res) => {
     const { content } = req.body || {};
     if (!content?.trim()) return res.status(400).json({ error: 'فارغ' });
     const user = await q.getUserById(req.user.id);
-    await q.addComment(
-      req.params.id,
+    const recordId = Number(req.params.id);
+    const result = await q.addComment(
+      recordId,
       user.id,
       user.username,
       user.display_name || '',
@@ -313,7 +356,22 @@ app.post('/api/records/:id/comments', requireAuth, async (req, res) => {
       user.role === 'admin' ? 'Admin' : 'Member',
       content.trim()
     );
-    const comments = await q.getComments(req.params.id);
+    const commentId = Number(result.lastInsertRowid);
+    const link = '/?p=' + recordId;
+
+    // إشعار صاحب المنشور بتعليق جديد (إن لم يكن هو نفسه المعلّق)
+    const rec = await q.getRecord(recordId);
+    if (rec && rec.user_id && Number(rec.user_id) !== user.id) {
+      q.createNotification(
+        rec.user_id, 'comment', user.id,
+        user.display_name || user.username, user.avatar || '',
+        recordId, commentId, content.trim().slice(0, 140), link
+      );
+    }
+    // إشعار كل من تم ذكره بـ @ داخل التعليق
+    notifyMentions(content, user, recordId, commentId, link);
+
+    const comments = await q.getComments(recordId);
     res.json({ success: true, comments });
   } catch(e) {
     res.status(500).json({ error: 'خطأ في الخادم' });
@@ -323,6 +381,48 @@ app.post('/api/records/:id/comments', requireAuth, async (req, res) => {
 app.delete('/api/comments/:id', requireAuth, async (req, res) => {
   try {
     await q.deleteComment(req.params.id, req.user.id, req.user.role);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+// ============================================================
+// Notifications
+// ============================================================
+app.get('/api/notifications', requireAuth, async (req, res) => {
+  try {
+    res.json(await q.getNotifications(req.user.id));
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+app.get('/api/notifications/unread', requireAuth, async (req, res) => {
+  try {
+    res.json(await q.getUnreadNotifCount(req.user.id));
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+app.put('/api/notifications/read-all', requireAuth, async (req, res) => {
+  try {
+    await q.markAllNotifRead(req.user.id);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+app.put('/api/notifications/:id/read', requireAuth, async (req, res) => {
+  try {
+    await q.markNotifRead(req.params.id, req.user.id);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+app.delete('/api/notifications/:id', requireAuth, async (req, res) => {
+  try {
+    await q.deleteNotification(req.params.id, req.user.id);
     res.json({ success: true });
   } catch(e) {
     res.status(500).json({ error: 'خطأ في الخادم' });
@@ -844,6 +944,31 @@ app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
   try {
     await q.deleteUser(req.params.id);
     res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+// أداة إرسال إشعارات للأعضاء من لوحة الإدارة
+app.post('/api/admin/notifications', requireAdmin, async (req, res) => {
+  try {
+    const { content, link, target } = req.body || {};
+    if (!content?.trim()) return res.status(400).json({ error: 'محتوى الإشعار مطلوب' });
+    const admin = await q.getUserById(req.user.id);
+    let userIds;
+    if (target && target.trim() && target.trim() !== 'all') {
+      const uid = await q.getUserIdByUsername(target.trim().replace(/^@/, ''));
+      if (!uid) return res.status(404).json({ error: 'المستخدم غير موجود' });
+      userIds = [uid];
+    } else {
+      userIds = await q.listAllUserIds();
+    }
+    await q.createNotificationsBulk(
+      userIds, 'admin', admin.id,
+      admin.display_name || admin.username, admin.avatar || '',
+      content.trim(), link?.trim() || ''
+    );
+    res.json({ success: true, count: userIds.length });
   } catch(e) {
     res.status(500).json({ error: 'خطأ في الخادم' });
   }
