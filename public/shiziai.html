@@ -459,7 +459,8 @@ let sending = false;
 
 function t(key){ return LANG[currentLang]?.[key] || LANG['ar'][key] || key; }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function fmtTime(s){ if(!s) return ''; return new Date(s).toLocaleTimeString(currentLang==='ar'?'ar':'en',{hour:'2-digit',minute:'2-digit'}); }
+function toUTCDate(s){ if(!s) return new Date(NaN); if(s instanceof Date) return s; if(typeof s==='string' && !/[zZ]|[+-]\d\d:?\d\d$/.test(s)) return new Date(s.replace(' ','T')+'Z'); return new Date(s); }
+function fmtTime(s){ if(!s) return ''; return toUTCDate(s).toLocaleTimeString(currentLang==='ar'?'ar':'en',{hour:'2-digit',minute:'2-digit'}); }
 const getToken = () => localStorage.getItem('hostaka_token') || '';
 
 function applyLang(){

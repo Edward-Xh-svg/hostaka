@@ -122,6 +122,16 @@
     .btn-follow.following:hover{background:rgba(128,128,128,0.15);}
     .btn-follow:active{transform:scale(0.95);}
     .btn-follow svg{width:13px;height:13px;}
+    .btn-more-wrap{position:relative;}
+    .btn-more{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;background:rgba(128,128,128,0.08);border:1px solid var(--border);border-radius:10px;color:var(--muted);cursor:pointer;transition:all 0.18s;}
+    .btn-more:hover{background:rgba(128,128,128,0.15);color:var(--text);}
+    .btn-more svg{width:15px;height:15px;}
+    .more-menu{position:absolute;top:42px;left:0;background:var(--modal-bg,var(--card));backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid var(--border);border-radius:12px;min-width:180px;opacity:0;visibility:hidden;transform:translateY(-8px) scale(0.96);transition:all 0.18s cubic-bezier(0.16,1,0.3,1);z-index:25;box-shadow:0 8px 32px rgba(0,0,0,0.3);overflow:hidden;}
+    .more-menu.show{opacity:1;visibility:visible;transform:translateY(0) scale(1);}
+    .more-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:none;border:none;color:var(--text);font-family:'Cairo',sans-serif;font-size:0.8rem;font-weight:600;cursor:pointer;text-align:right;transition:background 0.15s;}
+    .more-menu button:hover{background:rgba(128,128,128,0.08);}
+    .more-menu button.danger{color:#dc2626;}
+    .more-menu svg{width:14px;height:14px;flex-shrink:0;}
     .profile-meta{padding:4px 0 16px;}
     .meta-name{font-size:1.3rem;font-weight:900;color:var(--text);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
     .verified-icon{flex-shrink:0;}
@@ -336,6 +346,30 @@
   </div>
 </div>
 
+<!-- الإبلاغ عن مستخدم -->
+<div class="modal-bd" id="reportUserModal">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span>الإبلاغ عن مستخدم</span>
+      <button class="modal-close" onclick="closeModal('reportUserModal')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <input type="hidden" id="reportUserTarget">
+    <select id="reportUserReason" style="width:100%;padding:11px 13px;background:var(--input-bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Cairo',sans-serif;font-size:0.88rem;margin:12px 0 10px;">
+      <option value="abuse">إساءة أو تنمر</option>
+      <option value="fake">حساب مزيف أو منتحل</option>
+      <option value="spam">محتوى مزعج / سبام</option>
+      <option value="other">سبب آخر</option>
+    </select>
+    <textarea id="reportUserDetails" placeholder="تفاصيل إضافية (اختياري)" style="width:100%;min-height:90px;padding:11px 13px;background:var(--input-bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Cairo',sans-serif;font-size:0.88rem;resize:vertical;"></textarea>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
+      <button class="btn-edit" onclick="closeModal('reportUserModal')">إلغاء</button>
+      <button class="btn-follow" id="reportUserSubmitBtn" onclick="submitUserReport()">إرسال البلاغ</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ============================================================
 //  TRANSLATIONS (i18n)
@@ -512,7 +546,14 @@ function verifiedBadge() {
 }
 
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function fmtDate(s) { if(!s) return ''; return new Date(s).toLocaleDateString(currentLang === 'ar' ? 'ar-SA' : 'en-US', {year:'numeric', month:'long', day:'numeric'}); }
+// الخادم يخزّن التوقيت بصيغة UTC بدون منطقة زمنية؛ نفسّرها كـ UTC ليحوّلها المتصفح تلقائياً لتوقيت جهاز المستخدم
+function toUTCDate(s){
+  if(!s) return new Date(NaN);
+  if(s instanceof Date) return s;
+  if(typeof s === 'string' && !/[zZ]|[+-]\d\d:?\d\d$/.test(s)) return new Date(s.replace(' ','T')+'Z');
+  return new Date(s);
+}
+function fmtDate(s) { if(!s) return ''; return toUTCDate(s).toLocaleDateString(currentLang === 'ar' ? 'ar-SA' : 'en-US', {year:'numeric', month:'long', day:'numeric'}); }
 
 const SVG = {
   user:    `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
@@ -538,7 +579,17 @@ async function apiFetch(url, method = 'GET', body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token } };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(url, opts);
-  return res.json();
+  const data = await res.json();
+  if (res.status===403 && data?.suspended) handleSuspended(data.reason);
+  return data;
+}
+
+function handleSuspended(reason){
+  localStorage.removeItem('hostaka_token');
+  localStorage.removeItem('hostaka_user');
+  localStorage.removeItem('hostaka_role');
+  alert('تم تعليق حسابك من قبل الإدارة' + (reason ? ':\n' + reason : '') + '\nللاستفسار يرجى التواصل مع الدعم عبر صفحة /support');
+  window.location = '/';
 }
 
 async function followUser(username) {
@@ -702,6 +753,21 @@ function renderPublic(user, posts, followStatus) {
         ${isFollowing ? SVG.check : SVG.follow}
         <span>${isFollowing ? t('unfollow') : t('follow')}</span>
       </button>
+      <div class="btn-more-wrap">
+        <button class="btn-more" onclick="toggleMoreMenu()" title="خيارات">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+        </button>
+        <div class="more-menu" id="moreMenu">
+          <button onclick="openReportUserModal('${esc(user.username)}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2-3 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            الإبلاغ عن المستخدم
+          </button>
+          <button class="danger" id="blockToggleBtn" onclick="toggleBlockProfile('${esc(user.username)}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            <span id="blockToggleText">حظر المستخدم</span>
+          </button>
+        </div>
+      </div>
     `;
   }
 
@@ -729,6 +795,65 @@ function renderPublic(user, posts, followStatus) {
       <button class="tab-btn active" onclick="switchTab('posts')">${t('posts')}</button>
     </div>
     <div class="posts-tab" id="postsTab">${renderPosts(posts)}</div>`;
+
+  if (!isOwn && token) checkBlockStatus(user.username);
+}
+
+// ----- الحظر والإبلاغ عن مستخدم -----
+function toggleMoreMenu(){
+  document.getElementById('moreMenu')?.classList.toggle('show');
+}
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.btn-more-wrap')) document.getElementById('moreMenu')?.classList.remove('show');
+});
+
+async function checkBlockStatus(username){
+  try{
+    const d = await apiFetch('/api/block/status/' + encodeURIComponent(username));
+    const txt = document.getElementById('blockToggleText');
+    if(txt) txt.textContent = d.blocked ? 'إلغاء حظر المستخدم' : 'حظر المستخدم';
+  }catch(e){}
+}
+
+async function toggleBlockProfile(username){
+  document.getElementById('moreMenu')?.classList.remove('show');
+  const txt = document.getElementById('blockToggleText');
+  const isBlocked = txt && txt.textContent.includes('إلغاء');
+  try{
+    const d = isBlocked
+      ? await apiFetch('/api/block/' + encodeURIComponent(username), 'DELETE')
+      : await apiFetch('/api/block/' + encodeURIComponent(username), 'POST');
+    if(d.success){
+      showToast(isBlocked ? 'تم إلغاء حظر @'+username : 'تم حظر @'+username);
+      checkBlockStatus(username);
+    } else { showToast(d.error || 'فشلت العملية', 'error'); }
+  }catch(e){ showToast('تعذر الاتصال', 'error'); }
+}
+
+function openReportUserModal(username){
+  document.getElementById('moreMenu')?.classList.remove('show');
+  document.getElementById('reportUserTarget').value = username;
+  document.getElementById('reportUserReason').value = 'abuse';
+  document.getElementById('reportUserDetails').value = '';
+  document.getElementById('reportUserModal').classList.add('show');
+}
+async function submitUserReport(){
+  const username = document.getElementById('reportUserTarget').value;
+  const reasonType = document.getElementById('reportUserReason').value;
+  const details = document.getElementById('reportUserDetails').value.trim();
+  const labels = { abuse:'إساءة أو تنمر', fake:'حساب مزيف أو منتحل', spam:'محتوى مزعج / سبام', other:'سبب آخر' };
+  const reason = labels[reasonType] + (details ? ' — ' + details : '');
+  const btn = document.getElementById('reportUserSubmitBtn');
+  btn.disabled = true;
+  try{
+    const d = await apiFetch('/api/reports', 'POST', {
+      type: 'user', target_owner_username: username,
+      subject: 'إبلاغ عن مستخدم @' + username, reason
+    });
+    if(d.success){ showToast('تم إرسال البلاغ، شكراً لك'); document.getElementById('reportUserModal').classList.remove('show'); }
+    else { showToast(d.error || 'فشل الإرسال', 'error'); }
+  }catch(e){ showToast('تعذر الاتصال', 'error'); }
+  btn.disabled = false;
 }
 
 function renderMyProfile(user, posts) {

@@ -167,6 +167,21 @@
     }
     .icon-btn:hover,.icon-btn:active{background:rgba(128,128,128,0.12);color:var(--text);border-color:var(--border);}
     .icon-btn svg{width:16px;height:16px;}
+    .peer-opts-menu{
+      position:absolute;top:42px;left:0;
+      background:var(--modal-bg);
+      border:1px solid var(--border);border-radius:12px;
+      min-width:180px;
+      opacity:0;visibility:hidden;
+      transform:translateY(-6px) scale(0.96);
+      transition:all 0.2s cubic-bezier(0.16,1,0.3,1);
+      z-index:30;box-shadow:var(--shadow);overflow:hidden;
+    }
+    .peer-opts-menu.show{opacity:1;visibility:visible;transform:translateY(0) scale(1);}
+    .peer-opts-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:none;border:none;color:var(--text);font-family:'Cairo',sans-serif;font-size:0.8rem;font-weight:600;cursor:pointer;text-align:right;transition:background 0.15s;}
+    .peer-opts-menu button:hover{background:rgba(128,128,128,0.08);}
+    .peer-opts-menu button.danger{color:#dc2626;}
+    .peer-opts-menu svg{width:14px;height:14px;flex-shrink:0;}
     .lang-selector{position:relative;}
     .lang-menu{
       position:absolute;top:42px;left:0;
@@ -659,6 +674,21 @@
     <span class="topbar-title" id="topbarTitle">الرسائل</span>
   </div>
   <div class="topbar-right">
+    <div class="peer-opts-wrap" id="peerOptsWrap" style="position:relative;display:none;">
+      <button class="icon-btn" onclick="togglePeerOpts()" title="خيارات المحادثة">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+      <div class="peer-opts-menu" id="peerOptsMenu">
+        <button onclick="openReportPeerModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2-3 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          الإبلاغ عن المستخدم
+        </button>
+        <button class="danger" id="peerBlockBtn" onclick="togglePeerBlock()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+          <span id="peerBlockText">حظر المستخدم</span>
+        </button>
+      </div>
+    </div>
     <button class="icon-btn" id="themeToggle" onclick="toggleTheme()" title="تبديل الثيم">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="5"/>
@@ -738,6 +768,26 @@
     <div class="m-footer">
       <button class="btn-cancel" onclick="closeCreateGroup()" id="modalCancelBtn">إلغاء</button>
       <button class="btn-confirm" id="createGroupBtn" onclick="createGroup()"><span id="modalCreateBtn">إنشاء</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="reportPeerModal">
+  <div class="modal-box">
+    <div class="modal-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2-3 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>الإبلاغ عن المستخدم</span>
+    </div>
+    <select id="reportPeerReason" class="m-input" style="margin-bottom:10px;">
+      <option value="abuse">إساءة أو تنمر</option>
+      <option value="spam">رسائل مزعجة</option>
+      <option value="fake">حساب مزيف أو منتحل</option>
+      <option value="other">سبب آخر</option>
+    </select>
+    <textarea id="reportPeerDetails" class="m-input" placeholder="تفاصيل إضافية (اختياري)" style="min-height:90px;resize:vertical;"></textarea>
+    <div class="m-footer">
+      <button class="btn-cancel" onclick="closeModal('reportPeerModal')">إلغاء</button>
+      <button class="btn-confirm" id="reportPeerBtn" onclick="submitPeerReport()"><span>إرسال البلاغ</span></button>
     </div>
   </div>
 </div>
@@ -1078,10 +1128,20 @@ let msgReactions = {};
 let chatImgBase64 = '';
 
 function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function fmtTime(s) { if(!s) return ''; return new Date(s).toLocaleTimeString(currentLang === 'ar' ? 'ar' : 'en', {hour:'2-digit',minute:'2-digit'}); }
+// الخادم يخزّن التوقيت بصيغة UTC بدون معلومات منطقة زمنية (مثل "2026-07-18 10:08:23")
+// هذه الدالة تفسّرها بشكل صحيح كـ UTC ثم تترك المتصفح يحوّلها تلقائياً لتوقيت جهاز المستخدم
+function toUTCDate(s) {
+  if (!s) return new Date(NaN);
+  if (s instanceof Date) return s;
+  if (typeof s === 'string' && !/[zZ]|[+-]\d\d:?\d\d$/.test(s)) {
+    return new Date(s.replace(' ', 'T') + 'Z');
+  }
+  return new Date(s);
+}
+function fmtTime(s) { if(!s) return ''; return toUTCDate(s).toLocaleTimeString(currentLang === 'ar' ? 'ar' : 'en', {hour:'2-digit',minute:'2-digit'}); }
 function fmtDay(s) {
   if(!s) return '';
-  const d = new Date(s), now = new Date();
+  const d = toUTCDate(s), now = new Date();
   const diff = Math.floor((now - d) / 86400000);
   if(diff === 0) return t('today');
   if(diff === 1) return t('yesterday');
@@ -1095,10 +1155,19 @@ async function apiFetch(url, method = 'GET', body = null) {
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(url, opts);
   if (!r.ok) {
-    const text = await r.text().catch(() => '');
-    throw new Error('HTTP ' + r.status + ': ' + text.slice(0, 200));
+    const data = await r.json().catch(() => null);
+    if (r.status === 403 && data?.suspended) { handleSuspended(data.reason); return data; }
+    throw new Error((data && data.error) || ('HTTP ' + r.status));
   }
   return r.json();
+}
+
+function handleSuspended(reason){
+  localStorage.removeItem('hostaka_token');
+  localStorage.removeItem('hostaka_user');
+  localStorage.removeItem('hostaka_role');
+  alert('تم تعليق حسابك من قبل الإدارة' + (reason ? ':\n' + reason : '') + '\nللاستفسار يرجى التواصل مع الدعم عبر صفحة /support');
+  window.location = '/';
 }
 
 // ====== SVG ======
@@ -1259,6 +1328,67 @@ function updateTopbarPeer(peer) {
         <div class="topbar-peer-role">${role}</div>
       </div>
     </div>`;
+  currentPeerUsername = peer.username;
+  document.getElementById('peerOptsWrap').style.display = 'block';
+  checkPeerBlockStatus();
+}
+
+// ----- خيارات المحادثة: الإبلاغ والحظر -----
+let currentPeerUsername = null;
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+function togglePeerOpts(){ document.getElementById('peerOptsMenu')?.classList.toggle('show'); }
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.peer-opts-wrap') && !e.target.closest('#peerOptsWrap')) document.getElementById('peerOptsMenu')?.classList.remove('show');
+});
+
+async function checkPeerBlockStatus(){
+  if(!currentPeerUsername) return;
+  try{
+    const d = await apiFetch('/api/block/status/' + encodeURIComponent(currentPeerUsername));
+    const txt = document.getElementById('peerBlockText');
+    if(txt) txt.textContent = d.blocked ? 'إلغاء حظر المستخدم' : 'حظر المستخدم';
+  }catch(e){}
+}
+
+async function togglePeerBlock(){
+  document.getElementById('peerOptsMenu')?.classList.remove('show');
+  if(!currentPeerUsername) return;
+  const txt = document.getElementById('peerBlockText');
+  const isBlocked = txt && txt.textContent.includes('إلغاء');
+  try{
+    const d = isBlocked
+      ? await apiFetch('/api/block/' + encodeURIComponent(currentPeerUsername), 'DELETE')
+      : await apiFetch('/api/block/' + encodeURIComponent(currentPeerUsername), 'POST');
+    if(d.success){
+      showToast(isBlocked ? 'تم إلغاء الحظر' : 'تم حظر المستخدم');
+      checkPeerBlockStatus();
+    } else { showToast(d.error || 'فشلت العملية', 'error'); }
+  }catch(e){ showToast('تعذر الاتصال', 'error'); }
+}
+
+function openReportPeerModal(){
+  document.getElementById('peerOptsMenu')?.classList.remove('show');
+  document.getElementById('reportPeerReason').value = 'abuse';
+  document.getElementById('reportPeerDetails').value = '';
+  document.getElementById('reportPeerModal').classList.add('show');
+}
+async function submitPeerReport(){
+  if(!currentPeerUsername) return;
+  const reasonType = document.getElementById('reportPeerReason').value;
+  const details = document.getElementById('reportPeerDetails').value.trim();
+  const labels = { abuse:'إساءة أو تنمر', spam:'رسائل مزعجة', fake:'حساب مزيف أو منتحل', other:'سبب آخر' };
+  const reason = labels[reasonType] + (details ? ' — ' + details : '');
+  const btn = document.getElementById('reportPeerBtn');
+  btn.disabled = true;
+  try{
+    const d = await apiFetch('/api/reports', 'POST', {
+      type: 'user', target_owner_username: currentPeerUsername,
+      subject: 'إبلاغ عن مستخدم @' + currentPeerUsername, reason
+    });
+    if(d.success){ showToast('تم إرسال البلاغ'); closeModal('reportPeerModal'); }
+    else { showToast(d.error || 'فشل الإرسال', 'error'); }
+  }catch(e){ showToast('تعذر الاتصال', 'error'); }
+  btn.disabled = false;
 }
 
 // ============================================================
@@ -1445,7 +1575,7 @@ async function sendMsg() {
     loadSidebar();
   } catch (e) {
     console.error('sendMsg failed:', e);
-    showToast('فشل إرسال الرسالة', 'error');
+    showToast(e.message || 'فشل إرسال الرسالة', 'error');
   }
   document.getElementById('sendBtn').disabled = false;
 }

@@ -212,6 +212,20 @@
     .hashtag-tag{color:var(--primary);font-weight:700;text-decoration:none;cursor:pointer;}
     .hashtag-tag:hover{text-decoration:underline;}
 
+    .post-opts-wrap{position:relative;}
+    .post-opts-menu{
+      position:absolute;top:38px;left:0;
+      background:var(--modal-bg);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+      border:1px solid var(--border);border-radius:12px;min-width:170px;
+      opacity:0;visibility:hidden;transform:translateY(-8px) scale(0.96);
+      transition:all 0.18s cubic-bezier(0.16,1,0.3,1);z-index:25;box-shadow:var(--shadow);overflow:hidden;
+    }
+    .post-opts-menu.show{opacity:1;visibility:visible;transform:translateY(0) scale(1);}
+    .post-opts-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:none;border:none;color:var(--text);font-family:'Cairo',sans-serif;font-size:0.8rem;font-weight:600;cursor:pointer;text-align:right;transition:background 0.15s;}
+    .post-opts-menu button:hover{background:rgba(128,128,128,0.08);}
+    .post-opts-menu button.danger{color:#dc2626;}
+    .post-opts-menu svg{width:15px;height:15px;flex-shrink:0;}
+
     .lang-selector{position:relative;}
     .lang-menu{
       position:absolute;
@@ -946,6 +960,10 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span class="drop-download">تحميل تطبيق الأندرويد</span>
         </button>
+        <button onclick="location.href='/support'">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2-3 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span class="drop-support">الدعم والمساعدة</span>
+        </button>
         <button onclick="doLogout()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           <span class="drop-logout">تسجيل الخروج</span>
@@ -1112,6 +1130,28 @@
         إزالة الخلفية
       </button>
       <button class="btn-submit" style="width:auto;padding:10px 26px;" onclick="closeModal('wallpaperModal')">تم</button>
+    </div>
+  </div>
+</div>
+
+<!-- الإبلاغ عن منشور / مستخدم -->
+<div class="modal-bd" id="reportModal">
+  <div class="modal-box">
+    <div class="modal-t">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2-3 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span id="reportModalTitle">الإبلاغ</span>
+    </div>
+    <select class="f-input" id="reportReason" style="width:100%;padding:11px 13px;background:var(--input-bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Cairo',sans-serif;font-size:0.88rem;margin-bottom:10px;">
+      <option value="spam">محتوى مزعج / سبام</option>
+      <option value="abuse">إساءة أو تنمر</option>
+      <option value="nudity">محتوى غير لائق</option>
+      <option value="fake">حساب مزيف أو منتحل</option>
+      <option value="other">سبب آخر</option>
+    </select>
+    <textarea id="reportDetails" placeholder="تفاصيل إضافية (اختياري)" style="width:100%;min-height:90px;padding:11px 13px;background:var(--input-bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Cairo',sans-serif;font-size:0.88rem;resize:vertical;"></textarea>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('reportModal')">إلغاء</button>
+      <button class="btn-submit" id="reportSubmitBtn" style="width:auto;padding:10px 26px;" onclick="submitReport()">إرسال البلاغ</button>
     </div>
   </div>
 </div>
@@ -1586,7 +1626,7 @@ function sortPosts(posts, mode) {
   const sorted = [...posts];
   switch(mode) {
     case 'latest':
-      return sorted.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+      return sorted.sort((a,b) => toUTCDate(b.created_at) - toUTCDate(a.created_at));
     case 'popular': {
       return sorted.sort((a,b) => {
         const aScore = (a.reactions||[]).reduce((s,r)=>s+(r.count||0),0) + (a.comments||[]).length;
@@ -1616,7 +1656,14 @@ function setSort(mode) {
 //  REST OF ORIGINAL SCRIPT (with minor translation adaptations)
 // ============================================================
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function fmtDate(s){ if(!s) return ''; return new Date(s).toLocaleDateString(currentLang === 'ar' ? 'ar-SA' : 'en-US', {year:'numeric', month:'short', day:'numeric'}); }
+// الخادم يخزّن التوقيت بصيغة UTC بدون منطقة زمنية؛ نفسّرها كـ UTC ليحوّلها المتصفح تلقائياً لتوقيت جهاز المستخدم
+function toUTCDate(s){
+  if(!s) return new Date(NaN);
+  if(s instanceof Date) return s;
+  if(typeof s === 'string' && !/[zZ]|[+-]\d\d:?\d\d$/.test(s)) return new Date(s.replace(' ','T')+'Z');
+  return new Date(s);
+}
+function fmtDate(s){ if(!s) return ''; return toUTCDate(s).toLocaleDateString(currentLang === 'ar' ? 'ar-SA' : 'en-US', {year:'numeric', month:'short', day:'numeric'}); }
 
 // دالة لإزالة الإيموجيات من النص
 function stripEmojis(text) {
@@ -1629,7 +1676,17 @@ async function apiFetch(url, method='GET', body=null){
   const opts = { method, headers:{'Content-Type':'application/json','Authorization':'Bearer '+token} };
   if(body) opts.body = JSON.stringify(body);
   const r = await fetch(url, opts);
-  return r.json();
+  const data = await r.json();
+  if(r.status===403 && data?.suspended) handleSuspended(data.reason);
+  return data;
+}
+
+function handleSuspended(reason){
+  localStorage.removeItem('hostaka_user');
+  localStorage.removeItem('hostaka_token');
+  localStorage.removeItem('hostaka_role');
+  alert('تم تعليق حسابك من قبل الإدارة' + (reason ? ':\n' + reason : '') + '\nللاستفسار يرجى التواصل مع الدعم عبر صفحة /support');
+  window.location = '/';
 }
 
 // SVG Icons
@@ -1765,7 +1822,7 @@ let notifCache = [];
 
 function timeAgo(dateStr){
   if(!dateStr) return '';
-  const diff = (Date.now() - new Date(dateStr.replace(' ','T')+'Z').getTime())/1000;
+  const diff = (Date.now() - toUTCDate(dateStr).getTime())/1000;
   if(diff < 60) return 'الآن';
   if(diff < 3600) return Math.floor(diff/60) + ' د';
   if(diff < 86400) return Math.floor(diff/3600) + ' س';
@@ -1779,6 +1836,7 @@ function notifMessage(n){
     case 'mention_post':    return `${actor} أشار إليك في منشور`;
     case 'mention_comment':  return `${actor} أشار إليك في تعليق`;
     case 'comment':          return `${actor} علّق على منشورك`;
+    case 'report_reply':     return `رد فريق الدعم على بلاغك: ${esc(n.content||'')}`;
     case 'admin':            return `${actor}: ${esc(n.content||'')}`;
     default:                 return `${actor} ${esc(n.content||'')}`;
   }
@@ -1911,6 +1969,72 @@ function filterByHashtag(tag){
   window.scrollTo({ top: document.getElementById('feed').offsetTop - 120, behavior:'smooth' });
 }
 
+// ----- خيارات المنشور: الإبلاغ والحظر -----
+let blockedUsernames = new Set();
+
+async function loadBlockedSet(){
+  if(!ME || !getToken()) return;
+  try {
+    const list = await apiFetch('/api/block/list');
+    blockedUsernames = new Set((Array.isArray(list)?list:[]).map(u=>u.username));
+  } catch(e){}
+}
+
+function togglePostOpts(id){
+  document.querySelectorAll('.post-opts-menu.show').forEach(el=>{ if(el.id !== 'postOpts-'+id) el.classList.remove('show'); });
+  document.getElementById('postOpts-'+id)?.classList.toggle('show');
+}
+function closePostOpts(id){ document.getElementById('postOpts-'+id)?.classList.remove('show'); }
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.post-opts-wrap')){
+    document.querySelectorAll('.post-opts-menu.show').forEach(el=>el.classList.remove('show'));
+  }
+});
+
+let reportTarget = { type:'general', id:null, owner:'' };
+function openReportModal(type, id, owner){
+  if(!ME){ openAuth(); return; }
+  reportTarget = { type, id, owner };
+  document.getElementById('reportModalTitle').textContent = type==='post' ? 'الإبلاغ عن المنشور' : 'الإبلاغ عن مستخدم';
+  document.getElementById('reportReason').value = 'spam';
+  document.getElementById('reportDetails').value = '';
+  document.getElementById('reportModal').classList.add('show');
+}
+async function submitReport(){
+  const reasonType = document.getElementById('reportReason').value;
+  const details = document.getElementById('reportDetails').value.trim();
+  const labels = { spam:'محتوى مزعج / سبام', abuse:'إساءة أو تنمر', nudity:'محتوى غير لائق', fake:'حساب مزيف أو منتحل', other:'سبب آخر' };
+  const reason = labels[reasonType] + (details ? ' — ' + details : '');
+  const btn = document.getElementById('reportSubmitBtn');
+  btn.disabled = true;
+  try {
+    const d = await apiFetch('/api/reports', 'POST', {
+      type: reportTarget.type, target_id: reportTarget.id,
+      target_owner_username: reportTarget.owner,
+      subject: reportTarget.type==='post' ? 'إبلاغ عن منشور' : 'إبلاغ عن مستخدم',
+      reason
+    });
+    if(d.success){ showToast('تم إرسال البلاغ، شكراً لك'); closeModal('reportModal'); }
+    else { showToast(d.error||'فشل الإرسال','error'); }
+  } catch(e){ showToast('تعذر الاتصال','error'); }
+  btn.disabled = false;
+}
+
+async function toggleBlockUser(username){
+  if(!ME){ openAuth(); return; }
+  const isBlocked = blockedUsernames.has(username);
+  try {
+    const d = isBlocked
+      ? await apiFetch('/api/block/'+encodeURIComponent(username), 'DELETE')
+      : await apiFetch('/api/block/'+encodeURIComponent(username), 'POST');
+    if(d.success){
+      if(isBlocked){ blockedUsernames.delete(username); showToast('تم إلغاء حظر @'+username); }
+      else { blockedUsernames.add(username); showToast('تم حظر @'+username); }
+      loadPosts();
+    } else { showToast(d.error||'فشلت العملية','error'); }
+  } catch(e){ showToast('تعذر الاتصال','error'); }
+}
+
 async function checkVerifyStatus(){
   if(!ME || !getToken()) return;
   try {
@@ -1950,7 +2074,7 @@ async function requestVerify(){
 async function loadPosts(){
   try {
     const data = await apiFetch('/api/records');
-    allPosts = Array.isArray(data) ? data : [];
+    allPosts = (Array.isArray(data) ? data : []).filter(p => !blockedUsernames.has(p.publisher));
     const sorted = sortPosts(allPosts, currentSort);
     renderFeed(sorted);
   } catch(e){ document.getElementById('feed').innerHTML='<div class="empty">'+SVG.empty+'<br>'+t('empty')+'</div>'; }
@@ -2029,6 +2153,22 @@ function renderPost(p){
           <button class="btn-icon" onclick="sharePost(${p.id})" title="${t('share')}">${SVG.share}</button>
           ${ME && p.user_id && p.user_id!=ME?.id ? `<button class="btn-icon" onclick="location.href='/chat?with=${esc(p.publisher)}'" title="${t('message')}">${SVG.comment}</button>` : ''}
           ${canDel ? `<button class="btn-icon" onclick="delPost(${p.id})" title="${t('delete')}">${SVG.delete}</button>` : ''}
+          ${ME && p.user_id && p.user_id!=ME?.id ? `
+          <div class="post-opts-wrap">
+            <button class="btn-icon" onclick="togglePostOpts(${p.id})" title="خيارات">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+            </button>
+            <div class="post-opts-menu" id="postOpts-${p.id}">
+              <button onclick="openReportModal('post', ${p.id}, '${esc(p.publisher)}'); closePostOpts(${p.id});">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2-3 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                الإبلاغ عن المنشور
+              </button>
+              <button class="danger" onclick="toggleBlockUser('${esc(p.publisher)}'); closePostOpts(${p.id});">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                حظر @${esc(p.publisher)}
+              </button>
+            </div>
+          </div>` : ''}
         </div>
       </div>
       <div class="post-text post-html">${linkifyContent(p.content)}</div>
@@ -2309,6 +2449,7 @@ async function delComment(commentId, postId){
     if (ME) showSplashLoggedIn(ME); else showSplashGuest();
   }
 
+  if (ME && TOKEN) await loadBlockedSet();
   await loadPosts();
   if (ME && TOKEN) {
     loadUnread();

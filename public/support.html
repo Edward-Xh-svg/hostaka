@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="icon" href="hostaka-icon.png" type="image/png">
+<title>Hostaka — الدعم والمساعدة</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --black: #ffffff; --dark: #f7f7f8; --card: #ffffff; --border: #e5e5e5;
+    --text: #1a1a1a; --muted: #6b7280; --primary: #000000; --primary-h: #333333;
+    --primary-light: rgba(0,0,0,0.08); --primary-border: rgba(0,0,0,0.25);
+    --topbar-bg: rgba(255,255,255,0.85); --input-bg: #f7f7f8; --modal-bg:#ffffff;
+    --shadow: 0 10px 30px rgba(0,0,0,0.15); --avatar-gradient: linear-gradient(145deg,#000,#333);
+  }
+  [data-theme="dark"] {
+    --black: #0d0d0d; --dark: #141414; --card: #1a1a1a; --border: #2a2a2a;
+    --text: #e5e5e5; --muted: #8d8d8d; --primary: #ffffff; --primary-h: #dddddd;
+    --primary-light: rgba(255,255,255,0.08); --primary-border: rgba(255,255,255,0.25);
+    --topbar-bg: rgba(13,13,13,0.85); --input-bg: #1f1f1f; --modal-bg:#1a1a1a;
+    --shadow: 0 10px 30px rgba(0,0,0,0.6); --avatar-gradient: linear-gradient(145deg,#fff,#ddd);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{background:var(--black);color:var(--text);font-family:'Cairo',sans-serif;min-height:100vh;transition:background .3s,color .3s;}
+  .topbar{position:fixed;top:0;left:0;right:0;height:60px;background:var(--topbar-bg);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 18px;z-index:50;}
+  .back-btn{display:flex;align-items:center;gap:6px;color:var(--text);text-decoration:none;font-weight:800;font-size:0.95rem;}
+  .icon-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);}
+  .wrap{max-width:640px;margin:0 auto;padding:84px 16px 60px;}
+  .page-title{font-size:1.35rem;font-weight:900;margin-bottom:4px;}
+  .page-sub{color:var(--muted);font-size:0.88rem;margin-bottom:22px;}
+  .tabs{display:flex;gap:6px;background:var(--input-bg);border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:20px;}
+  .tab-btn{flex:1;padding:9px;border:none;background:none;border-radius:9px;font-family:'Cairo';font-weight:700;font-size:0.85rem;color:var(--muted);cursor:pointer;transition:.18s;}
+  .tab-btn.active{background:var(--card);color:var(--text);box-shadow:var(--shadow);}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;}
+  .f-label{display:block;font-size:0.82rem;font-weight:700;color:var(--muted);margin-bottom:6px;}
+  select.f-input, .f-input{width:100%;padding:11px 13px;background:var(--input-bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Cairo';font-size:0.88rem;margin-bottom:14px;}
+  textarea.f-input{resize:vertical;min-height:110px;}
+  .f-input:focus{outline:none;border-color:var(--primary-border);}
+  .btn-submit{width:100%;padding:12px;border:none;border-radius:10px;background:var(--primary);color:var(--black);font-family:'Cairo';font-weight:800;font-size:0.92rem;cursor:pointer;transition:.18s;}
+  .btn-submit:hover{opacity:0.88;}
+  .btn-submit:disabled{opacity:0.5;cursor:default;}
+  .ticket{border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px;background:var(--card);}
+  .ticket-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;}
+  .ticket-type{font-size:0.72rem;font-weight:700;color:var(--muted);}
+  .ticket-status{font-size:0.7rem;font-weight:800;padding:2px 10px;border-radius:999px;}
+  .st-pending{background:rgba(234,179,8,0.12);color:#a16207;}
+  [data-theme="dark"] .st-pending{color:#eab308;}
+  .st-resolved{background:rgba(34,197,94,0.12);color:#15803d;}
+  [data-theme="dark"] .st-resolved{color:#4ade80;}
+  .st-dismissed{background:rgba(239,68,68,0.1);color:#b91c1c;}
+  [data-theme="dark"] .st-dismissed{color:#f87171;}
+  .ticket-subject{font-weight:800;font-size:0.9rem;margin-bottom:4px;}
+  .ticket-reason{font-size:0.83rem;color:var(--muted);line-height:1.6;margin-bottom:6px;}
+  .ticket-reply{background:var(--input-bg);border-radius:10px;padding:10px 12px;font-size:0.83rem;line-height:1.6;margin-top:8px;}
+  .ticket-reply b{display:block;margin-bottom:3px;font-size:0.76rem;color:var(--muted);}
+  .ticket-date{font-size:0.7rem;color:var(--muted);margin-top:6px;}
+  .empty-state{text-align:center;padding:50px 10px;color:var(--muted);font-size:0.88rem;}
+  .login-gate{text-align:center;padding:60px 20px;}
+  .login-gate a{display:inline-block;margin-top:14px;padding:10px 22px;background:var(--primary);color:var(--black);border-radius:10px;text-decoration:none;font-weight:800;font-size:0.86rem;}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--primary);color:var(--black);padding:11px 22px;border-radius:10px;font-size:0.85rem;font-weight:700;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;}
+  .toast.show{opacity:1;}
+  .toast.toast-error{background:#dc2626;color:#fff;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="/" class="back-btn">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+    الدعم والمساعدة
+  </a>
+  <button class="icon-btn" id="themeToggle" onclick="toggleTheme()" title="تبديل الثيم">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+  </button>
+</div>
+
+<div class="wrap" id="wrap">
+  <div style="text-align:center;padding:60px;color:var(--muted);">جارٍ التحميل...</div>
+</div>
+
+<div id="toastHost"></div>
+
+<script>
+// ===== Theme =====
+let currentTheme = localStorage.getItem('hostaka_theme') || 'light';
+function setTheme(theme){
+  const html = document.documentElement;
+  if(theme==='dark') html.setAttribute('data-theme','dark'); else html.removeAttribute('data-theme');
+  currentTheme = theme;
+  localStorage.setItem('hostaka_theme', theme);
+}
+function toggleTheme(){ setTheme(currentTheme==='light'?'dark':'light'); }
+setTheme(currentTheme);
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function getToken(){ return localStorage.getItem('hostaka_token') || ''; }
+
+function showToast(msg, type='success'){
+  const host = document.getElementById('toastHost');
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + type;
+  el.textContent = msg;
+  host.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=>el.remove(),300); }, 3000);
+}
+
+async function apiFetch(url, method='GET', body=null){
+  const token = getToken();
+  const opts = { method, headers:{'Content-Type':'application/json','Authorization':'Bearer '+token} };
+  if(body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  const data = await r.json();
+  if(r.status===403 && data?.suspended){
+    localStorage.removeItem('hostaka_token'); localStorage.removeItem('hostaka_user'); localStorage.removeItem('hostaka_role');
+    alert('تم تعليق حسابك من قبل الإدارة' + (data.reason?':\n'+data.reason:''));
+    window.location = '/';
+  }
+  return data;
+}
+
+const TYPE_LABELS = {
+  general: 'استفسار / شكوى عامة',
+  bug: 'مشكلة تقنية',
+  abuse: 'إساءة استخدام',
+  account: 'مشكلة في الحساب',
+  suggestion: 'اقتراح'
+};
+const STATUS_LABELS = { pending:'قيد المراجعة', resolved:'تم الحل', dismissed:'مرفوض' };
+
+let ME = null;
+
+function fmtDate(s){
+  if(!s) return '';
+  let d;
+  if(typeof s === 'string' && !/[zZ]|[+-]\d\d:?\d\d$/.test(s)) d = new Date(s.replace(' ','T')+'Z');
+  else d = new Date(s);
+  return d.toLocaleDateString('ar-SA',{year:'numeric',month:'short',day:'numeric'}) + ' - ' + d.toLocaleTimeString('ar',{hour:'2-digit',minute:'2-digit'});
+}
+
+function renderForm(){
+  return `
+  <div class="card">
+    <label class="f-label">نوع الطلب</label>
+    <select class="f-input" id="spType">
+      ${Object.entries(TYPE_LABELS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}
+    </select>
+    <label class="f-label">الموضوع</label>
+    <input class="f-input" type="text" id="spSubject" placeholder="عنوان مختصر لطلبك" maxlength="120">
+    <label class="f-label">التفاصيل *</label>
+    <textarea class="f-input" id="spReason" placeholder="اشرح مشكلتك أو استفسارك بالتفصيل..."></textarea>
+    <button class="btn-submit" id="spBtn" onclick="submitTicket()">إرسال الطلب</button>
+  </div>`;
+}
+
+async function submitTicket(){
+  const type = document.getElementById('spType').value;
+  const subject = document.getElementById('spSubject').value.trim();
+  const reason = document.getElementById('spReason').value.trim();
+  if(!reason){ showToast('الرجاء كتابة التفاصيل', 'error'); return; }
+  const btn = document.getElementById('spBtn');
+  btn.disabled = true; btn.textContent = 'جارٍ الإرسال...';
+  try{
+    const d = await apiFetch('/api/reports', 'POST', { type, subject, reason });
+    if(d.success){
+      showToast('تم إرسال طلبك، سنقوم بالرد قريباً');
+      document.getElementById('spSubject').value = '';
+      document.getElementById('spReason').value = '';
+      switchTab('mine');
+    } else {
+      showToast(d.error || 'فشل الإرسال', 'error');
+    }
+  }catch(e){ showToast('تعذر الاتصال بالخادم', 'error'); }
+  btn.disabled = false; btn.textContent = 'إرسال الطلب';
+}
+
+function ticketCard(r){
+  const statusCls = r.status==='resolved' ? 'st-resolved' : (r.status==='dismissed' ? 'st-dismissed' : 'st-pending');
+  return `<div class="ticket">
+    <div class="ticket-top">
+      <span class="ticket-type">${esc(TYPE_LABELS[r.type] || r.type)}</span>
+      <span class="ticket-status ${statusCls}">${esc(STATUS_LABELS[r.status] || r.status)}</span>
+    </div>
+    ${r.subject ? `<div class="ticket-subject">${esc(r.subject)}</div>` : ''}
+    <div class="ticket-reason">${esc(r.reason)}</div>
+    ${r.admin_reply ? `<div class="ticket-reply"><b>رد الإدارة</b>${esc(r.admin_reply)}</div>` : ''}
+    <div class="ticket-date">${fmtDate(r.created_at)}</div>
+  </div>`;
+}
+
+async function loadMine(){
+  const wrap = document.getElementById('tabContent');
+  wrap.innerHTML = '<div class="empty-state">جارٍ التحميل...</div>';
+  try{
+    const data = await apiFetch('/api/reports/mine');
+    const list = Array.isArray(data) ? data : [];
+    if(!list.length){
+      wrap.innerHTML = '<div class="empty-state">لا توجد طلبات سابقة</div>';
+      return;
+    }
+    wrap.innerHTML = list.map(ticketCard).join('');
+  }catch(e){
+    wrap.innerHTML = '<div class="empty-state">تعذر تحميل الطلبات</div>';
+  }
+}
+
+let currentTab = 'new';
+function switchTab(tab){
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  const wrap = document.getElementById('tabContent');
+  if(tab==='new'){ wrap.innerHTML = renderForm(); }
+  else { loadMine(); }
+}
+
+async function loadMe(){
+  const token = getToken();
+  if(!token){
+    document.getElementById('wrap').innerHTML = `
+      <div class="login-gate">
+        <div style="font-size:1.05rem;font-weight:800;margin-bottom:6px;">الدعم متاح للأعضاء المسجلين فقط</div>
+        <div style="color:var(--muted);font-size:0.85rem;">سجّل الدخول لإرسال شكوى أو بلاغ ومتابعة ردود الإدارة</div>
+        <a href="/">تسجيل الدخول</a>
+      </div>`;
+    return;
+  }
+  try{
+    ME = await apiFetch('/api/me');
+    if(!ME || ME.error){ throw new Error('unauth'); }
+  }catch(e){
+    document.getElementById('wrap').innerHTML = `<div class="login-gate"><div style="font-weight:800;">تعذر التحقق من الحساب</div><a href="/">العودة للرئيسية</a></div>`;
+    return;
+  }
+  document.getElementById('wrap').innerHTML = `
+    <div class="page-title">مركز الدعم</div>
+    <div class="page-sub">أرسل شكوى، بلاغاً، أو استفساراً وسيتم الرد عليك من قبل فريق الإدارة</div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="new" onclick="switchTab('new')">طلب جديد</button>
+      <button class="tab-btn" data-tab="mine" onclick="switchTab('mine')">طلباتي</button>
+    </div>
+    <div id="tabContent"></div>
+  `;
+  switchTab('new');
+}
+
+loadMe();
+</script>
+</body>
+</html>

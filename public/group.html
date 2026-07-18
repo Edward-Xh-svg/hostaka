@@ -666,10 +666,17 @@ let chatImgBase64 = '';
 
 function t(key){ return LANG[currentLang]?.[key] || LANG['ar'][key] || key; }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function fmtTime(s){ if(!s) return ''; return new Date(s).toLocaleTimeString(currentLang==='ar'?'ar':'en',{hour:'2-digit',minute:'2-digit'}); }
+// الخادم يخزّن التوقيت بصيغة UTC بدون منطقة زمنية؛ نفسّرها كـ UTC ليحوّلها المتصفح تلقائياً لتوقيت جهاز المستخدم
+function toUTCDate(s){
+  if(!s) return new Date(NaN);
+  if(s instanceof Date) return s;
+  if(typeof s === 'string' && !/[zZ]|[+-]\d\d:?\d\d$/.test(s)) return new Date(s.replace(' ','T')+'Z');
+  return new Date(s);
+}
+function fmtTime(s){ if(!s) return ''; return toUTCDate(s).toLocaleTimeString(currentLang==='ar'?'ar':'en',{hour:'2-digit',minute:'2-digit'}); }
 function fmtDay(s){
   if(!s) return '';
-  const d = new Date(s), now = new Date();
+  const d = toUTCDate(s), now = new Date();
   const diff = Math.floor((now-d)/86400000);
   if (diff === 0) return t('today');
   if (diff === 1) return t('yesterday');
@@ -881,13 +888,22 @@ async function apiFetch(url, method='GET', body=null){
   const r = await fetch(url, opts);
   if (!r.ok){
     const text = await r.text().catch(()=> '');
-    let msg = text;
-    try { msg = JSON.parse(text).error || text; } catch(e){}
+    let msg = text, parsed = null;
+    try { parsed = JSON.parse(text); msg = parsed.error || text; } catch(e){}
+    if (r.status===403 && parsed?.suspended) { handleSuspended(parsed.reason); return parsed; }
     const err = new Error(msg || ('HTTP '+r.status));
     err.status = r.status;
     throw err;
   }
   return r.json();
+}
+
+function handleSuspended(reason){
+  localStorage.removeItem('hostaka_token');
+  localStorage.removeItem('hostaka_user');
+  localStorage.removeItem('hostaka_role');
+  alert('تم تعليق حسابك من قبل الإدارة' + (reason ? ':\n' + reason : '') + '\nللاستفسار يرجى التواصل مع الدعم عبر صفحة /support');
+  window.location = '/';
 }
 
 function showToast(msg, type='success'){
