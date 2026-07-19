@@ -118,6 +118,7 @@
         <input type="password" id="lPass" placeholder="••••••••" autocomplete="current-password">
       </div>
       <button class="btn" id="loginBtn" onclick="doLogin()">دخول</button>
+      <div class="hint"><a href="#" onclick="goToForgot();return false;" style="color:var(--text)">هل نسيت كلمة المرور؟</a></div>
     </div>
 
     <!-- ===== إنشاء حساب — الخطوة 1: البيانات ===== -->
@@ -153,6 +154,38 @@
       <button class="btn-ghost" id="resendBtn" onclick="resendCode()">إعادة إرسال الكود</button>
       <div class="hint"><a href="#" onclick="backToStart();return false;" style="color:var(--text)">تغيير البريد الإلكتروني</a></div>
     </div>
+
+    <!-- ===== نسيت كلمة المرور — الخطوة 1: طلب الكود ===== -->
+    <div class="pane" id="paneForgotStart">
+      <div class="err" id="forgotErr"></div>
+      <div class="step-title">استعادة كلمة المرور</div>
+      <div class="step-sub">أدخل بريدك الإلكتروني وسنرسل لك كود تأكيد لإعادة تعيين كلمة المرور.</div>
+      <div class="fg">
+        <label>البريد الإلكتروني</label>
+        <input type="email" id="fEmail" dir="ltr" placeholder="example@mail.com" autocomplete="email">
+      </div>
+      <button class="btn" id="forgotStartBtn" onclick="startForgot()">إرسال كود التأكيد</button>
+      <div class="hint"><a href="#" onclick="switchTab('login');return false;" style="color:var(--text)">العودة لتسجيل الدخول</a></div>
+    </div>
+
+    <!-- ===== نسيت كلمة المرور — الخطوة 2: الكود + كلمة مرور جديدة ===== -->
+    <div class="pane" id="paneForgotReset">
+      <div class="err" id="resetErr"></div>
+      <div class="ok" id="resetOk"></div>
+      <div class="step-title">تعيين كلمة مرور جديدة</div>
+      <div class="step-sub">أرسلنا كود تأكيد إلى <b id="sentToEmailForgot" style="color:var(--text)"></b>. أدخله مع كلمة المرور الجديدة.</div>
+      <div class="fg">
+        <label>كود التأكيد</label>
+        <input type="text" id="fCode" class="code-input" maxlength="6" inputmode="numeric" placeholder="000000">
+      </div>
+      <div class="fg">
+        <label>كلمة المرور الجديدة</label>
+        <input type="password" id="fNewPass" placeholder="6 أحرف على الأقل" autocomplete="new-password">
+      </div>
+      <button class="btn" id="resetBtn" onclick="doResetPassword()">تعيين كلمة المرور</button>
+      <button class="btn-ghost" id="resendForgotBtn" onclick="resendForgotCode()">إعادة إرسال الكود</button>
+      <div class="hint"><a href="#" onclick="backToForgotStart();return false;" style="color:var(--text)">تغيير البريد الإلكتروني</a></div>
+    </div>
   </div>
 </div>
 
@@ -187,6 +220,27 @@ function switchTab(tab){
   document.getElementById('paneLogin').classList.toggle('active', tab==='login');
   document.getElementById('paneRegStart').classList.toggle('active', tab!=='login');
   document.getElementById('paneRegVerify').classList.remove('active');
+  document.getElementById('paneForgotStart').classList.remove('active');
+  document.getElementById('paneForgotReset').classList.remove('active');
+}
+
+function goToForgot(){
+  document.getElementById('paneLogin').classList.remove('active');
+  document.getElementById('paneRegStart').classList.remove('active');
+  document.getElementById('paneRegVerify').classList.remove('active');
+  document.getElementById('paneForgotReset').classList.remove('active');
+  document.getElementById('paneForgotStart').classList.add('active');
+  document.getElementById('tabLoginBtn').classList.remove('active');
+  document.getElementById('tabRegisterBtn').classList.remove('active');
+  hideErr('forgotErr');
+  const f = document.getElementById('fEmail');
+  const l = document.getElementById('lEmail').value.trim();
+  if (l) f.value = l;
+}
+
+function backToForgotStart(){
+  document.getElementById('paneForgotReset').classList.remove('active');
+  document.getElementById('paneForgotStart').classList.add('active');
 }
 
 function backToStart(){
@@ -285,16 +339,17 @@ document.getElementById('vCode').addEventListener('keydown', e => { if (e.key===
 
 // ----- إعادة إرسال الكود مع عداد تنازلي -----
 let resendTimer = null;
-function startResendCooldown(seconds){
-  const btn = document.getElementById('resendBtn');
+function startResendCooldown(seconds, btnId){
+  const btn = document.getElementById(btnId || 'resendBtn');
   btn.disabled = true;
   let left = seconds;
+  const timerRef = btnId === 'resendForgotBtn' ? 'forgotResendTimer' : 'resendTimer';
   btn.textContent = `إعادة الإرسال بعد ${left} ثانية`;
-  clearInterval(resendTimer);
-  resendTimer = setInterval(() => {
+  clearInterval(window[timerRef]);
+  window[timerRef] = setInterval(() => {
     left--;
     if (left <= 0) {
-      clearInterval(resendTimer);
+      clearInterval(window[timerRef]);
       btn.disabled = false;
       btn.textContent = 'إعادة إرسال الكود';
     } else {
@@ -315,12 +370,83 @@ async function resendCode(){
       ok.textContent = 'تم إرسال كود جديد إلى بريدك الإلكتروني';
       ok.style.display = 'block';
       setTimeout(() => ok.style.display='none', 4000);
-      startResendCooldown(45);
+      startResendCooldown(45, 'resendBtn');
     } else {
       showErr('verifyErr', d.error || 'تعذر إعادة إرسال الكود');
-      startResendCooldown(45);
+      startResendCooldown(45, 'resendBtn');
     }
   } catch(e) { showErr('verifyErr','تعذر الاتصال بالخادم'); btn.disabled=false; }
+}
+
+// ----- نسيت كلمة المرور: الخطوة 1 -----
+let forgotEmail = null;
+
+async function startForgot(){
+  const email = document.getElementById('fEmail').value.trim();
+  hideErr('forgotErr');
+  if (!email) return showErr('forgotErr','البريد الإلكتروني مطلوب');
+
+  const btn = document.getElementById('forgotStartBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    const d = await apiFetch('/api/auth/password/forgot','POST',{ email });
+    if (d.success) {
+      forgotEmail = email;
+      document.getElementById('sentToEmailForgot').textContent = email;
+      document.getElementById('paneForgotStart').classList.remove('active');
+      document.getElementById('paneForgotReset').classList.add('active');
+      hideErr('resetErr');
+      startResendCooldown(45, 'resendForgotBtn');
+    } else {
+      showErr('forgotErr', d.error || 'تعذر إرسال كود التأكيد');
+    }
+  } catch(e) { showErr('forgotErr','تعذر الاتصال بالخادم'); }
+  finally { btn.disabled = false; btn.textContent = 'إرسال كود التأكيد'; }
+}
+
+// ----- نسيت كلمة المرور: الخطوة 2 (تأكيد الكود + كلمة مرور جديدة) -----
+async function doResetPassword(){
+  if (!forgotEmail) return backToForgotStart();
+  const code = document.getElementById('fCode').value.trim();
+  const newPassword = document.getElementById('fNewPass').value;
+  hideErr('resetErr');
+  if (!/^\d{6}$/.test(code)) return showErr('resetErr','أدخل كود التأكيد المكون من 6 أرقام');
+  if (newPassword.length < 6) return showErr('resetErr','كلمة المرور 6 أحرف على الأقل');
+
+  const btn = document.getElementById('resetBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    const d = await apiFetch('/api/auth/password/reset','POST',{ email: forgotEmail, code, newPassword });
+    if (d.success) {
+      setLoggedIn(d);
+      location.href = '/';
+    } else {
+      showErr('resetErr', d.error || 'تعذر إعادة تعيين كلمة المرور');
+      if (d.expired) backToForgotStart();
+    }
+  } catch(e) { showErr('resetErr','تعذر الاتصال بالخادم'); }
+  finally { btn.disabled = false; btn.textContent = 'تعيين كلمة المرور'; }
+}
+document.getElementById('fNewPass').addEventListener('keydown', e => { if (e.key==='Enter') doResetPassword(); });
+
+async function resendForgotCode(){
+  if (!forgotEmail) return backToForgotStart();
+  hideErr('resetErr');
+  const btn = document.getElementById('resendForgotBtn');
+  btn.disabled = true;
+  try {
+    const d = await apiFetch('/api/auth/password/resend','POST',{ email: forgotEmail });
+    if (d.success) {
+      const ok = document.getElementById('resetOk');
+      ok.textContent = 'تم إرسال كود جديد إلى بريدك الإلكتروني';
+      ok.style.display = 'block';
+      setTimeout(() => ok.style.display='none', 4000);
+      startResendCooldown(45, 'resendForgotBtn');
+    } else {
+      showErr('resetErr', d.error || 'تعذر إعادة إرسال الكود');
+      startResendCooldown(45, 'resendForgotBtn');
+    }
+  } catch(e) { showErr('resetErr','تعذر الاتصال بالخادم'); btn.disabled=false; }
 }
 </script>
 </body>
