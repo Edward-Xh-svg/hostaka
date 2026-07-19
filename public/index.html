@@ -535,6 +535,18 @@
     .post-html em{color:var(--muted);}
     .post-html a{color:var(--primary);text-decoration:none;border-bottom:1px solid var(--primary-border);transition:border-color 0.2s;}
     .post-html a:hover{border-color:var(--primary);}
+    .post-html a.post-link{word-break:break-all;}
+    .link-preview-card{
+      display:block;margin-top:10px;border:1px solid var(--border);border-radius:14px;
+      overflow:hidden;background:var(--card);text-decoration:none !important;color:inherit;max-width:420px;
+    }
+    .link-preview-img{width:100%;max-height:220px;object-fit:cover;display:block;background:var(--dark);}
+    .link-preview-body{padding:10px 14px;}
+    .link-preview-site{font-size:0.68rem;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:3px;}
+    .link-preview-title{font-size:0.92rem;font-weight:800;line-height:1.3;color:var(--text);
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+    .link-preview-desc{font-size:0.8rem;color:var(--muted);margin-top:4px;
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 
     .reactions-row{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
     .react-wrap{position:relative;display:inline-flex;align-items:center;}
@@ -2191,19 +2203,33 @@ function linkifyContent(html){
     const textNodes = [];
     let node;
     while((node = walker.nextNode())) textNodes.push(node);
-    const re = /(^|[\s(])([@#])([A-Za-z0-9_\u0600-\u06FF]{2,32})/gu;
+    const re = /(^|[\s(])(?:([@#])([A-Za-z0-9_\u0600-\u06FF]{2,32})|(https?:\/\/[^\s<]+))/gu;
     textNodes.forEach(tn=>{
       const text = tn.nodeValue;
-      if(!text || !/[@#]/.test(text)) return;
+      if(!text || !/[@#]|https?:\/\//.test(text)) return;
       let last = 0, m, changed = false;
       const frag = document.createDocumentFragment();
       re.lastIndex = 0;
       while((m = re.exec(text))){
         changed = true;
-        const [full, pre, sym, word] = m;
+        const [full, pre, sym, word, rawUrl] = m;
         const start = m.index;
         if(start > last) frag.appendChild(document.createTextNode(text.slice(last, start)));
         if(pre) frag.appendChild(document.createTextNode(pre));
+        if(rawUrl){
+          const cleanUrl = rawUrl.replace(/[.,!?)\]]+$/, '');
+          const trail = rawUrl.slice(cleanUrl.length);
+          const a = document.createElement('a');
+          a.textContent = cleanUrl;
+          a.className = 'post-link';
+          a.href = cleanUrl;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          frag.appendChild(a);
+          if(trail) frag.appendChild(document.createTextNode(trail));
+          last = start + full.length;
+          continue;
+        }
         const a = document.createElement('a');
         a.textContent = sym + word;
         if(sym === '@'){
@@ -2223,6 +2249,47 @@ function linkifyContent(html){
     });
     return wrapper.innerHTML;
   } catch(e){ return html; }
+}
+
+// ============================================================
+//  بطاقة معاينة Open Graph للروابط داخل المنشورات
+// ============================================================
+function extractFirstUrl(text){
+  const m = String(text||'').match(/https?:\/\/[^\s<]+/);
+  if(!m) return null;
+  return m[0].replace(/[.,!?)\]]+$/, '');
+}
+const linkPreviewCache = {};
+async function fetchLinkPreview(url){
+  if(linkPreviewCache[url]) return linkPreviewCache[url];
+  try {
+    const r = await fetch('/api/link-preview?url=' + encodeURIComponent(url));
+    const data = await r.json();
+    linkPreviewCache[url] = data;
+    return data;
+  } catch(e){ return null; }
+}
+function linkPreviewCardHtml(data){
+  if(!data || (!data.title && !data.image)) return '';
+  return `<a href="${esc(data.url)}" target="_blank" rel="noopener noreferrer" class="link-preview-card">
+    ${data.image ? `<img src="${esc(data.image)}" class="link-preview-img" loading="lazy" onerror="this.remove()">` : ''}
+    <div class="link-preview-body">
+      ${data.site ? `<div class="link-preview-site">${esc(data.site)}</div>` : ''}
+      ${data.title ? `<div class="link-preview-title">${esc(data.title)}</div>` : ''}
+      ${data.description ? `<div class="link-preview-desc">${esc(data.description)}</div>` : ''}
+    </div>
+  </a>`;
+}
+async function loadLinkPreviews(scope){
+  const slots = (scope || document).querySelectorAll('.link-preview-slot[data-lp-url]');
+  slots.forEach(async (slot)=>{
+    const url = slot.getAttribute('data-lp-url');
+    if(!url) return;
+    const data = await fetchLinkPreview(url);
+    if(!slot.isConnected) return;
+    if(data && (data.title || data.image)) slot.innerHTML = linkPreviewCardHtml(data);
+    else slot.remove();
+  });
 }
 
 function filterByHashtag(tag){
@@ -2343,10 +2410,12 @@ async function loadPosts(){
   } catch(e){ document.getElementById('feed').innerHTML='<div class="empty">'+SVG.empty+'<br>'+t('empty')+'</div>'; }
 }
 
+function renderFeedDone(){ loadLinkPreviews(document.getElementById('feed')); }
 function renderFeed(posts){
   const feed = document.getElementById('feed');
   if(!posts.length){ feed.innerHTML='<div class="empty">'+SVG.empty+'<br>'+t('empty')+'</div>'; return; }
   feed.innerHTML = posts.map(p => renderPost(p)).join('');
+  renderFeedDone();
 }
 
 function renderPost(p){
@@ -2443,6 +2512,7 @@ function renderPost(p){
         </div>
       </div>
       <div class="post-text post-html">${linkifyContent(p.content)}</div>
+      ${extractFirstUrl(p.content) ? `<div class="link-preview-slot" data-lp-url="${esc(extractFirstUrl(p.content))}"></div>` : ''}
       <div class="reactions-row">
         ${reactionHtml}
         <button class="react-btn" onclick="toggleComments(${p.id})" id="cmtToggle-${p.id}">
