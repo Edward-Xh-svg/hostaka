@@ -207,26 +207,15 @@ async function initDB() {
       created_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
-    -- ===== جدول القصص (Stories) =====
-    CREATE TABLE IF NOT EXISTS stories (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      media      TEXT NOT NULL,
-      media_type TEXT NOT NULL DEFAULT 'image',
-      caption    TEXT DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      expires_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_stories_expires ON stories(expires_at);
-    CREATE INDEX IF NOT EXISTS idx_stories_user ON stories(user_id, created_at DESC);
-
-    -- ===== جدول مشاهدات القصص =====
-    CREATE TABLE IF NOT EXISTS story_views (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      story_id   INTEGER NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
-      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      viewed_at  TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE(story_id, user_id)
+    -- ===== جدول طلبات استعادة كلمة المرور (كود عبر البريد) =====
+    CREATE TABLE IF NOT EXISTS password_resets (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      email        TEXT NOT NULL UNIQUE,
+      code         TEXT NOT NULL,
+      attempts     INTEGER NOT NULL DEFAULT 0,
+      expires_at   TEXT NOT NULL,
+      last_sent_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
 
@@ -246,9 +235,6 @@ async function initDB() {
     "ALTER TABLE records ADD COLUMN user_avatar TEXT DEFAULT ''",
     "ALTER TABLE records ADD COLUMN image       TEXT DEFAULT ''",
     "ALTER TABLE records ADD COLUMN video       TEXT DEFAULT ''",  // ✅ عمود الفيديو
-    "ALTER TABLE records ADD COLUMN is_reel     INTEGER DEFAULT 0",   // ✅ هل الفيديو ريلز (عمودي)
-    "ALTER TABLE records ADD COLUMN video_width  INTEGER DEFAULT 0",  // ✅ عرض الفيديو بالبكسل
-    "ALTER TABLE records ADD COLUMN video_height INTEGER DEFAULT 0",  // ✅ ارتفاع الفيديو بالبكسل
     "ALTER TABLE record_comments ADD COLUMN display_name TEXT DEFAULT ''",
     "ALTER TABLE record_comments ADD COLUMN avatar       TEXT DEFAULT ''",
     "ALTER TABLE record_comments ADD COLUMN user_role    TEXT DEFAULT 'Member'",
@@ -258,10 +244,7 @@ async function initDB() {
     "CREATE TABLE IF NOT EXISTS message_reactions (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id INTEGER NOT NULL, user_id INTEGER NOT NULL, emoji TEXT NOT NULL DEFAULT 'heart', UNIQUE(message_id, user_id))",
     "CREATE TABLE IF NOT EXISTS shizi_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, role TEXT NOT NULL DEFAULT 'user', content TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))",
     "CREATE TABLE IF NOT EXISTS pending_registrations (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL UNIQUE, username TEXT NOT NULL, password TEXT NOT NULL, code TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, expires_at TEXT NOT NULL, last_sent_at TEXT NOT NULL DEFAULT (datetime('now')), created_at TEXT NOT NULL DEFAULT (datetime('now')))",
-    "CREATE TABLE IF NOT EXISTS stories (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, media TEXT NOT NULL, media_type TEXT NOT NULL DEFAULT 'image', caption TEXT DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')), expires_at TEXT NOT NULL)",
-    "CREATE INDEX IF NOT EXISTS idx_stories_expires ON stories(expires_at)",
-    "CREATE INDEX IF NOT EXISTS idx_stories_user ON stories(user_id, created_at DESC)",
-    "CREATE TABLE IF NOT EXISTS story_views (id INTEGER PRIMARY KEY AUTOINCREMENT, story_id INTEGER NOT NULL, user_id INTEGER NOT NULL, viewed_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(story_id, user_id))",
+    "CREATE TABLE IF NOT EXISTS password_resets (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL UNIQUE, code TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, expires_at TEXT NOT NULL, last_sent_at TEXT NOT NULL DEFAULT (datetime('now')), created_at TEXT NOT NULL DEFAULT (datetime('now')))",
   ];
   for (const sql of migrations) {
     try { await db.execute(sql); } catch(e) { /* column/table already exists */ }
@@ -334,6 +317,7 @@ const q = {
   createUser:       (username,email,password) => db.execute({ sql:'INSERT INTO users (username,email,password) VALUES (?,?,?)', args:[username,email,password] }),
   createVerifiedUser: (username,email,password) => db.execute({ sql:'INSERT INTO users (username,email,password,email_verified) VALUES (?,?,?,1)', args:[username,email,password] }),
   getUserByUsername: (username) => db.execute({ sql:'SELECT * FROM users WHERE username=?', args:[username] }).then(first),
+  updateUserPasswordByEmail: (email, passwordHash) => db.execute({ sql:'UPDATE users SET password=? WHERE email=?', args:[passwordHash, email] }),
   updateProfile:    (display_name,bio,game_id,avatar,cover,id) => db.execute({ sql:'UPDATE users SET display_name=?,bio=?,game_id=?,avatar=?,cover=? WHERE id=?', args:[display_name,bio,game_id,avatar,cover,id] }),
   listUsers:        () => db.execute('SELECT id,username,email,role,avatar,display_name,verified,suspended,suspend_reason,created_at FROM users ORDER BY created_at DESC').then(rows),
   listPublicUsers:  () => db.execute('SELECT id,username,display_name,avatar,role,verified FROM users ORDER BY username ASC').then(rows),
@@ -353,44 +337,25 @@ const q = {
     LEFT JOIN users u ON (u.id = r.user_id) OR (r.user_id IS NULL AND u.username = r.publisher)
     ORDER BY r.created_at DESC
   `).then(rows),
-  createRecord: async (user_id, publisher, user_role, user_avatar, content, image, video, isReel, videoWidth, videoHeight) => {
-    // video/is_reel/video_width/video_height معاملات جديدة (اختيارية)
+  createRecord: async (user_id, publisher, user_role, user_avatar, content, image, video) => {
+    // video هو معامل جديد (اختياري)
     try {
       return await db.execute({
-        sql: 'INSERT INTO records (user_id,publisher,user_role,user_avatar,content,image,video,is_reel,video_width,video_height) VALUES (?,?,?,?,?,?,?,?,?,?)',
-        args: [user_id, publisher, user_role, user_avatar, content, image || '', video || '', isReel ? 1 : 0, videoWidth || 0, videoHeight || 0]
+        sql: 'INSERT INTO records (user_id,publisher,user_role,user_avatar,content,image,video) VALUES (?,?,?,?,?,?,?)',
+        args: [user_id, publisher, user_role, user_avatar, content, image || '', video || '']
       });
     } catch(e) {
-      // إذا فشل (مثلاً لعدم وجود أعمدة الريلز في الإصدارات القديمة)، نعيد المحاولة بالمخطط القديم
-      console.warn('⚠️ Reel columns missing, falling back to older schema');
-      try {
-        return await db.execute({
-          sql: 'INSERT INTO records (user_id,publisher,user_role,user_avatar,content,image,video) VALUES (?,?,?,?,?,?,?)',
-          args: [user_id, publisher, user_role, user_avatar, content, image || '', video || '']
-        });
-      } catch(e2) {
-        return await db.execute({
-          sql: 'INSERT INTO records (publisher,content,image) VALUES (?,?,?)',
-          args: [publisher, content, image || '']
-        });
-      }
+      // إذا فشل (مثلاً لعدم وجود عمود video في الإصدارات القديمة)، نعيد المحاولة بدون video
+      console.warn('⚠️ Video column missing, falling back to old schema');
+      return await db.execute({
+        sql: 'INSERT INTO records (publisher,content,image) VALUES (?,?,?)',
+        args: [publisher, content, image || '']
+      });
     }
   },
   deleteRecord: (id) => db.execute({ sql:'DELETE FROM records WHERE id=?', args:[id] }),
   getRecord:    (id) => db.execute({ sql:'SELECT * FROM records WHERE id=?', args:[id] }).then(first),
   getUserPosts: (uid) => db.execute({ sql:'SELECT * FROM records WHERE user_id=? ORDER BY created_at DESC', args:[uid] }).then(rows),
-
-  // ── Reels (فيديوهات عمودية) ──
-  listReels: () => db.execute(`
-    SELECT r.*,
-           COALESCE(u.avatar, r.user_avatar, '') as user_avatar,
-           COALESCE(u.display_name, u.username, r.publisher, '') as publisher_name,
-           COALESCE(u.verified, 0) as publisher_verified
-    FROM records r
-    LEFT JOIN users u ON (u.id = r.user_id) OR (r.user_id IS NULL AND u.username = r.publisher)
-    WHERE r.video IS NOT NULL AND r.video != '' AND r.is_reel = 1
-    ORDER BY r.created_at DESC
-  `).then(rows),
 
   // ── Reactions ──
   getAllReactions:      () => db.execute('SELECT record_id,emoji,COUNT(*) as count FROM record_reactions GROUP BY record_id,emoji').then(rows),
@@ -557,32 +522,20 @@ const q = {
   incrementPendingRegistrationAttempts: (email) => db.execute({ sql:'UPDATE pending_registrations SET attempts=attempts+1 WHERE email=?', args:[email] }),
   deletePendingRegistration: (email) => db.execute({ sql:'DELETE FROM pending_registrations WHERE email=?', args:[email] }),
 
-  // ── Stories (القصص - تختفي بعد 24 ساعة) ──
-  deleteExpiredStories: () => db.execute("DELETE FROM stories WHERE expires_at <= datetime('now')"),
-  createStory: (user_id, media, media_type, caption) => db.execute({
-    sql: `INSERT INTO stories (user_id, media, media_type, caption, expires_at)
-          VALUES (?,?,?,?, datetime('now','+24 hours'))`,
-    args: [user_id, media, media_type || 'image', caption || '']
+  // ── Password Resets (نسيت كلمة المرور) ──
+  getPasswordResetByEmail: (email) => db.execute({ sql:'SELECT * FROM password_resets WHERE email=?', args:[email] }).then(first),
+  upsertPasswordReset: (email, code, expiresAt) => db.execute({
+    sql: `INSERT INTO password_resets (email,code,attempts,expires_at,last_sent_at)
+          VALUES (?,?,0,?,datetime('now'))
+          ON CONFLICT(email) DO UPDATE SET
+            code=excluded.code,
+            attempts=0,
+            expires_at=excluded.expires_at,
+            last_sent_at=datetime('now')`,
+    args: [email, code, expiresAt]
   }),
-  listActiveStories: (viewerId) => db.execute({
-    sql: `
-      SELECT s.id, s.user_id, s.media, s.media_type, s.caption, s.created_at, s.expires_at,
-             u.username, u.display_name, u.avatar, u.verified,
-             CASE WHEN sv.id IS NULL THEN 0 ELSE 1 END as viewed
-      FROM stories s
-      JOIN users u ON u.id = s.user_id
-      LEFT JOIN story_views sv ON sv.story_id = s.id AND sv.user_id = ?
-      WHERE s.expires_at > datetime('now')
-      ORDER BY s.user_id, s.created_at ASC
-    `,
-    args: [viewerId || 0]
-  }).then(rows),
-  getStory: (id) => db.execute({ sql:'SELECT * FROM stories WHERE id=?', args:[id] }).then(first),
-  deleteStory: (id) => db.execute({ sql:'DELETE FROM stories WHERE id=?', args:[id] }),
-  markStoryViewed: (story_id, user_id) => db.execute({
-    sql: 'INSERT INTO story_views (story_id,user_id) VALUES (?,?) ON CONFLICT(story_id,user_id) DO NOTHING',
-    args: [story_id, user_id]
-  }),
+  incrementPasswordResetAttempts: (email) => db.execute({ sql:'UPDATE password_resets SET attempts=attempts+1 WHERE email=?', args:[email] }),
+  deletePasswordReset: (email) => db.execute({ sql:'DELETE FROM password_resets WHERE email=?', args:[email] }),
 };
 
 module.exports = { db, q, initDB };
