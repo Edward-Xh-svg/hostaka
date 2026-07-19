@@ -79,6 +79,40 @@ async function sendVerificationEmail(email, username, code) {
   return data;
 }
 
+async function sendPasswordResetEmail(email, username, code) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error('RESEND_API_KEY غير مُعدّ على الخادم');
+  const from = process.env.RESEND_FROM_EMAIL || 'Hostaka <onboarding@resend.dev>';
+
+  const html = `
+  <div style="font-family:'Cairo',Tahoma,sans-serif;background:#f7f7f8;padding:32px 0;direction:rtl">
+    <div style="max-width:420px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px;border:1px solid #eee">
+      <h2 style="margin:0 0 8px;color:#111;font-size:20px;">مرحباً ${username || ''} 🔒</h2>
+      <p style="margin:0 0 20px;color:#555;font-size:14px;line-height:1.7">
+        وصلنا طلب لإعادة تعيين كلمة المرور لحسابك في <b>Hostaka</b>. استخدم الكود التالي لإتمام العملية:
+      </p>
+      <div style="text-align:center;margin:20px 0;">
+        <span style="display:inline-block;background:#f5f5f5;border-radius:12px;padding:14px 28px;font-size:30px;font-weight:800;letter-spacing:8px;color:#111;">${code}</span>
+      </div>
+      <p style="margin:0;color:#888;font-size:13px;">
+        هذا الكود صالح لمدة ${CODE_TTL_MINUTES} دقائق. إذا لم تطلب إعادة تعيين كلمة المرور، تجاهل هذه الرسالة ولن يتغير شيء في حسابك.
+      </p>
+    </div>
+  </div>`;
+
+  const r = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to: [email], subject: `كود إعادة تعيين كلمة المرور في Hostaka: ${code}`, html }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    console.error('❌ Resend error:', data);
+    throw new Error(data?.message || 'تعذر إرسال بريد إعادة التعيين');
+  }
+  return data;
+}
+
 function signToken(user) {
   return jwt.sign({ id:user.id, username:user.username, role:user.role, avatar:user.avatar||'' }, JWT_SECRET, { expiresIn:JWT_EXPIRES });
 }
@@ -270,6 +304,110 @@ app.post('/api/auth/register/verify', async (req, res) => {
   }
 });
 
+// ============================================================
+// نسيت كلمة المرور — كود تأكيد عبر البريد ثم تعيين كلمة جديدة
+// ============================================================
+
+// الخطوة 1: طلب كود إعادة التعيين
+app.post('/api/auth/password/forgot', async (req, res) => {
+  try {
+    const mail = String(req.body?.email||'').trim().toLowerCase();
+    if (!mail) return res.status(400).json({ error:'البريد الإلكتروني مطلوب' });
+
+    const user = await q.getUserByEmail(mail);
+    if (!user) return res.status(404).json({ error:'لا يوجد حساب مرتبط بهذا البريد' });
+
+    const existing = await q.getPasswordResetByEmail(mail);
+    if (existing) {
+      const secsSinceLastSend = (Date.now() - parseSqliteUTC(existing.last_sent_at).getTime()) / 1000;
+      if (secsSinceLastSend < RESEND_COOLDOWN_S) {
+        return res.status(429).json({ error:`الرجاء الانتظار ${Math.ceil(RESEND_COOLDOWN_S - secsSinceLastSend)} ثانية قبل طلب كود جديد` });
+      }
+    }
+
+    const code = generateCode();
+    const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES*60000).toISOString().replace('T',' ').slice(0,19);
+    await sendPasswordResetEmail(mail, user.display_name || user.username, code);
+    await q.upsertPasswordReset(mail, code, expiresAt);
+
+    res.json({ success:true, email: mail, message:'تم إرسال كود إعادة التعيين إلى بريدك الإلكتروني' });
+  } catch(e) {
+    console.error('❌ password/forgot error:', e);
+    res.status(500).json({ error: e.message || 'تعذر إرسال كود إعادة التعيين' });
+  }
+});
+
+// إعادة إرسال كود إعادة التعيين
+app.post('/api/auth/password/resend', async (req, res) => {
+  try {
+    const mail = String(req.body?.email||'').trim().toLowerCase();
+    if (!mail) return res.status(400).json({ error:'البريد الإلكتروني مطلوب' });
+
+    const existing = await q.getPasswordResetByEmail(mail);
+    if (!existing) return res.status(404).json({ error:'لا يوجد طلب إعادة تعيين بهذا البريد، ابدأ من جديد' });
+
+    const secsSinceLastSend = (Date.now() - parseSqliteUTC(existing.last_sent_at).getTime()) / 1000;
+    if (secsSinceLastSend < RESEND_COOLDOWN_S) {
+      return res.status(429).json({ error:`الرجاء الانتظار ${Math.ceil(RESEND_COOLDOWN_S - secsSinceLastSend)} ثانية قبل طلب كود جديد` });
+    }
+
+    const user = await q.getUserByEmail(mail);
+    if (!user) return res.status(404).json({ error:'لا يوجد حساب مرتبط بهذا البريد' });
+
+    const code = generateCode();
+    const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES*60000).toISOString().replace('T',' ').slice(0,19);
+    await sendPasswordResetEmail(mail, user.display_name || user.username, code);
+    await q.upsertPasswordReset(mail, code, expiresAt);
+
+    res.json({ success:true, message:'تم إرسال كود جديد إلى بريدك الإلكتروني' });
+  } catch(e) {
+    console.error('❌ password/resend error:', e);
+    res.status(500).json({ error: e.message || 'تعذر إعادة إرسال الكود' });
+  }
+});
+
+// الخطوة 2: تأكيد الكود وتعيين كلمة المرور الجديدة
+app.post('/api/auth/password/reset', async (req, res) => {
+  try {
+    const mail = String(req.body?.email||'').trim().toLowerCase();
+    const code = String(req.body?.code||'').trim();
+    const newPassword = String(req.body?.newPassword||'');
+    if (!mail || !code || !newPassword) return res.status(400).json({ error:'جميع الحقول مطلوبة' });
+    if (newPassword.length < 6) return res.status(400).json({ error:'كلمة المرور 6 أحرف على الأقل' });
+
+    const reset = await q.getPasswordResetByEmail(mail);
+    if (!reset) return res.status(404).json({ error:'لا يوجد طلب إعادة تعيين بهذا البريد، ابدأ من جديد' });
+
+    if (parseSqliteUTC(reset.expires_at).getTime() < Date.now()) {
+      await q.deletePasswordReset(mail);
+      return res.status(410).json({ error:'انتهت صلاحية الكود، الرجاء طلب كود جديد', expired:true });
+    }
+    if (reset.attempts >= MAX_CODE_ATTEMPTS) {
+      await q.deletePasswordReset(mail);
+      return res.status(429).json({ error:'تم تجاوز عدد المحاولات المسموحة، الرجاء البدء من جديد', expired:true });
+    }
+    if (reset.code !== code) {
+      await q.incrementPasswordResetAttempts(mail);
+      return res.status(400).json({ error:'كود التأكيد غير صحيح' });
+    }
+
+    const user = await q.getUserByEmail(mail);
+    if (!user) {
+      await q.deletePasswordReset(mail);
+      return res.status(404).json({ error:'لا يوجد حساب مرتبط بهذا البريد' });
+    }
+
+    const hash = bcrypt.hashSync(newPassword, 10);
+    await q.updateUserPasswordByEmail(mail, hash);
+    await q.deletePasswordReset(mail);
+
+    res.json({ success:true, token: signToken(user), username:user.username, role:user.role, avatar:user.avatar||'', id:user.id, message:'تم تحديث كلمة المرور بنجاح' });
+  } catch(e) {
+    console.error('❌ password/reset error:', e);
+    res.status(500).json({ error: e.message || 'تعذر إعادة تعيين كلمة المرور' });
+  }
+});
+
 app.get('/api/auth/me',(req,res)=>{
   const u=verifyToken(req); if(!u) return res.status(401).json({error:'غير مصرح'});
   res.json({id:u.id,username:u.username,role:u.role,avatar:u.avatar||''});
@@ -434,17 +572,12 @@ app.get('/api/records', async (req, res) => {
 
 app.post('/api/records', requireAuth, async (req, res) => {
   try {
-    const { content, image, video, video_width, video_height } = req.body || {};
+    const { content, image, video } = req.body || {};
     if (!content?.trim() && !image && !video) {
       return res.status(400).json({ error: 'المحتوى أو الملف مطلوب' });
     }
     const user = await q.getUserById(req.user.id);
     if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
-
-    // تصنيف الفيديو: ريلز (عمودي) إذا كان الارتفاع أكبر من العرض بوضوح
-    const w = Number(video_width) || 0;
-    const h = Number(video_height) || 0;
-    const isReel = !!(video && w > 0 && h > 0 && h > w);
 
     const result = await q.createRecord(
       user.id,
@@ -453,130 +586,14 @@ app.post('/api/records', requireAuth, async (req, res) => {
       user.avatar || '',
       content?.trim() || '',
       image || '',
-      video || '',
-      isReel,
-      w,
-      h
+      video || ''
     );
     const recordId = Number(result.lastInsertRowid);
     notifyMentions(content, user, recordId, null, '/?p=' + recordId);
-    res.json({ success: true, id: recordId, is_reel: isReel });
+    res.json({ success: true, id: recordId });
   } catch(e) {
     console.error('Create record error:', e);
     res.status(500).json({ error: 'خطأ: ' + e.message });
-  }
-});
-
-// ============================================================
-// Reels (فيديوهات عمودية - تُعرض بطريقة تيك توك / شورتس)
-// ============================================================
-app.get('/api/reels', async (req, res) => {
-  try {
-    const records = await q.listReels();
-    if (!records.length) return res.json([]);
-    const u = verifyToken(req);
-    const [allR, allC, urList] = await Promise.all([
-      q.getAllReactions(),
-      q.getAllComments(),
-      u ? q.getUserAllReactions(u.id) : Promise.resolve([])
-    ]);
-    const rMap = {}, cMap = {}, urMap = {};
-    allR.forEach(r => {
-      if (!rMap[r.record_id]) rMap[r.record_id] = [];
-      rMap[r.record_id].push({ emoji: r.emoji, count: r.count });
-    });
-    allC.forEach(c => {
-      if (!cMap[c.record_id]) cMap[c.record_id] = [];
-      cMap[c.record_id].push(c);
-    });
-    urList.forEach(r => { urMap[r.record_id] = r.emoji; });
-    res.json(records.map(r => ({
-      ...r,
-      reactions: rMap[r.id] || [],
-      comments: cMap[r.id] || [],
-      userReaction: urMap[r.id] || null
-    })));
-  } catch(e) {
-    console.error('List reels error:', e);
-    res.status(500).json({ error: 'خطأ في الخادم' });
-  }
-});
-
-// ============================================================
-// Stories (القصص - تختفي تلقائياً بعد 24 ساعة)
-// ============================================================
-app.get('/api/stories', async (req, res) => {
-  try {
-    await q.deleteExpiredStories();
-    const u = verifyToken(req);
-    const rowsList = await q.listActiveStories(u ? u.id : 0);
-    // تجميع القصص حسب المستخدم للعرض كحلقات (مثل الستوري)
-    const groups = {};
-    const order = [];
-    rowsList.forEach(r => {
-      if (!groups[r.user_id]) {
-        groups[r.user_id] = {
-          user_id: r.user_id,
-          username: r.username,
-          display_name: r.display_name || r.username,
-          avatar: r.avatar || '',
-          verified: !!r.verified,
-          allViewed: true,
-          stories: []
-        };
-        order.push(r.user_id);
-      }
-      groups[r.user_id].stories.push({
-        id: r.id, media: r.media, media_type: r.media_type,
-        caption: r.caption, created_at: r.created_at, expires_at: r.expires_at,
-        viewed: !!r.viewed
-      });
-      if (!r.viewed) groups[r.user_id].allViewed = false;
-    });
-    res.json(order.map(id => groups[id]));
-  } catch(e) {
-    console.error('List stories error:', e);
-    res.status(500).json({ error: 'خطأ في الخادم' });
-  }
-});
-
-app.post('/api/stories', requireAuth, async (req, res) => {
-  try {
-    const { media, media_type, caption } = req.body || {};
-    if (!media) return res.status(400).json({ error: 'الوسائط مطلوبة' });
-    const user = await q.getUserById(req.user.id);
-    if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
-    const result = await q.createStory(user.id, media, media_type === 'video' ? 'video' : 'image', (caption || '').trim());
-    res.json({ success: true, id: Number(result.lastInsertRowid) });
-  } catch(e) {
-    console.error('Create story error:', e);
-    res.status(500).json({ error: 'خطأ: ' + e.message });
-  }
-});
-
-app.post('/api/stories/:id/view', requireAuth, async (req, res) => {
-  try {
-    const story = await q.getStory(req.params.id);
-    if (!story) return res.status(404).json({ error: 'غير موجود' });
-    await q.markStoryViewed(story.id, req.user.id);
-    res.json({ success: true });
-  } catch(e) {
-    res.status(500).json({ error: 'خطأ في الخادم' });
-  }
-});
-
-app.delete('/api/stories/:id', requireAuth, async (req, res) => {
-  try {
-    const story = await q.getStory(req.params.id);
-    if (!story) return res.status(404).json({ error: 'غير موجود' });
-    const user = await q.getUserById(req.user.id);
-    if (story.user_id !== req.user.id && user?.role !== 'admin') {
-      return res.status(403).json({ error: 'غير مصرح' });
-    }
-    await q.deleteStory(story.id);
-    res.json({ success: true });
-  } catch(e) {
-    res.status(500).json({ error: 'خطأ في الخادم' });
   }
 });
 
@@ -1384,7 +1401,6 @@ app.get('/chat',    (_, res) => res.sendFile(path.join(__dirname, 'public', 'cha
 app.get('/group',   (_, res) => res.sendFile(path.join(__dirname, 'public', 'group.html')));
 app.get('/shiziai', (_, res) => res.sendFile(path.join(__dirname, 'public', 'shiziai.html')));
 app.get('/support', (_, res) => res.sendFile(path.join(__dirname, 'public', 'support.html')));
-app.get('/short',   (_, res) => res.sendFile(path.join(__dirname, 'public', 'short.html')));
 app.get('*',        (_, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // ============================================================
