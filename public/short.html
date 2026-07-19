@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<link rel="icon" href="hostaka-icon.png" type="image/png">
+<title>Hostaka — الريلز</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;background:#000;overscroll-behavior:none;}
+  body{font-family:'Cairo',sans-serif;color:#fff;}
+
+  .topbar{
+    position:fixed;top:0;left:0;right:0;z-index:50;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:calc(12px + env(safe-area-inset-top)) 14px 12px;
+    background:linear-gradient(rgba(0,0,0,0.55),transparent);
+    pointer-events:none;
+  }
+  .topbar > *{pointer-events:auto;}
+  .back-btn{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.12);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(6px);}
+  .topbar-title{font-weight:800;font-size:1rem;display:flex;align-items:center;gap:6px;}
+
+  .reels-feed{height:100%;overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;}
+  .reels-feed::-webkit-scrollbar{display:none;}
+
+  .reel-slide{
+    height:100dvh;width:100%;position:relative;scroll-snap-align:start;
+    display:flex;align-items:center;justify-content:center;background:#0a0a0a;overflow:hidden;
+  }
+  .reel-slide video{width:100%;height:100%;object-fit:contain;background:#000;}
+  .reel-tap-layer{position:absolute;inset:0;z-index:2;}
+
+  .reel-mute-hint{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:60px;height:60px;border-radius:50%;background:rgba(0,0,0,0.4);
+    display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.25s;pointer-events:none;z-index:3;
+  }
+  .reel-mute-hint.show{opacity:1;}
+
+  .reel-gradient-bottom{position:absolute;left:0;right:0;bottom:0;height:220px;background:linear-gradient(transparent,rgba(0,0,0,0.75));pointer-events:none;z-index:1;}
+
+  .reel-info{
+    position:absolute;bottom:calc(18px + env(safe-area-inset-bottom));inset-inline-start:14px;
+    inset-inline-end:78px;z-index:4;
+  }
+  .reel-pub{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .reel-avatar{width:36px;height:36px;border-radius:50%;overflow:hidden;background:linear-gradient(145deg,#fff,#ccc);color:#000;display:flex;align-items:center;justify-content:center;font-weight:800;flex:0 0 auto;}
+  .reel-avatar img{width:100%;height:100%;object-fit:cover;}
+  .reel-pub-name{font-weight:800;font-size:0.92rem;display:flex;align-items:center;gap:4px;}
+  .reel-caption{font-size:0.86rem;line-height:1.6;color:rgba(255,255,255,0.92);max-height:4.8em;overflow:hidden;}
+
+  .reel-actions{
+    position:absolute;bottom:calc(18px + env(safe-area-inset-bottom));inset-inline-end:10px;z-index:4;
+    display:flex;flex-direction:column;align-items:center;gap:20px;
+  }
+  .reel-act-btn{background:none;border:none;color:#fff;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;}
+  .reel-act-circle{width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);transition:transform 0.15s;}
+  .reel-act-btn:active .reel-act-circle{transform:scale(0.88);}
+  .reel-act-btn.liked .reel-act-circle{background:rgba(229,57,53,0.25);color:#e53935;}
+  .reel-act-count{font-size:0.72rem;font-weight:700;}
+
+  .empty-state{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:rgba(255,255,255,0.6);text-align:center;padding:20px;}
+  .empty-state svg{opacity:0.5;}
+
+  .loader{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000;z-index:100;}
+  .spinner{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,0.2);border-top-color:#fff;animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* ===== ورقة التعليقات السفلية ===== */
+  .comments-sheet-bd{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:80;opacity:0;visibility:hidden;transition:all 0.25s;}
+  .comments-sheet-bd.show{opacity:1;visibility:visible;}
+  .comments-sheet{
+    position:fixed;left:0;right:0;bottom:0;max-height:70vh;background:#141414;border-radius:20px 20px 0 0;
+    z-index:81;display:flex;flex-direction:column;transform:translateY(100%);transition:transform 0.3s cubic-bezier(0.16,1,0.3,1);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .comments-sheet-bd.show .comments-sheet{transform:translateY(0);}
+  .comments-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid #262626;font-weight:800;}
+  .comments-head button{background:none;border:none;color:#fff;cursor:pointer;display:flex;}
+  .comments-list{flex:1;overflow-y:auto;padding:10px 18px;}
+  .comment-row{display:flex;gap:10px;margin-bottom:16px;}
+  .comment-avatar{width:32px;height:32px;border-radius:50%;background:#333;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem;overflow:hidden;}
+  .comment-avatar img{width:100%;height:100%;object-fit:cover;}
+  .comment-name{font-size:0.8rem;font-weight:700;color:rgba(255,255,255,0.6);margin-bottom:2px;}
+  .comment-text{font-size:0.9rem;line-height:1.5;}
+  .comment-empty{text-align:center;color:rgba(255,255,255,0.4);padding:30px 10px;font-size:0.85rem;}
+  .comments-input-row{display:flex;gap:10px;padding:12px 14px;border-top:1px solid #262626;align-items:center;}
+  .comments-input-row input{flex:1;background:#222;border:none;border-radius:22px;padding:11px 16px;color:#fff;font-family:inherit;font-size:0.88rem;outline:none;}
+  .comments-input-row button{width:40px;height:40px;border-radius:50%;background:#fff;color:#000;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;}
+</style>
+</head>
+<body>
+
+<div class="loader" id="loader"><div class="spinner"></div></div>
+
+<div class="topbar">
+  <button class="back-btn" onclick="location.href='/'">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <div class="topbar-title">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2.5"/><polygon points="10.5 9.5 15 12 10.5 14.5" fill="currentColor" stroke="none"/></svg>
+    الريلز
+  </div>
+  <div style="width:38px;"></div>
+</div>
+
+<div class="reels-feed" id="reelsFeed"></div>
+
+<div class="comments-sheet-bd" id="commentsSheetBd" onclick="if(event.target===this) closeComments();">
+  <div class="comments-sheet">
+    <div class="comments-head">
+      <span id="commentsCount">التعليقات</span>
+      <button onclick="closeComments()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="comments-list" id="commentsList"></div>
+    <div class="comments-input-row">
+      <input type="text" id="commentInput" placeholder="أضف تعليقاً..." maxlength="500" onkeydown="if(event.key==='Enter') sendReelComment();">
+      <button onclick="sendReelComment()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const TOKEN = localStorage.getItem('hostaka_token') || '';
+let ME = null;
+try { const stored = localStorage.getItem('hostaka_user'); if (stored) ME = JSON.parse(stored); } catch(e) {}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+async function apiFetch(url, method='GET', body=null){
+  const opts = { method, headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+const HEART_ICON = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+const HEART_FILLED = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+const COMMENT_ICON = `<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
+const SHARE_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>`;
+const MUTE_ICON = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>`;
+const UNMUTE_ICON = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
+
+let reels = [];
+let soundOn = false;
+let activeCommentReelId = null;
+
+function reactCount(reel){ return (reel.reactions||[]).reduce((s,r)=>s+(r.count||0),0); }
+
+function reelSlideHtml(r){
+  const name = r.publisher_name || r.publisher || '?';
+  const avatarHtml = r.user_avatar ? `<img src="${esc(r.user_avatar)}" alt="">` : esc(name.charAt(0).toUpperCase());
+  const liked = r.userReaction === 'like';
+  return `
+  <div class="reel-slide" id="reel-${r.id}" data-id="${r.id}">
+    <video src="${esc(r.video)}" loop playsinline muted preload="metadata"></video>
+    <div class="reel-tap-layer" onclick="onSlideTap(${r.id})"></div>
+    <div class="reel-mute-hint" id="muteHint-${r.id}"></div>
+    <div class="reel-gradient-bottom"></div>
+    <div class="reel-info">
+      <div class="reel-pub">
+        <div class="reel-avatar">${avatarHtml}</div>
+        <div class="reel-pub-name">${esc(r.publisher_name || r.publisher || '')}</div>
+      </div>
+      ${r.content ? `<div class="reel-caption">${esc(stripHtml(r.content))}</div>` : ''}
+    </div>
+    <div class="reel-actions">
+      <button class="reel-act-btn ${liked?'liked':''}" id="likeBtn-${r.id}" onclick="toggleReelLike(${r.id})">
+        <div class="reel-act-circle">${liked?HEART_FILLED:HEART_ICON}</div>
+        <span class="reel-act-count" id="likeCount-${r.id}">${reactCount(r)||''}</span>
+      </button>
+      <button class="reel-act-btn" onclick="openComments(${r.id})">
+        <div class="reel-act-circle">${COMMENT_ICON}</div>
+        <span class="reel-act-count" id="cmtCount-${r.id}">${(r.comments||[]).length||''}</span>
+      </button>
+      <button class="reel-act-btn" onclick="shareReel(${r.id})">
+        <div class="reel-act-circle">${SHARE_ICON}</div>
+      </button>
+    </div>
+  </div>`;
+}
+
+function stripHtml(html){
+  const d = document.createElement('div'); d.innerHTML = html;
+  return (d.textContent || d.innerText || '').trim();
+}
+
+async function loadReels(){
+  try {
+    reels = await apiFetch('/api/reels');
+    if (!Array.isArray(reels)) reels = [];
+  } catch(e) { reels = []; }
+  document.getElementById('loader').style.display = 'none';
+  const feed = document.getElementById('reelsFeed');
+  if (!reels.length) {
+    feed.innerHTML = `<div class="empty-state">
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="6" y="2" width="12" height="20" rx="2.5"/><polygon points="10.5 9.5 15 12 10.5 14.5"/></svg>
+      <div>لا توجد فيديوهات ريلز بعد</div>
+    </div>`;
+    return;
+  }
+  feed.innerHTML = reels.map(reelSlideHtml).join('');
+  setupObserver();
+
+  const wantedId = new URLSearchParams(location.search).get('id');
+  if (wantedId) {
+    const el = document.getElementById('reel-' + wantedId);
+    if (el) requestAnimationFrame(() => el.scrollIntoView({ behavior:'instant', block:'start' }));
+  }
+}
+
+let observer = null;
+function setupObserver(){
+  if (observer) observer.disconnect();
+  observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const video = entry.target.querySelector('video');
+      if (!video) return;
+      if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+        video.muted = !soundOn;
+        video.play().catch(()=>{});
+      } else {
+        video.pause();
+      }
+    });
+  }, { threshold: [0, 0.6, 1] });
+  document.querySelectorAll('.reel-slide').forEach(s => observer.observe(s));
+}
+
+function onSlideTap(id){
+  soundOn = !soundOn;
+  document.querySelectorAll('.reel-slide video').forEach(v => v.muted = !soundOn);
+  const hint = document.getElementById('muteHint-' + id);
+  if (hint) {
+    hint.innerHTML = soundOn ? UNMUTE_ICON : MUTE_ICON;
+    hint.classList.add('show');
+    setTimeout(() => hint.classList.remove('show'), 600);
+  }
+}
+
+function goLogin(){ location.href = '/login'; }
+
+async function toggleReelLike(id){
+  if (!ME) { goLogin(); return; }
+  const d = await apiFetch('/api/records/' + id + '/react', 'POST', { emoji: 'like' });
+  if (!d.success) return;
+  const reel = reels.find(r => r.id === id);
+  if (!reel) return;
+  reel.reactions = d.reactions; reel.userReaction = d.userReaction;
+  const liked = reel.userReaction === 'like';
+  const btn = document.getElementById('likeBtn-' + id);
+  btn.classList.toggle('liked', liked);
+  btn.querySelector('.reel-act-circle').innerHTML = liked ? HEART_FILLED : HEART_ICON;
+  document.getElementById('likeCount-' + id).textContent = reactCount(reel) || '';
+}
+
+function openComments(id){
+  if (!ME) { goLogin(); return; }
+  activeCommentReelId = id;
+  document.getElementById('commentsSheetBd').classList.add('show');
+  renderComments();
+}
+function closeComments(){
+  document.getElementById('commentsSheetBd').classList.remove('show');
+  activeCommentReelId = null;
+}
+
+async function renderComments(){
+  const list = document.getElementById('commentsList');
+  list.innerHTML = '<div class="comment-empty">جارٍ التحميل...</div>';
+  const comments = await apiFetch('/api/records/' + activeCommentReelId + '/comments');
+  const reel = reels.find(r => r.id === activeCommentReelId);
+  if (reel) { reel.comments = comments; const cEl = document.getElementById('cmtCount-' + activeCommentReelId); if (cEl) cEl.textContent = comments.length || ''; }
+  document.getElementById('commentsCount').textContent = comments.length ? (comments.length + ' تعليق') : 'التعليقات';
+  if (!comments.length) { list.innerHTML = '<div class="comment-empty">لا توجد تعليقات بعد، كن أول من يعلّق</div>'; return; }
+  list.innerHTML = comments.map(c => `
+    <div class="comment-row">
+      <div class="comment-avatar">${c.avatar ? `<img src="${esc(c.avatar)}" alt="">` : esc((c.display_name||c.username||'?').charAt(0).toUpperCase())}</div>
+      <div>
+        <div class="comment-name">${esc(c.display_name || c.username)}</div>
+        <div class="comment-text">${esc(c.content)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function sendReelComment(){
+  if (!ME) { goLogin(); return; }
+  const input = document.getElementById('commentInput');
+  const content = input.value.trim();
+  if (!content || !activeCommentReelId) return;
+  input.value = '';
+  const d = await apiFetch('/api/records/' + activeCommentReelId + '/comments', 'POST', { content });
+  if (d.success) renderComments();
+}
+
+function shareReel(id){
+  const url = location.origin + '/short?id=' + id;
+  if (navigator.share) { navigator.share({ url }).catch(()=>{}); return; }
+  navigator.clipboard?.writeText(url).then(() => showShareToast()).catch(() => showShareToast());
+}
+function showShareToast(){
+  let el = document.createElement('div');
+  el.textContent = 'تم نسخ رابط الريلز';
+  el.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.95);color:#000;padding:10px 20px;border-radius:24px;font-size:0.85rem;font-weight:700;z-index:200;';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2000);
+}
+
+loadReels();
+</script>
+</body>
+</html>
