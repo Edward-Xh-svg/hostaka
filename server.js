@@ -434,12 +434,17 @@ app.get('/api/records', async (req, res) => {
 
 app.post('/api/records', requireAuth, async (req, res) => {
   try {
-    const { content, image, video } = req.body || {};
+    const { content, image, video, video_width, video_height } = req.body || {};
     if (!content?.trim() && !image && !video) {
       return res.status(400).json({ error: 'المحتوى أو الملف مطلوب' });
     }
     const user = await q.getUserById(req.user.id);
     if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
+
+    // تصنيف الفيديو: ريلز (عمودي) إذا كان الارتفاع أكبر من العرض بوضوح
+    const w = Number(video_width) || 0;
+    const h = Number(video_height) || 0;
+    const isReel = !!(video && w > 0 && h > 0 && h > w);
 
     const result = await q.createRecord(
       user.id,
@@ -448,14 +453,130 @@ app.post('/api/records', requireAuth, async (req, res) => {
       user.avatar || '',
       content?.trim() || '',
       image || '',
-      video || ''
+      video || '',
+      isReel,
+      w,
+      h
     );
     const recordId = Number(result.lastInsertRowid);
     notifyMentions(content, user, recordId, null, '/?p=' + recordId);
-    res.json({ success: true, id: recordId });
+    res.json({ success: true, id: recordId, is_reel: isReel });
   } catch(e) {
     console.error('Create record error:', e);
     res.status(500).json({ error: 'خطأ: ' + e.message });
+  }
+});
+
+// ============================================================
+// Reels (فيديوهات عمودية - تُعرض بطريقة تيك توك / شورتس)
+// ============================================================
+app.get('/api/reels', async (req, res) => {
+  try {
+    const records = await q.listReels();
+    if (!records.length) return res.json([]);
+    const u = verifyToken(req);
+    const [allR, allC, urList] = await Promise.all([
+      q.getAllReactions(),
+      q.getAllComments(),
+      u ? q.getUserAllReactions(u.id) : Promise.resolve([])
+    ]);
+    const rMap = {}, cMap = {}, urMap = {};
+    allR.forEach(r => {
+      if (!rMap[r.record_id]) rMap[r.record_id] = [];
+      rMap[r.record_id].push({ emoji: r.emoji, count: r.count });
+    });
+    allC.forEach(c => {
+      if (!cMap[c.record_id]) cMap[c.record_id] = [];
+      cMap[c.record_id].push(c);
+    });
+    urList.forEach(r => { urMap[r.record_id] = r.emoji; });
+    res.json(records.map(r => ({
+      ...r,
+      reactions: rMap[r.id] || [],
+      comments: cMap[r.id] || [],
+      userReaction: urMap[r.id] || null
+    })));
+  } catch(e) {
+    console.error('List reels error:', e);
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+// ============================================================
+// Stories (القصص - تختفي تلقائياً بعد 24 ساعة)
+// ============================================================
+app.get('/api/stories', async (req, res) => {
+  try {
+    await q.deleteExpiredStories();
+    const u = verifyToken(req);
+    const rowsList = await q.listActiveStories(u ? u.id : 0);
+    // تجميع القصص حسب المستخدم للعرض كحلقات (مثل الستوري)
+    const groups = {};
+    const order = [];
+    rowsList.forEach(r => {
+      if (!groups[r.user_id]) {
+        groups[r.user_id] = {
+          user_id: r.user_id,
+          username: r.username,
+          display_name: r.display_name || r.username,
+          avatar: r.avatar || '',
+          verified: !!r.verified,
+          allViewed: true,
+          stories: []
+        };
+        order.push(r.user_id);
+      }
+      groups[r.user_id].stories.push({
+        id: r.id, media: r.media, media_type: r.media_type,
+        caption: r.caption, created_at: r.created_at, expires_at: r.expires_at,
+        viewed: !!r.viewed
+      });
+      if (!r.viewed) groups[r.user_id].allViewed = false;
+    });
+    res.json(order.map(id => groups[id]));
+  } catch(e) {
+    console.error('List stories error:', e);
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+app.post('/api/stories', requireAuth, async (req, res) => {
+  try {
+    const { media, media_type, caption } = req.body || {};
+    if (!media) return res.status(400).json({ error: 'الوسائط مطلوبة' });
+    const user = await q.getUserById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
+    const result = await q.createStory(user.id, media, media_type === 'video' ? 'video' : 'image', (caption || '').trim());
+    res.json({ success: true, id: Number(result.lastInsertRowid) });
+  } catch(e) {
+    console.error('Create story error:', e);
+    res.status(500).json({ error: 'خطأ: ' + e.message });
+  }
+});
+
+app.post('/api/stories/:id/view', requireAuth, async (req, res) => {
+  try {
+    const story = await q.getStory(req.params.id);
+    if (!story) return res.status(404).json({ error: 'غير موجود' });
+    await q.markStoryViewed(story.id, req.user.id);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+app.delete('/api/stories/:id', requireAuth, async (req, res) => {
+  try {
+    const story = await q.getStory(req.params.id);
+    if (!story) return res.status(404).json({ error: 'غير موجود' });
+    const user = await q.getUserById(req.user.id);
+    if (story.user_id !== req.user.id && user?.role !== 'admin') {
+      return res.status(403).json({ error: 'غير مصرح' });
+    }
+    await q.deleteStory(story.id);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
   }
 });
 
@@ -1263,6 +1384,7 @@ app.get('/chat',    (_, res) => res.sendFile(path.join(__dirname, 'public', 'cha
 app.get('/group',   (_, res) => res.sendFile(path.join(__dirname, 'public', 'group.html')));
 app.get('/shiziai', (_, res) => res.sendFile(path.join(__dirname, 'public', 'shiziai.html')));
 app.get('/support', (_, res) => res.sendFile(path.join(__dirname, 'public', 'support.html')));
+app.get('/short',   (_, res) => res.sendFile(path.join(__dirname, 'public', 'short.html')));
 app.get('*',        (_, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // ============================================================
