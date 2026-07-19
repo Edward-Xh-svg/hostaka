@@ -28,18 +28,21 @@ async function initDB() {
       verified     INTEGER DEFAULT 0,
       suspended       INTEGER DEFAULT 0,
       suspend_reason  TEXT DEFAULT '',
+      last_seen    TEXT DEFAULT (datetime('now')),
       created_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS records (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id     INTEGER REFERENCES users(id),
+      page_id     INTEGER DEFAULT NULL REFERENCES pages(id),
       publisher   TEXT NOT NULL,
       user_role   TEXT NOT NULL DEFAULT 'Member',
       user_avatar TEXT DEFAULT '',
       content     TEXT NOT NULL,
       image       TEXT DEFAULT '',
       video       TEXT DEFAULT '',
+      edited      INTEGER DEFAULT 0,
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -72,6 +75,7 @@ async function initDB() {
       content    TEXT NOT NULL,
       image      TEXT DEFAULT '',
       read       INTEGER NOT NULL DEFAULT 0,
+      edited     INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -112,6 +116,7 @@ async function initDB() {
       from_avatar TEXT DEFAULT '',
       content     TEXT NOT NULL,
       image       TEXT DEFAULT '',
+      edited      INTEGER NOT NULL DEFAULT 0,
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -139,6 +144,30 @@ async function initDB() {
       followed_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       created_at  TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE(follower_id, followed_id)
+    );
+
+    -- ===== جدول الصفحات/القنوات التابعة لحساب =====
+    CREATE TABLE IF NOT EXISTS pages (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      owner_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      username    TEXT NOT NULL UNIQUE,
+      name        TEXT NOT NULL,
+      avatar      TEXT DEFAULT '',
+      cover       TEXT DEFAULT '',
+      bio         TEXT DEFAULT '',
+      category    TEXT DEFAULT '',
+      verified    INTEGER DEFAULT 0,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_pages_owner ON pages(owner_id);
+
+    -- ===== جدول متابعي الصفحات =====
+    CREATE TABLE IF NOT EXISTS page_follows (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      page_id    INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(page_id, user_id)
     );
 
     -- ===== جدول محادثات Shizi AI =====
@@ -260,6 +289,11 @@ async function initDB() {
     "ALTER TABLE records ADD COLUMN is_reel     INTEGER DEFAULT 0",   // ✅ هل الفيديو ريلز (عمودي)
     "ALTER TABLE records ADD COLUMN video_width  INTEGER DEFAULT 0",  // ✅ عرض الفيديو بالبكسل
     "ALTER TABLE records ADD COLUMN video_height INTEGER DEFAULT 0",  // ✅ ارتفاع الفيديو بالبكسل
+    "ALTER TABLE records ADD COLUMN edited      INTEGER DEFAULT 0",  // ✅ تعديل المنشور
+    "ALTER TABLE records ADD COLUMN page_id     INTEGER DEFAULT NULL",  // ✅ نشر باسم صفحة/قناة
+    "ALTER TABLE users   ADD COLUMN last_seen   TEXT DEFAULT (datetime('now'))",  // ✅ آخر ظهور
+    "ALTER TABLE messages ADD COLUMN edited     INTEGER NOT NULL DEFAULT 0",  // ✅ تعديل الرسالة
+    "ALTER TABLE group_messages ADD COLUMN edited INTEGER NOT NULL DEFAULT 0",  // ✅ تعديل رسالة المجموعة
     "ALTER TABLE record_comments ADD COLUMN display_name TEXT DEFAULT ''",
     "ALTER TABLE record_comments ADD COLUMN avatar       TEXT DEFAULT ''",
     "ALTER TABLE record_comments ADD COLUMN user_role    TEXT DEFAULT 'Member'",
@@ -274,6 +308,9 @@ async function initDB() {
     "CREATE INDEX IF NOT EXISTS idx_stories_expires ON stories(expires_at)",
     "CREATE INDEX IF NOT EXISTS idx_stories_user ON stories(user_id, created_at DESC)",
     "CREATE TABLE IF NOT EXISTS story_views (id INTEGER PRIMARY KEY AUTOINCREMENT, story_id INTEGER NOT NULL, user_id INTEGER NOT NULL, viewed_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(story_id, user_id))",
+    "CREATE TABLE IF NOT EXISTS pages (id INTEGER PRIMARY KEY AUTOINCREMENT, owner_id INTEGER NOT NULL, username TEXT NOT NULL UNIQUE, name TEXT NOT NULL, avatar TEXT DEFAULT '', cover TEXT DEFAULT '', bio TEXT DEFAULT '', category TEXT DEFAULT '', verified INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')))",
+    "CREATE INDEX IF NOT EXISTS idx_pages_owner ON pages(owner_id)",
+    "CREATE TABLE IF NOT EXISTS page_follows (id INTEGER PRIMARY KEY AUTOINCREMENT, page_id INTEGER NOT NULL, user_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(page_id, user_id))",
   ];
   for (const sql of migrations) {
     try { await db.execute(sql); } catch(e) { /* column/table already exists */ }
@@ -328,7 +365,13 @@ async function initDB() {
 const q = {
   // ── Users ──
   getUserByEmail:   (email)    => db.execute({ sql:'SELECT * FROM users WHERE email=?', args:[email] }).then(first),
-  getUserById:      (id)       => db.execute({ sql:'SELECT id,username,email,role,avatar,bio,game_id,display_name,cover,verified,suspended,suspend_reason,created_at FROM users WHERE id=?', args:[id] }).then(first),
+  getUserById:      (id)       => db.execute({ sql:'SELECT id,username,email,role,avatar,bio,game_id,display_name,cover,verified,suspended,suspend_reason,last_seen,created_at FROM users WHERE id=?', args:[id] }).then(first),
+  touchLastSeen: (id) => db.execute({ sql:"UPDATE users SET last_seen=datetime('now') WHERE id=?", args:[id] }).catch(()=>{}),
+  getUserStatus: async (username) => {
+    const u = await db.execute({ sql:'SELECT id, last_seen FROM users WHERE username=?', args:[username] }).then(first);
+    if (!u) return null;
+    return u;
+  },
   getPublicProfile: (username, viewerId = null) => {
     return db.execute({ 
       sql: `
@@ -361,21 +404,23 @@ const q = {
     SELECT r.*,
            COALESCE(u.avatar, r.user_avatar, '') as user_avatar,
            COALESCE(u.display_name, u.username, r.publisher, '') as publisher_name,
-           COALESCE(u.verified, 0) as publisher_verified
+           COALESCE(u.verified, 0) as publisher_verified,
+           p.username as page_username
     FROM records r
     LEFT JOIN users u ON (u.id = r.user_id) OR (r.user_id IS NULL AND u.username = r.publisher)
+    LEFT JOIN pages p ON p.id = r.page_id
     ORDER BY r.created_at DESC
   `).then(rows),
-  createRecord: async (user_id, publisher, user_role, user_avatar, content, image, video, isReel, videoWidth, videoHeight) => {
-    // video/is_reel/video_width/video_height معاملات جديدة (اختيارية)
+  createRecord: async (user_id, publisher, user_role, user_avatar, content, image, video, isReel, videoWidth, videoHeight, pageId) => {
+    // video/is_reel/video_width/video_height/page_id معاملات جديدة (اختيارية)
     try {
       return await db.execute({
-        sql: 'INSERT INTO records (user_id,publisher,user_role,user_avatar,content,image,video,is_reel,video_width,video_height) VALUES (?,?,?,?,?,?,?,?,?,?)',
-        args: [user_id, publisher, user_role, user_avatar, content, image || '', video || '', isReel ? 1 : 0, videoWidth || 0, videoHeight || 0]
+        sql: 'INSERT INTO records (user_id,publisher,user_role,user_avatar,content,image,video,is_reel,video_width,video_height,page_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+        args: [user_id, publisher, user_role, user_avatar, content, image || '', video || '', isReel ? 1 : 0, videoWidth || 0, videoHeight || 0, pageId || null]
       });
     } catch(e) {
-      // إذا فشل (مثلاً لعدم وجود أعمدة الريلز في الإصدارات القديمة)، نعيد المحاولة بالمخطط القديم
-      console.warn('⚠️ Reel columns missing, falling back to older schema');
+      // إذا فشل (مثلاً لعدم وجود أعمدة الريلز/الصفحات في الإصدارات القديمة)، نعيد المحاولة بالمخطط القديم
+      console.warn('⚠️ Reel/page columns missing, falling back to older schema');
       try {
         return await db.execute({
           sql: 'INSERT INTO records (user_id,publisher,user_role,user_avatar,content,image,video) VALUES (?,?,?,?,?,?,?)',
@@ -389,6 +434,10 @@ const q = {
       }
     }
   },
+  updateRecord: (id, content, image) => db.execute({
+    sql: 'UPDATE records SET content=?, image=?, edited=1 WHERE id=?',
+    args: [content || '', image || '', id]
+  }),
   deleteRecord: (id) => db.execute({ sql:'DELETE FROM records WHERE id=?', args:[id] }),
   getRecord:    (id) => db.execute({ sql:'SELECT * FROM records WHERE id=?', args:[id] }).then(first),
   getUserPosts: (uid) => db.execute({ sql:'SELECT * FROM records WHERE user_id=? ORDER BY created_at DESC', args:[uid] }).then(rows),
@@ -402,7 +451,7 @@ const q = {
     FROM records r
     LEFT JOIN users u ON (u.id = r.user_id) OR (r.user_id IS NULL AND u.username = r.publisher)
     WHERE r.video IS NOT NULL AND r.video != '' AND r.is_reel = 1
-    ORDER BY r.created_at DESC
+    ORDER BY RANDOM()
   `).then(rows),
 
   // ── Reactions ──
@@ -439,6 +488,9 @@ const q = {
     ORDER BY m.created_at DESC`, args:[uid,uid,uid] }).then(rows),
   getMessages:  (uid,oid) => db.execute({ sql:'SELECT m.*,u.avatar as from_avatar FROM messages m JOIN users u ON u.id=m.from_id WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?) ORDER BY created_at ASC', args:[uid,oid,oid,uid] }).then(rows),
   sendMessage:  (fid,tid,fn,tn,content,image) => db.execute({ sql:'INSERT INTO messages (from_id,to_id,from_name,to_name,content,image) VALUES (?,?,?,?,?,?)', args:[fid,tid,fn,tn,content,image||''] }),
+  getMessage:   (id) => db.execute({ sql:'SELECT * FROM messages WHERE id=?', args:[id] }).then(first),
+  updateMessage:(id,content) => db.execute({ sql:'UPDATE messages SET content=?, edited=1 WHERE id=?', args:[content,id] }),
+  deleteMessage:(id) => db.execute({ sql:'DELETE FROM messages WHERE id=?', args:[id] }),
   markRead:     (fid,tid) => db.execute({ sql:'UPDATE messages SET read=1 WHERE from_id=? AND to_id=?', args:[fid,tid] }),
   unreadCount:  (uid) => db.execute({ sql:'SELECT COUNT(*) as count FROM messages WHERE to_id=? AND read=0', args:[uid] }).then(first),
 
@@ -464,6 +516,9 @@ const q = {
   // ── Group Messages ──
   getGroupMessages:       (gid) => db.execute({ sql:'SELECT * FROM group_messages WHERE group_id=? ORDER BY created_at ASC', args:[gid] }).then(rows),
   sendGroupMessage:       (gid,uid,fn,fa,content,image) => db.execute({ sql:'INSERT INTO group_messages (group_id,user_id,from_name,from_avatar,content,image) VALUES (?,?,?,?,?,?)', args:[gid,uid,fn,fa,content,image||''] }),
+  getGroupMessage:        (id) => db.execute({ sql:'SELECT * FROM group_messages WHERE id=?', args:[id] }).then(first),
+  updateGroupMessage:     (id,content) => db.execute({ sql:'UPDATE group_messages SET content=?, edited=1 WHERE id=?', args:[content,id] }),
+  deleteGroupMessage:     (id) => db.execute({ sql:'DELETE FROM group_messages WHERE id=?', args:[id] }),
   getGroupMsgReactions:   (mid) => db.execute({ sql:'SELECT emoji,COUNT(*) as count FROM group_message_reactions WHERE message_id=? GROUP BY emoji', args:[mid] }).then(rows),
   getUserGroupMsgReaction:(mid,uid) => db.execute({ sql:'SELECT emoji FROM group_message_reactions WHERE message_id=? AND user_id=?', args:[mid,uid] }).then(first),
   addGroupMsgReaction:    (mid,uid,emoji) => db.execute({ sql:'INSERT OR REPLACE INTO group_message_reactions (message_id,user_id,emoji) VALUES (?,?,?)', args:[mid,uid,emoji] }),
@@ -611,6 +666,28 @@ const q = {
     sql: 'INSERT INTO story_views (story_id,user_id) VALUES (?,?) ON CONFLICT(story_id,user_id) DO NOTHING',
     args: [story_id, user_id]
   }),
+
+  // ── Pages (صفحات/قنوات تابعة لحساب) ──
+  createPage: (owner_id, username, name, avatar, bio, category) => db.execute({
+    sql: 'INSERT INTO pages (owner_id, username, name, avatar, bio, category) VALUES (?,?,?,?,?,?)',
+    args: [owner_id, username, name, avatar || '', bio || '', category || '']
+  }),
+  getPageByUsername: (username) => db.execute({ sql:'SELECT * FROM pages WHERE username=?', args:[username] }).then(first),
+  getPageById:       (id)       => db.execute({ sql:'SELECT * FROM pages WHERE id=?', args:[id] }).then(first),
+  getPagesByOwner:   (owner_id) => db.execute({ sql:'SELECT * FROM pages WHERE owner_id=? ORDER BY created_at DESC', args:[owner_id] }).then(rows),
+  updatePage: (id, name, avatar, cover, bio, category) => db.execute({
+    sql: 'UPDATE pages SET name=?, avatar=?, cover=?, bio=?, category=? WHERE id=?',
+    args: [name, avatar || '', cover || '', bio || '', category || '', id]
+  }),
+  deletePage: (id) => db.execute({ sql:'DELETE FROM pages WHERE id=?', args:[id] }),
+  getPagePosts: (page_id) => db.execute({ sql:'SELECT * FROM records WHERE page_id=? ORDER BY created_at DESC', args:[page_id] }).then(rows),
+  followPage:   (page_id, user_id) => db.execute({
+    sql: 'INSERT INTO page_follows (page_id,user_id) VALUES (?,?) ON CONFLICT(page_id,user_id) DO NOTHING',
+    args: [page_id, user_id]
+  }),
+  unfollowPage: (page_id, user_id) => db.execute({ sql:'DELETE FROM page_follows WHERE page_id=? AND user_id=?', args:[page_id, user_id] }),
+  isFollowingPage: (page_id, user_id) => db.execute({ sql:'SELECT id FROM page_follows WHERE page_id=? AND user_id=?', args:[page_id, user_id] }).then(first),
+  getPageFollowerCount: (page_id) => db.execute({ sql:'SELECT COUNT(*) as c FROM page_follows WHERE page_id=?', args:[page_id] }).then(first).then(r => r?.c || 0),
 };
 
 module.exports = { db, q, initDB };

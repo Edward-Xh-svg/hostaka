@@ -17,9 +17,9 @@ const JWT_EXPIRES = '30d';
 
 // ===== شخصية Shizi AI (مبنية على Gemini) =====
 const SHIZI_SYSTEM_PROMPT = `أنتِ "شيزي" (Shizi AI)، المساعدة الذكية الرسمية لمنصة Hostaka.
-Hostaka هي منصة تواصل اجتماعي ناشئة (وليست منصة استضافة/hosting رغم تشابه الاسم). تم تطويرك بواسطة فريق من المطورين الشباب
+Hostaka هي منصة تواصل اجتماعي ناشئة (وليست منصة استضافة/hosting رغم تشابه الاسم). المديرة والمطوّرة الرئيسية للمنصة هي مريم الغافوري، المعروفة أيضاً بلقب "ميشا".
 شخصيتك: احترافية، واضحة، ومتعاونة. تتحدثين بأسلوب راقٍ ومباشر، وتستخدمين اللغة العربية بشكل أساسي (إلا إذا كتب المستخدم بلغة أخرى، فحينها تجاوبين بنفس لغته).
-يمكنك ان تستخدمي أي رموز تعبيرية (إيموجي) في ردودك بشكل طبيعي.
+لا تستخدمي أي رموز تعبيرية (إيموجي) في ردودك مطلقاً.
 مهمتك مساعدة مستخدمي Hostaka في أي استفسار: عن المنصة، أو الدردشة العامة، أو الأسئلة العلمية والتقنية، أو كتابة نصوص، أو حل المشاكل.
 كوني دقيقة ومختصرة قدر الإمكان، وواضحة في إجاباتك، ولا تختلقي معلومات لا تعرفينها.
 لا تفصحي عن الجهة التقنية المبنية عليها إلا إذا سُئلتِ صراحة عن ذلك.`;
@@ -127,6 +127,7 @@ async function requireAuth(req,res,next) {
     const dbUser = await q.getUserById(u.id);
     if (!dbUser) return res.status(401).json({error:'غير مصرح'});
     if (dbUser.suspended) return res.status(403).json({ error:'تم تعليق حسابك' + (dbUser.suspend_reason ? ': ' + dbUser.suspend_reason : ''), suspended:true, reason: dbUser.suspend_reason||'' });
+    q.touchLastSeen(dbUser.id); // تحديث آخر ظهور بدون انتظار (fire-and-forget)
     req.user=u; next();
   } catch(e) { res.status(500).json({error:'خطأ في الخادم'}); }
 }
@@ -455,6 +456,36 @@ app.put('/api/profile', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/users/:username/status', async (req, res) => {
+  try {
+    const u = await q.getUserStatus(req.params.username);
+    if (!u) return res.status(404).json({ error: 'غير موجود' });
+    const lastSeenMs = new Date(u.last_seen.replace(' ', 'T') + 'Z').getTime();
+    const online = (Date.now() - lastSeenMs) < 2 * 60 * 1000; // أونلاين إذا كان نشطاً خلال آخر دقيقتين
+    res.json({ online, last_seen: u.last_seen });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+app.get('/api/users/status/batch', async (req, res) => {
+  try {
+    const usernames = (req.query.usernames || '').split(',').map(s => s.trim()).filter(Boolean).slice(0, 100);
+    if (!usernames.length) return res.json({});
+    const result = {};
+    for (const uname of usernames) {
+      const u = await q.getUserStatus(uname);
+      if (u) {
+        const lastSeenMs = new Date(u.last_seen.replace(' ', 'T') + 'Z').getTime();
+        result[uname] = { online: (Date.now() - lastSeenMs) < 2 * 60 * 1000, last_seen: u.last_seen };
+      }
+    }
+    res.json(result);
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
 // Users
 app.get('/api/users', async (req, res) => {
   try {
@@ -572,12 +603,28 @@ app.get('/api/records', async (req, res) => {
 
 app.post('/api/records', requireAuth, async (req, res) => {
   try {
-    const { content, image, video, video_width, video_height } = req.body || {};
+    const { content, image, video, video_width, video_height, page_id } = req.body || {};
     if (!content?.trim() && !image && !video) {
       return res.status(400).json({ error: 'المحتوى أو الملف مطلوب' });
     }
     const user = await q.getUserById(req.user.id);
     if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
+
+    // النشر باسم صفحة/قناة تابعة لحسابي (اختياري)
+    let publisher = user.display_name || user.username;
+    let publisherAvatar = user.avatar || '';
+    let publisherRole = user.role === 'admin' ? 'Admin' : 'Member';
+    let pageId = null;
+    if (page_id) {
+      const page = await q.getPageById(page_id);
+      if (!page || Number(page.owner_id) !== Number(user.id)) {
+        return res.status(403).json({ error: 'لا تملك صلاحية النشر باسم هذه الصفحة' });
+      }
+      publisher = page.name;
+      publisherAvatar = page.avatar || '';
+      publisherRole = 'Page';
+      pageId = page.id;
+    }
 
     // تصنيف الفيديو: ريلز (عمودي) إذا كان الارتفاع أكبر من العرض بوضوح
     const w = Number(video_width) || 0;
@@ -586,23 +633,115 @@ app.post('/api/records', requireAuth, async (req, res) => {
 
     const result = await q.createRecord(
       user.id,
-      user.display_name || user.username,
-      user.role === 'admin' ? 'Admin' : 'Member',
-      user.avatar || '',
+      publisher,
+      publisherRole,
+      publisherAvatar,
       content?.trim() || '',
       image || '',
       video || '',
       isReel,
       w,
-      h
+      h,
+      pageId
     );
     const recordId = Number(result.lastInsertRowid);
-    notifyMentions(content, user, recordId, null, '/?p=' + recordId);
+    if (!pageId) notifyMentions(content, user, recordId, null, '/?p=' + recordId);
     res.json({ success: true, id: recordId, is_reel: isReel });
   } catch(e) {
     console.error('Create record error:', e);
     res.status(500).json({ error: 'خطأ: ' + e.message });
   }
+});
+
+// ============================================================
+// Pages (صفحات/قنوات تابعة لحساب)
+// ============================================================
+function slugifyPageUsername(s) {
+  return String(s || '').trim().toLowerCase()
+    .replace(/[^a-z0-9_\u0621-\u064A\u0660-\u0669 ]/g, '')
+    .replace(/\s+/g, '_').slice(0, 40);
+}
+
+app.get('/api/pages/mine', requireAuth, async (req, res) => {
+  try {
+    const pages = await q.getPagesByOwner(req.user.id);
+    res.json(pages);
+  } catch(e) { res.status(500).json({ error: 'خطأ في الخادم' }); }
+});
+
+app.post('/api/pages', requireAuth, async (req, res) => {
+  try {
+    const { name, username, avatar, bio, category } = req.body || {};
+    if (!name?.trim()) return res.status(400).json({ error: 'اسم الصفحة مطلوب' });
+    let handle = slugifyPageUsername(username || name);
+    if (!handle) return res.status(400).json({ error: 'معرّف الصفحة غير صالح' });
+    const existing = await q.getPageByUsername(handle);
+    if (existing) return res.status(409).json({ error: 'هذا المعرّف مستخدم لصفحة أخرى، جرّب معرّفاً آخر' });
+    const result = await q.createPage(req.user.id, handle, name.trim(), avatar || '', (bio || '').trim(), (category || '').trim());
+    res.json({ success: true, id: Number(result.lastInsertRowid), username: handle });
+  } catch(e) {
+    console.error('Create page error:', e);
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+app.get('/api/pages/:username', async (req, res) => {
+  try {
+    const page = await q.getPageByUsername(req.params.username);
+    if (!page) return res.status(404).json({ error: 'الصفحة غير موجودة' });
+    const [posts, followerCount] = await Promise.all([
+      q.getPagePosts(page.id),
+      q.getPageFollowerCount(page.id)
+    ]);
+    const u = verifyToken(req);
+    let isFollowing = false;
+    if (u) isFollowing = !!(await q.isFollowingPage(page.id, u.id));
+    res.json({ ...page, posts, followerCount, isFollowing, isOwner: !!(u && Number(u.id) === Number(page.owner_id)) });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+app.put('/api/pages/:id', requireAuth, async (req, res) => {
+  try {
+    const page = await q.getPageById(req.params.id);
+    if (!page) return res.status(404).json({ error: 'غير موجود' });
+    if (Number(page.owner_id) !== Number(req.user.id)) return res.status(403).json({ error: 'غير مسموح' });
+    const { name, avatar, cover, bio, category } = req.body || {};
+    await q.updatePage(req.params.id, name?.trim() || page.name, avatar !== undefined ? avatar : page.avatar, cover !== undefined ? cover : page.cover, bio !== undefined ? bio.trim() : page.bio, category !== undefined ? category.trim() : page.category);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: 'خطأ في الخادم' }); }
+});
+
+app.delete('/api/pages/:id', requireAuth, async (req, res) => {
+  try {
+    const page = await q.getPageById(req.params.id);
+    if (!page) return res.status(404).json({ error: 'غير موجود' });
+    const me = await q.getUserById(req.user.id);
+    if (Number(page.owner_id) !== Number(req.user.id) && me?.role !== 'admin') {
+      return res.status(403).json({ error: 'غير مسموح' });
+    }
+    await q.deletePage(req.params.id);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: 'خطأ في الخادم' }); }
+});
+
+app.post('/api/pages/:id/follow', requireAuth, async (req, res) => {
+  try {
+    const page = await q.getPageById(req.params.id);
+    if (!page) return res.status(404).json({ error: 'غير موجود' });
+    await q.followPage(page.id, req.user.id);
+    res.json({ success: true, followerCount: await q.getPageFollowerCount(page.id) });
+  } catch(e) { res.status(500).json({ error: 'خطأ في الخادم' }); }
+});
+
+app.post('/api/pages/:id/unfollow', requireAuth, async (req, res) => {
+  try {
+    const page = await q.getPageById(req.params.id);
+    if (!page) return res.status(404).json({ error: 'غير موجود' });
+    await q.unfollowPage(page.id, req.user.id);
+    res.json({ success: true, followerCount: await q.getPageFollowerCount(page.id) });
+  } catch(e) { res.status(500).json({ error: 'خطأ في الخادم' }); }
 });
 
 // ============================================================
@@ -708,12 +847,31 @@ app.delete('/api/stories/:id', requireAuth, async (req, res) => {
     const story = await q.getStory(req.params.id);
     if (!story) return res.status(404).json({ error: 'غير موجود' });
     const user = await q.getUserById(req.user.id);
-    if (story.user_id !== req.user.id && user?.role !== 'admin') {
+    if (Number(story.user_id) !== Number(req.user.id) && user?.role !== 'admin') {
       return res.status(403).json({ error: 'غير مصرح' });
     }
     await q.deleteStory(story.id);
     res.json({ success: true });
   } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+app.put('/api/records/:id', requireAuth, async (req, res) => {
+  try {
+    const rec = await q.getRecord(req.params.id);
+    if (!rec) return res.status(404).json({ error: 'غير موجود' });
+    if (req.user.role !== 'admin' && rec.user_id != req.user.id) {
+      return res.status(403).json({ error: 'غير مسموح' });
+    }
+    const { content, image } = req.body || {};
+    if (!content?.trim() && !image && !rec.video) {
+      return res.status(400).json({ error: 'المحتوى مطلوب' });
+    }
+    await q.updateRecord(req.params.id, content?.trim() || '', image !== undefined ? image : rec.image);
+    res.json({ success: true });
+  } catch(e) {
+    console.error('Update record error:', e);
     res.status(500).json({ error: 'خطأ في الخادم' });
   }
 });
@@ -1113,6 +1271,35 @@ app.post('/api/messages/:username', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'خطأ في الخادم' });
   }
 });
+app.put('/api/messages/:id', requireAuth, async (req, res) => {
+  try {
+    const msg = await q.getMessage(req.params.id);
+    if (!msg) return res.status(404).json({ error: 'غير موجود' });
+    if (msg.from_id != req.user.id) return res.status(403).json({ error: 'غير مسموح' });
+    const { content } = req.body || {};
+    if (!content?.trim()) return res.status(400).json({ error: 'الرسالة فارغة' });
+    await q.updateMessage(req.params.id, content.trim());
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+app.delete('/api/messages/:id', requireAuth, async (req, res) => {
+  try {
+    const msg = await q.getMessage(req.params.id);
+    if (!msg) return res.status(404).json({ error: 'غير موجود' });
+    const me = await q.getUserById(req.user.id);
+    if (msg.from_id != req.user.id && me?.role !== 'admin') {
+      return res.status(403).json({ error: 'غير مسموح' });
+    }
+    await q.deleteMessage(req.params.id);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
 app.post('/api/messages/react/:id', requireAuth, async (req, res) => {
   try {
     const { emoji } = req.body || {};
@@ -1294,6 +1481,39 @@ app.post('/api/groups/:id/messages', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'خطأ في الخادم' });
   }
 });
+app.put('/api/groups/:id/messages/:mid', requireAuth, async (req, res) => {
+  try {
+    const msg = await q.getGroupMessage(req.params.mid);
+    if (!msg || Number(msg.group_id) !== Number(req.params.id)) return res.status(404).json({ error: 'غير موجود' });
+    if (msg.user_id != req.user.id) return res.status(403).json({ error: 'غير مسموح' });
+    const { content } = req.body || {};
+    if (!content?.trim()) return res.status(400).json({ error: 'الرسالة فارغة' });
+    await q.updateGroupMessage(req.params.mid, content.trim());
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+app.delete('/api/groups/:id/messages/:mid', requireAuth, async (req, res) => {
+  try {
+    const msg = await q.getGroupMessage(req.params.mid);
+    if (!msg || Number(msg.group_id) !== Number(req.params.id)) return res.status(404).json({ error: 'غير موجود' });
+    const m = await q.isMember(req.params.id, req.user.id);
+    const me = await q.getUserById(req.user.id);
+    const isOwnerOfMsg = msg.user_id == req.user.id;
+    const isGroupPriv = m && m.role !== 'member';
+    const isSiteAdmin = me?.role === 'admin';
+    if (!isOwnerOfMsg && !isGroupPriv && !isSiteAdmin) {
+      return res.status(403).json({ error: 'غير مسموح' });
+    }
+    await q.deleteGroupMessage(req.params.mid);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
 app.post('/api/groups/:gid/messages/:mid/react', requireAuth, async (req, res) => {
   try {
     const { emoji } = req.body || {};
@@ -1523,6 +1743,7 @@ app.get('/group',   (_, res) => res.sendFile(path.join(__dirname, 'public', 'gro
 app.get('/shiziai', (_, res) => res.sendFile(path.join(__dirname, 'public', 'shiziai.html')));
 app.get('/support', (_, res) => res.sendFile(path.join(__dirname, 'public', 'support.html')));
 app.get('/short',   (_, res) => res.sendFile(path.join(__dirname, 'public', 'short.html')));
+app.get('/page',    (_, res) => res.sendFile(path.join(__dirname, 'public', 'page.html')));
 app.get('*',        (_, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // ============================================================
