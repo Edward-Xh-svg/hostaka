@@ -291,7 +291,7 @@ async function initDB() {
     "ALTER TABLE records ADD COLUMN video_height INTEGER DEFAULT 0",  // ✅ ارتفاع الفيديو بالبكسل
     "ALTER TABLE records ADD COLUMN edited      INTEGER DEFAULT 0",  // ✅ تعديل المنشور
     "ALTER TABLE records ADD COLUMN page_id     INTEGER DEFAULT NULL",  // ✅ نشر باسم صفحة/قناة
-    "ALTER TABLE users   ADD COLUMN last_seen   TEXT DEFAULT (datetime('now'))",  // ✅ آخر ظهور
+    "ALTER TABLE users   ADD COLUMN last_seen   TEXT DEFAULT ''",  // ✅ آخر ظهور (تُملأ لاحقاً بقيمة حقيقية)
     "ALTER TABLE messages ADD COLUMN edited     INTEGER NOT NULL DEFAULT 0",  // ✅ تعديل الرسالة
     "ALTER TABLE group_messages ADD COLUMN edited INTEGER NOT NULL DEFAULT 0",  // ✅ تعديل رسالة المجموعة
     "ALTER TABLE record_comments ADD COLUMN display_name TEXT DEFAULT ''",
@@ -315,6 +315,8 @@ async function initDB() {
   for (const sql of migrations) {
     try { await db.execute(sql); } catch(e) { /* column/table already exists */ }
   }
+  // تعبئة قيمة أولية لآخر ظهور لأي مستخدم لم يُحدَّث عموده بعد (بعد إضافة العمود لأول مرة)
+  try { await db.execute("UPDATE users SET last_seen = datetime('now') WHERE last_seen IS NULL OR last_seen = ''"); } catch(e) {}
 
   // Admin — Hostaka
   const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@hostaka.io';
