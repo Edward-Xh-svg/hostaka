@@ -224,7 +224,9 @@
     }
     .topbar-peer-av img{width:100%;height:100%;object-fit:cover;}
     .topbar-peer-name{font-weight:700;font-size:0.9rem;color:var(--text);}
-    .topbar-peer-role{font-size:0.7rem;color:var(--muted);}
+    .topbar-peer-role{font-size:0.7rem;color:var(--muted);display:flex;align-items:center;gap:5px;}
+    .status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex:0 0 auto;display:inline-block;}
+    .status-dot.online{background:#2ecc71;box-shadow:0 0 0 2px rgba(46,204,113,0.2);}
 
     /* ===== التخطيط ===== */
     .chat-layout{display:flex;flex:1;overflow:hidden;}
@@ -423,6 +425,8 @@
     .r-emoji:hover{background:rgba(128,128,128,0.08);transform:scale(1.2);color:var(--text);}
     .r-emoji.active{background:rgba(212,175,55,0.15);color:var(--red);}
     .r-emoji svg{width:16px;height:16px;}
+    .picker-sep{width:1px;align-self:stretch;background:var(--border);margin:2px 2px;}
+    .msg-edited-tag{opacity:0.75;font-style:italic;}
 
     /* ===== مربع الإدخال ===== */
     .img-preview-bar{
@@ -447,7 +451,14 @@
       border-top:1px solid var(--border);
       display:flex;align-items:flex-end;gap:8px;
       background:var(--topbar-bg);flex-shrink:0;
+      position:relative;flex-wrap:wrap;
     }
+    .edit-msg-banner{
+      width:100%;display:flex;align-items:center;justify-content:space-between;
+      background:rgba(212,175,55,0.1);border:1px solid var(--border);border-radius:10px;
+      padding:6px 12px;font-size:0.78rem;font-weight:700;color:var(--red);margin-bottom:4px;
+    }
+    .edit-msg-banner button{background:none;border:none;color:var(--muted);cursor:pointer;display:flex;}
     .btn-attach{
       width:40px;height:40px;border-radius:50%;
       background:rgba(128,128,128,0.06);
@@ -776,7 +787,7 @@
   <div class="modal-box">
     <div class="modal-title">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2-3 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      <span>الإبلاغ عن المستخدم</span>
+      <span id="reportPeerModalTitle">الإبلاغ عن المستخدم</span>
     </div>
     <select id="reportPeerReason" class="m-input" style="margin-bottom:10px;">
       <option value="abuse">إساءة أو تنمر</option>
@@ -836,6 +847,11 @@ const LANG = {
     groups: 'المجموعات', conversations: 'المحادثات', allMembers: 'جميع الأعضاء',
     noMembers: 'لا يوجد أعضاء آخرون', startChat: 'ابدأ محادثة',
     you: 'أنت', admin: 'مدير', member: 'عضو',
+    onlineNow: 'متصل الآن', lastSeen: 'آخر ظهور',
+    editMsg: 'تعديل', deleteMsg: 'حذف', reportMsg: 'إبلاغ', msgEdited: 'معدّلة',
+    editMsgPlaceholder: 'عدّل رسالتك...', save: 'حفظ', cancelEdit: 'إلغاء التعديل',
+    deleteMsgConfirm: 'حذف هذه الرسالة؟', reportMsgTitle: 'الإبلاغ عن رسالة',
+    reportSent: 'تم إرسال البلاغ، شكراً لك',
     groupName: 'اسم المجموعة *', create: 'إنشاء', cancel: 'إلغاء',
     createGroupTitle: 'إنشاء مجموعة جديدة',
     sendPlaceholder: 'اكتب رسالة...', attach: 'إرفاق صورة JPG', imageAttached: 'صورة مرفقة',
@@ -850,6 +866,11 @@ const LANG = {
     groups: 'Groups', conversations: 'Conversations', allMembers: 'All Members',
     noMembers: 'No other members', startChat: 'Start chat',
     you: 'You', admin: 'Admin', member: 'Member',
+    onlineNow: 'Online now', lastSeen: 'Last seen',
+    editMsg: 'Edit', deleteMsg: 'Delete', reportMsg: 'Report', msgEdited: 'edited',
+    editMsgPlaceholder: 'Edit your message...', save: 'Save', cancelEdit: 'Cancel edit',
+    deleteMsgConfirm: 'Delete this message?', reportMsgTitle: 'Report message',
+    reportSent: 'Report sent, thank you',
     groupName: 'Group name *', create: 'Create', cancel: 'Cancel',
     createGroupTitle: 'Create New Group',
     sendPlaceholder: 'Type a message...', attach: 'Attach JPG image', imageAttached: 'Image attached',
@@ -1184,6 +1205,9 @@ const SVG = {
   haha:     `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
   sad:      `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 16c-1.5-1-2.5-1.5-4-1.5s-2.5.5-4 1.5"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
   angry:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 16c-1.5-1-2.5-1.5-4-1.5s-2.5.5-4 1.5"/><path d="M8 8l2 2"/><path d="M16 8l-2 2"/></svg>`,
+  editIc:   `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
+  deleteIc: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`,
+  flagIc:   `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>`,
 };
 
 // ====== الرياكتشنز ======
@@ -1325,12 +1349,43 @@ function updateTopbarPeer(peer) {
       <div class="topbar-peer-av">${av}</div>
       <div>
         <div class="topbar-peer-name">${esc(peer.display_name || peer.username)}</div>
-        <div class="topbar-peer-role">${role}</div>
+        <div class="topbar-peer-role"><span id="peerStatusDot" class="status-dot"></span><span id="peerStatusText">${role}</span></div>
       </div>
     </div>`;
   currentPeerUsername = peer.username;
   document.getElementById('peerOptsWrap').style.display = 'block';
   checkPeerBlockStatus();
+  refreshPeerStatus();
+  if (peerStatusInterval) clearInterval(peerStatusInterval);
+  peerStatusInterval = setInterval(refreshPeerStatus, 25000);
+}
+
+let peerStatusInterval = null;
+async function refreshPeerStatus(){
+  if (!currentPeerUsername) return;
+  try {
+    const d = await apiFetch('/api/users/' + encodeURIComponent(currentPeerUsername) + '/status');
+    const dot = document.getElementById('peerStatusDot');
+    const txt = document.getElementById('peerStatusText');
+    if (!dot || !txt) return;
+    if (d.online) {
+      dot.classList.add('online');
+      txt.textContent = t('onlineNow');
+    } else {
+      dot.classList.remove('online');
+      txt.textContent = t('lastSeen') + ' ' + fmtRelativeShort(d.last_seen);
+    }
+  } catch(e) { /* تجاهل */ }
+}
+
+function fmtRelativeShort(s){
+  const d = toUTCDate(s);
+  const diffMin = Math.max(1, Math.round((Date.now() - d.getTime()) / 60000));
+  if (diffMin < 60) return diffMin + (currentLang === 'ar' ? ' د' : 'm');
+  const diffH = Math.round(diffMin / 60);
+  if (diffH < 24) return diffH + (currentLang === 'ar' ? ' س' : 'h');
+  const diffD = Math.round(diffH / 24);
+  return diffD + (currentLang === 'ar' ? ' يوم' : 'd');
 }
 
 // ----- خيارات المحادثة: الإبلاغ والحظر -----
@@ -1366,8 +1421,22 @@ async function togglePeerBlock(){
   }catch(e){ showToast('تعذر الاتصال', 'error'); }
 }
 
+let reportMode = 'user'; // 'user' | 'message'
+let reportMsgTargetId = null;
 function openReportPeerModal(){
   document.getElementById('peerOptsMenu')?.classList.remove('show');
+  reportMode = 'user';
+  document.getElementById('reportPeerModalTitle').textContent = 'الإبلاغ عن المستخدم';
+  document.getElementById('reportPeerReason').value = 'abuse';
+  document.getElementById('reportPeerDetails').value = '';
+  document.getElementById('reportPeerModal').classList.add('show');
+}
+function openReportMsgModal(e, mid){
+  e.stopPropagation();
+  document.querySelectorAll('.react-picker.show').forEach(p => p.classList.remove('show'));
+  reportMode = 'message';
+  reportMsgTargetId = mid;
+  document.getElementById('reportPeerModalTitle').textContent = t('reportMsgTitle');
   document.getElementById('reportPeerReason').value = 'abuse';
   document.getElementById('reportPeerDetails').value = '';
   document.getElementById('reportPeerModal').classList.add('show');
@@ -1381,11 +1450,11 @@ async function submitPeerReport(){
   const btn = document.getElementById('reportPeerBtn');
   btn.disabled = true;
   try{
-    const d = await apiFetch('/api/reports', 'POST', {
-      type: 'user', target_owner_username: currentPeerUsername,
-      subject: 'إبلاغ عن مستخدم @' + currentPeerUsername, reason
-    });
-    if(d.success){ showToast('تم إرسال البلاغ'); closeModal('reportPeerModal'); }
+    const payload = reportMode === 'message'
+      ? { type:'message', target_id: reportMsgTargetId, target_owner_username: currentPeerUsername, subject: t('reportMsgTitle'), reason }
+      : { type:'user', target_owner_username: currentPeerUsername, subject: 'إبلاغ عن مستخدم @' + currentPeerUsername, reason };
+    const d = await apiFetch('/api/reports', 'POST', payload);
+    if(d.success){ showToast(reportMode === 'message' ? t('reportSent') : 'تم إرسال البلاغ'); closeModal('reportPeerModal'); }
     else { showToast(d.error || 'فشل الإرسال', 'error'); }
   }catch(e){ showToast('تعذر الاتصال', 'error'); }
   btn.disabled = false;
@@ -1495,10 +1564,15 @@ function renderMsgs(msgs, scroll = true) {
           ${m.content ? esc(m.content) : ''}
           <div class="react-picker" id="picker-${m.id}">
             ${REACTIONS.map(r => `<button class="r-emoji ${rc.userReaction === r.emoji ? 'active' : ''}" onclick="reactMsg(event,${m.id},'${r.emoji}')" title="${r.label}">${r.icon}</button>`).join('')}
+            <div class="picker-sep"></div>
+            ${isMine
+              ? `<button class="r-emoji" onclick="startEditMsg(event, ${m.id})" title="${t('editMsg')}">${SVG.editIc}</button>
+                 <button class="r-emoji" onclick="deleteMsg(event, ${m.id})" title="${t('deleteMsg')}">${SVG.deleteIc}</button>`
+              : `<button class="r-emoji" onclick="openReportMsgModal(event, ${m.id})" title="${t('reportMsg')}">${SVG.flagIc}</button>`}
           </div>
         </div>
         ${reactionHtml}
-        ${isLast ? `<div class="msg-time">${fmtTime(m.created_at)}</div>` : ''}
+        <div class="msg-time">${fmtTime(m.created_at)}${Number(m.edited) === 1 ? ' · <span class="msg-edited-tag">' + esc(t('msgEdited')) + '</span>' : ''}</div>
       </div>
       ${isMine ? `<div class="msg-av ${isLast ? '' : 'invisible'}">${av}</div>` : ''}
     </div>`;
@@ -1556,10 +1630,74 @@ function removeChatImg() {
   document.getElementById('imgPreviewBar').style.display = 'none';
 }
 
+let editingMsgId = null;
+
+function startEditMsg(e, mid){
+  e.stopPropagation();
+  document.querySelectorAll('.react-picker.show').forEach(p => p.classList.remove('show'));
+  const bubble = document.getElementById('bubble-' + mid);
+  if (!bubble) return;
+  // نجيب نص الرسالة الأصلي من الفقاعة (بدون الوسوم الداخلية الأخرى)
+  const clone = bubble.cloneNode(true);
+  clone.querySelectorAll('.react-picker, .bubble-img').forEach(el => el.remove());
+  const text = clone.textContent.trim();
+  editingMsgId = mid;
+  const input = document.getElementById('msgInput');
+  input.value = text;
+  input.focus();
+  autoResize(input);
+  showEditBanner();
+}
+
+function showEditBanner(){
+  let banner = document.getElementById('editMsgBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'editMsgBanner';
+    banner.className = 'edit-msg-banner';
+    banner.innerHTML = `<span>${esc(t('editMsg'))}</span><button onclick="cancelEditMsg()">${SVG.close}</button>`;
+    document.getElementById('msgInput')?.closest('.input-area')?.prepend(banner);
+  }
+  banner.style.display = 'flex';
+}
+function cancelEditMsg(){
+  editingMsgId = null;
+  const banner = document.getElementById('editMsgBanner');
+  if (banner) banner.style.display = 'none';
+  const input = document.getElementById('msgInput');
+  if (input) { input.value = ''; input.style.height = ''; }
+}
+
+async function deleteMsg(e, mid){
+  e.stopPropagation();
+  document.querySelectorAll('.react-picker.show').forEach(p => p.classList.remove('show'));
+  if (!confirm(t('deleteMsgConfirm'))) return;
+  try {
+    const d = await apiFetch('/api/messages/' + mid, 'DELETE');
+    if (d.success) { await loadMsgs(currentPeer, false); loadSidebar(); }
+    else showToast(d.error || t('error'), 'error');
+  } catch(err) { showToast(t('error'), 'error'); }
+}
+
 async function sendMsg() {
   const input = document.getElementById('msgInput');
   const content = input?.value.trim() || '';
   if (!content && !chatImgBase64) return;
+
+  if (editingMsgId) {
+    const mid = editingMsgId;
+    input.value = ''; input.style.height = '';
+    cancelEditMsg();
+    document.getElementById('sendBtn').disabled = true;
+    try {
+      const d = await apiFetch('/api/messages/' + mid, 'PUT', { content });
+      if (d.success) await loadMsgs(currentPeer, false);
+      else showToast(d.error || t('error'), 'error');
+    } catch(e) { showToast(t('error'), 'error'); }
+    document.getElementById('sendBtn').disabled = false;
+    return;
+  }
+
   input.value = '';
   input.style.height = '';
   document.getElementById('sendBtn').disabled = true;

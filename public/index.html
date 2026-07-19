@@ -308,6 +308,14 @@
     }
     .user-dropdown.show{opacity:1;visibility:visible;transform:translateY(0) scale(1);}
     .dropdown-name{padding:12px 18px;font-size:0.85rem;color:var(--muted);border-bottom:1px solid var(--border);margin-bottom:4px;font-weight:600;}
+    .account-switcher{display:flex;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);margin-bottom:4px;overflow-x:auto;}
+    .acc-item{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;position:relative;width:44px;}
+    .acc-av{width:38px;height:38px;border-radius:50%;background:var(--avatar-gradient);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;overflow:hidden;border:2px solid transparent;}
+    .acc-item.current .acc-av{border-color:var(--primary);}
+    .acc-av img{width:100%;height:100%;object-fit:cover;}
+    .acc-label{font-size:0.62rem;color:var(--muted);max-width:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .acc-remove{position:absolute;top:-3px;left:-3px;width:15px;height:15px;border-radius:50%;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted);}
+    .acc-add .acc-av{background:var(--input-bg);color:var(--muted);border:1.5px dashed var(--border);}
     .user-dropdown button{
       width:100%;text-align:right;padding:10px 18px;
       background:none;border:none;color:var(--muted);
@@ -1019,6 +1027,7 @@
       <div class="user-badge" id="userBadgeEl" onclick="toggleDrop()"></div>
       <div class="user-dropdown" id="userDrop">
         <div class="dropdown-name" id="dropName"></div>
+        <div class="account-switcher" id="accountSwitcher"></div>
         <button id="adminBtn" onclick="location.href='/admin'" style="display:none;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M21 12h-2M5 12H3M12 21v-2M12 5V3"/></svg>
           <span class="drop-admin">لوحة الإدارة</span>
@@ -1114,6 +1123,10 @@
     <div class="modal-t">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       <span id="newPostModalTitle">منشور جديد</span>
+    </div>
+    <div class="fg" id="postAsWrap" style="display:none;margin-bottom:10px;">
+      <label style="font-size:0.78rem;color:var(--muted);font-weight:700;display:block;margin-bottom:6px;">النشر باسم</label>
+      <select id="postAsSelect" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-family:inherit;font-size:0.85rem;background:var(--input-bg);color:var(--text);"></select>
     </div>
     <div class="err" id="postErr"></div>
     <div class="fmt-bar">
@@ -1296,7 +1309,7 @@ const LANG = {
     loginSubmit: 'دخول', registerSubmit: 'إنشاء الحساب',
     admin: 'لوحة الإدارة', profile: 'الملف الشخصي', chat: 'الرسائل', logout: 'تسجيل الخروج',
     loading: 'جارٍ تحميل المنشورات...', empty: 'لا توجد منشورات بعد',
-    postModalTitle: 'منشور جديد', attachMedia: 'صورة / فيديو', cancel: 'إلغاء', publish: 'نشر',
+    postModalTitle: 'منشور جديد', attachMedia: 'صورة / فيديو', cancel: 'إلغاء', publish: 'نشر', editPost: 'تعديل المنشور', saveChanges: 'حفظ التعديل', edit: 'تعديل', postEdited: 'تم التعديل',
     react: 'تفاعل', comment: 'تعليق', delete: 'حذف', share: 'مشاركة الرابط', message: 'مراسلة',
     reply: 'أضف تعليقاً...', verified: 'حساب موثق', member: 'Member', adminRole: 'Admin',
     copyLink: 'تم نسخ الرابط', verifyRequest: 'تم إرسال طلب التوثيق', verifyPending: 'طلبك قيد المراجعة',
@@ -1321,7 +1334,7 @@ const LANG = {
     loginSubmit: 'Login', registerSubmit: 'Create Account',
     admin: 'Dashboard', profile: 'Profile', chat: 'Messages', logout: 'Logout',
     loading: 'Loading posts...', empty: 'No posts yet',
-    postModalTitle: 'New Post', attachMedia: 'Image / Video', cancel: 'Cancel', publish: 'Publish',
+    postModalTitle: 'New Post', attachMedia: 'Image / Video', cancel: 'Cancel', publish: 'Publish', editPost: 'Edit Post', saveChanges: 'Save Changes', edit: 'Edit', postEdited: 'Edited',
     react: 'React', comment: 'Comment', delete: 'Delete', share: 'Share link', message: 'Message',
     reply: 'Add a comment...', verified: 'Verified account', member: 'Member', adminRole: 'Admin',
     copyLink: 'Link copied', verifyRequest: 'Verification request sent', verifyPending: 'Your request is pending',
@@ -1860,6 +1873,7 @@ const SVG = {
   heart:   `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`,
   comment: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
   delete:  `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`,
+  edit:    `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
   send:    `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`,
   share:   `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>`,
   chevron: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>`,
@@ -1895,6 +1909,8 @@ function setLoggedInUI(user){
   checkVerifyStatus();
   loadNotifCount();
   renderStoriesBar();
+  saveAccountToSwitcher();
+  renderAccountSwitcher();
 }
 
 function clearUser(){
@@ -1907,6 +1923,79 @@ function clearUser(){
   document.getElementById('actionBar').style.display = 'none';
   document.getElementById('notifWrap').style.display = 'none';
   renderStoriesBar();
+  renderAccountSwitcher();
+}
+
+// ============================================================
+//  تبديل الحسابات حسب آخر تسجيلات الدخول من هذا الجهاز
+// ============================================================
+const ACCOUNTS_KEY = 'hostaka_accounts';
+const MAX_SAVED_ACCOUNTS = 5;
+
+function getSavedAccounts(){
+  try { return JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || '[]'); } catch(e) { return []; }
+}
+function setSavedAccounts(list){
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list));
+}
+
+// يحفظ الحساب الحالي (من localStorage) في قائمة آخر الحسابات المستخدمة على هذا الجهاز
+function saveAccountToSwitcher(){
+  if (!ME || !TOKEN) return;
+  let list = getSavedAccounts();
+  list = list.filter(a => a.username !== ME.username);
+  list.unshift({
+    username: ME.username,
+    display_name: ME.display_name || ME.username,
+    avatar: ME.avatar || '',
+    role: ME.role || 'user',
+    token: TOKEN,
+    last_used: Date.now()
+  });
+  if (list.length > MAX_SAVED_ACCOUNTS) list = list.slice(0, MAX_SAVED_ACCOUNTS);
+  setSavedAccounts(list);
+}
+
+function renderAccountSwitcher(){
+  const wrap = document.getElementById('accountSwitcher');
+  if (!wrap) return;
+  const list = getSavedAccounts();
+  if (!ME || list.length <= 1) {
+    // لا داعي لإظهار المبدّل إذا كان هناك حساب واحد فقط محفوظ أو لا يوجد تسجيل دخول
+    wrap.innerHTML = '';
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = 'flex';
+  wrap.innerHTML = list.map(a => {
+    const isCurrent = ME && a.username === ME.username;
+    const av = a.avatar ? `<img src="${esc(a.avatar)}" alt="">` : esc((a.display_name || a.username || '?').charAt(0).toUpperCase());
+    return `<div class="acc-item ${isCurrent?'current':''}" onclick="${isCurrent?'':'switchAccount(\''+esc(a.username)+'\')'}">
+      ${!isCurrent ? `<span class="acc-remove" onclick="removeAccountFromSwitcher(event,'${esc(a.username)}')">${SVG.close}</span>` : ''}
+      <div class="acc-av">${av}</div>
+      <span class="acc-label">${esc(a.display_name || a.username)}</span>
+    </div>`;
+  }).join('') + `<div class="acc-item acc-add" onclick="location.href='/login'">
+      <div class="acc-av">${SVG.plus}</div>
+      <span class="acc-label">${currentLang === 'ar' ? 'إضافة' : 'Add'}</span>
+    </div>`;
+}
+
+function switchAccount(username){
+  const list = getSavedAccounts();
+  const acc = list.find(a => a.username === username);
+  if (!acc) return;
+  localStorage.setItem('hostaka_token', acc.token);
+  localStorage.setItem('hostaka_role', acc.role || 'user');
+  localStorage.setItem('hostaka_user', JSON.stringify({ username: acc.username, display_name: acc.display_name, role: acc.role, avatar: acc.avatar }));
+  location.reload();
+}
+
+function removeAccountFromSwitcher(e, username){
+  e.stopPropagation();
+  let list = getSavedAccounts().filter(a => a.username !== username);
+  setSavedAccounts(list);
+  renderAccountSwitcher();
 }
 
 function toggleDrop(){ dropVisible=!dropVisible; document.getElementById('userDrop').classList.toggle('show',dropVisible); }
@@ -2320,19 +2409,20 @@ function renderPost(p){
     <div class="card-body">
       <div class="pub-row">
         <div class="pub-info">
-          <div class="pub-avatar" onclick="goProfile('${esc(p.publisher)}')">${avatarHtml}</div>
+          <div class="pub-avatar" onclick="goPublisher('${p.page_username?esc(p.page_username):esc(p.publisher)}', ${p.page_id?'true':'false'})">${avatarHtml}</div>
           <div class="pub-meta">
-            <div class="pub-name" onclick="goProfile('${esc(p.publisher)}')">
-              <span class="role-badge ${badgeCls}">${p.user_role==='Admin' ? t('adminRole') : t('member')}</span>
+            <div class="pub-name" onclick="goPublisher('${p.page_username?esc(p.page_username):esc(p.publisher)}', ${p.page_id?'true':'false'})">
+              <span class="role-badge ${badgeCls}">${p.user_role==='Admin' ? t('adminRole') : (p.user_role==='Page' ? 'صفحة' : t('member'))}</span>
               ${esc(name)}
               ${(p.publisher_verified||p.user_verified) ? verifiedBadge() : ''}
             </div>
-            <div class="pub-date">${fmtDate(p.created_at)}</div>
+            <div class="pub-date">${fmtDate(p.created_at)}${Number(p.edited)===1 ? ' · <span style="opacity:0.7;">'+esc(t('postEdited'))+'</span>' : ''}</div>
           </div>
         </div>
         <div class="pub-actions">
           <button class="btn-icon" onclick="sharePost(${p.id})" title="${t('share')}">${SVG.share}</button>
           ${ME && p.user_id && p.user_id!=ME?.id ? `<button class="btn-icon" onclick="location.href='/chat?with=${esc(p.publisher)}'" title="${t('message')}">${SVG.comment}</button>` : ''}
+          ${canDel ? `<button class="btn-icon" onclick="openEditPost(${p.id})" title="${t('edit')}">${SVG.edit}</button>` : ''}
           ${canDel ? `<button class="btn-icon" onclick="delPost(${p.id})" title="${t('delete')}">${SVG.delete}</button>` : ''}
           ${ME && p.user_id && p.user_id!=ME?.id ? `
           <div class="post-opts-wrap">
@@ -2368,6 +2458,9 @@ function renderPost(p){
 }
 
 function goProfile(username){ window.location = '/profile?u=' + encodeURIComponent(username); }
+function goPublisher(username, isPage){
+  window.location = (isPage ? '/page?u=' : '/profile?u=') + encodeURIComponent(username);
+}
 
 function sharePost(id){
   const url = window.location.origin + '/?p=' + id;
@@ -2385,15 +2478,33 @@ document.getElementById('searchInput').addEventListener('input', function(){
 // ----- Post Editor & Media Upload -----
 function openPostModal(){
   if(!ME){openAuth();return;}
+  editingPostId = null;
   const ed=document.getElementById('postEditor');
   if(ed) ed.innerHTML='';
   document.getElementById('postErr').style.display='none';
   document.getElementById('postMediaPreviewWrap').style.display='none';
+  document.getElementById('newPostModalTitle').textContent = t('newPost');
+  document.getElementById('publishBtn').textContent = t('publish');
   postMediaBase64='';
   postMediaType='';
   postMediaFileObj=null;
+  loadPostAsOptions();
   document.getElementById('postModal').classList.add('show');
   setTimeout(()=>document.getElementById('postEditor')?.focus(),100);
+}
+
+let myPagesCache = null;
+async function loadPostAsOptions(){
+  const wrap = document.getElementById('postAsWrap');
+  const sel = document.getElementById('postAsSelect');
+  wrap.style.display = 'none';
+  try {
+    if (myPagesCache === null) myPagesCache = await apiFetch('/api/pages/mine');
+    if (!Array.isArray(myPagesCache) || !myPagesCache.length) return;
+    sel.innerHTML = `<option value="">${esc(ME.display_name || ME.username)} (${currentLang === 'ar' ? 'حسابي' : 'my account'})</option>` +
+      myPagesCache.map(pg => `<option value="${pg.id}">${esc(pg.name)}</option>`).join('');
+    wrap.style.display = 'block';
+  } catch(e) { /* تجاهل */ }
 }
 
 let postMediaFileObj = null; // نحتفظ بملف الفيديو الأصلي لرفعه مباشرة لاحقاً
@@ -2519,18 +2630,54 @@ async function submitPost(){
         return;
       }
     }
+    if (editingPostId) {
+      const d = await apiFetch('/api/records/' + editingPostId, 'PUT', {
+        content: content || '',
+        image: postMediaType === 'image' ? imageUrl : undefined
+      });
+      if (d.success) {
+        closeModal('postModal');
+        editingPostId = null;
+        await loadPosts();
+      } else { errEl.textContent = d.error || 'فشل التعديل'; errEl.style.display = 'block'; }
+      btn.disabled = false; btn.innerHTML = `<span id="publishBtn">${t('publish')}</span>`;
+      return;
+    }
     const d = await apiFetch('/api/records','POST',{
       content: content || '',
       image: imageUrl,
       video: videoUrl,
       media_type: postMediaType,
       video_width: postVideoMeta.width || 0,
-      video_height: postVideoMeta.height || 0
+      video_height: postVideoMeta.height || 0,
+      page_id: document.getElementById('postAsSelect')?.value || null
     });
     if(d.success){ closeModal('postModal'); await loadPosts(); }
     else { errEl.textContent=d.error||'فشل النشر'; errEl.style.display='block'; }
   } catch(e){ errEl.textContent='تعذر الاتصال'; errEl.style.display='block'; }
   finally { btn.disabled=false; btn.innerHTML=`<span id="publishBtn">${t('publish')}</span>`; }
+}
+
+let editingPostId = null;
+function openEditPost(id){
+  const p = allPosts.find(x => x.id === id);
+  if (!p) return;
+  editingPostId = id;
+  const ed = document.getElementById('postEditor');
+  if (ed) ed.innerHTML = p.content || '';
+  document.getElementById('postErr').style.display = 'none';
+  postMediaBase64 = ''; postMediaFileObj = null;
+  postMediaType = p.image ? 'image' : '';
+  const preview = document.getElementById('postMediaPreviewWrap');
+  if (p.image) {
+    document.getElementById('postMediaPreview').innerHTML = `<img src="${esc(p.image)}" alt="">`;
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+  document.getElementById('newPostModalTitle').textContent = t('editPost');
+  document.getElementById('publishBtn').textContent = t('saveChanges');
+  document.getElementById('postModal').classList.add('show');
 }
 
 async function delPost(id){
@@ -2577,7 +2724,7 @@ function renderStoriesBar(){
   storyViewOrder = [];
 
   if (ME) {
-    const mine = storiesData.find(g => g.user_id === ME.id);
+    const mine = storiesData.find(g => Number(g.user_id) === Number(ME.id));
     if (mine) {
       storyViewOrder.push(mine);
       html += storyItemHtml(mine, true);
@@ -2595,7 +2742,7 @@ function renderStoriesBar(){
   }
 
   storiesData.forEach(g => {
-    if (ME && g.user_id === ME.id) return;
+    if (ME && Number(g.user_id) === Number(ME.id)) return;
     storyViewOrder.push(g);
     html += storyItemHtml(g, false);
   });
@@ -2715,7 +2862,7 @@ function showStorySlide(){
   document.getElementById('storyViewerName').textContent = group.display_name || group.username;
   document.getElementById('storyViewerTime').textContent = fmtStoryTime(story.created_at);
   document.getElementById('storyViewerCaption').textContent = story.caption || '';
-  document.getElementById('storyViewerDelete').style.display = (ME && ME.id === group.user_id) ? 'flex' : 'none';
+  document.getElementById('storyViewerDelete').style.display = (ME && Number(ME.id) === Number(group.user_id)) ? 'flex' : 'none';
 
   const wrap = document.getElementById('storyProgressWrap');
   wrap.innerHTML = group.stories.map((s,i) =>
@@ -2762,21 +2909,35 @@ function closeStoryViewer(){
 }
 
 async function deleteCurrentStory(){
+  clearTimeout(storyTimer); // أوقف التقدم التلقائي فوراً لمنع تسابق يفسد الحذف
   const group = currentStoryGroup();
   const story = group?.stories[storySlideIndex];
   if (!story) return;
-  if (!confirm(t('storyDeleteConfirm'))) return;
-  await apiFetch('/api/stories/' + story.id, 'DELETE');
-  group.stories.splice(storySlideIndex, 1);
-  storiesData = storiesData.filter(g => g.user_id !== group.user_id || group.stories.length > 0);
-  if (!group.stories.length) {
-    storyViewOrder.splice(currentGroupIdx, 1);
+  if (!confirm(t('storyDeleteConfirm'))) { showStorySlide(); return; } // نعيد المؤقت إذا ألغى المستخدم
+  const targetStoryId = story.id;
+  const targetUserId = group.user_id;
+  try {
+    const d = await apiFetch('/api/stories/' + targetStoryId, 'DELETE');
+    if (d && d.error) { showToast(d.error, 'error'); showStorySlide(); return; }
+  } catch(e) { showToast('تعذر حذف القصة', 'error'); showStorySlide(); return; }
+
+  // نعيد إيجاد المجموعة/الفهرس بالاعتماد على المعرّفات لا الفهارس (تحسباً لأي تغيير أثناء الانتظار)
+  const gIdx = storyViewOrder.findIndex(g => g.user_id === targetUserId);
+  if (gIdx === -1) { closeStoryViewer(); return; }
+  const g = storyViewOrder[gIdx];
+  const sIdx = g.stories.findIndex(s => s.id === targetStoryId);
+  if (sIdx !== -1) g.stories.splice(sIdx, 1);
+  storiesData = storiesData.filter(sg => sg.user_id !== g.user_id || g.stories.length > 0);
+
+  if (!g.stories.length) {
+    storyViewOrder.splice(gIdx, 1);
+    currentGroupIdx = Math.min(gIdx, storyViewOrder.length - 1);
     storySlideIndex = 0;
     if (!storyViewOrder.length) { closeStoryViewer(); return; }
-    if (currentGroupIdx >= storyViewOrder.length) currentGroupIdx = storyViewOrder.length - 1;
     showStorySlide();
   } else {
-    if (storySlideIndex >= group.stories.length) storySlideIndex = group.stories.length - 1;
+    currentGroupIdx = gIdx;
+    storySlideIndex = Math.min(sIdx, g.stories.length - 1);
     showStorySlide();
   }
 }

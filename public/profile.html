@@ -890,6 +890,7 @@ function renderMyProfile(user, posts) {
     <div class="tabs-bar">
       <button class="tab-btn active" id="tabPosts" onclick="switchTab('posts')">${t('posts')}</button>
       <button class="tab-btn" id="tabEdit" onclick="switchTab('edit')">${t('editProfile')}</button>
+      <button class="tab-btn" id="tabPages" onclick="switchTab('pages')">الصفحات</button>
     </div>
     <div class="posts-tab" id="postsTab">${renderPosts(posts)}</div>
     <div class="edit-section" id="editTab" style="display:none;">
@@ -901,6 +902,13 @@ function renderMyProfile(user, posts) {
       </div>
       <div class="fg"><label>${t('bio')}</label><textarea id="fBio" placeholder="${t('bio')}">${esc(user.bio || '')}</textarea></div>
       <button class="btn-save" id="saveBtn" onclick="save()">${SVG.save}${t('save')}</button>
+    </div>
+    <div class="edit-section" id="pagesTab" style="display:none;">
+      <button class="btn-save" style="margin-bottom:16px;" onclick="openCreatePage()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        إنشاء صفحة/قناة جديدة
+      </button>
+      <div id="myPagesList"><div class="post-empty">جارٍ التحميل...</div></div>
     </div>`;
 }
 
@@ -923,15 +931,64 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   const postsTab = document.getElementById('postsTab');
   const editTab = document.getElementById('editTab');
+  const pagesTab = document.getElementById('pagesTab');
   if (tab === 'posts') {
     document.getElementById('tabPosts')?.classList.add('active');
     if (postsTab) postsTab.style.display = 'block';
     if (editTab) editTab.style.display = 'none';
+    if (pagesTab) pagesTab.style.display = 'none';
+  } else if (tab === 'pages') {
+    document.getElementById('tabPages')?.classList.add('active');
+    if (postsTab) postsTab.style.display = 'none';
+    if (editTab) editTab.style.display = 'none';
+    if (pagesTab) { pagesTab.style.display = 'block'; loadMyPages(); }
   } else {
     document.getElementById('tabEdit')?.classList.add('active');
     if (postsTab) postsTab.style.display = 'none';
     if (editTab) editTab.style.display = 'block';
+    if (pagesTab) pagesTab.style.display = 'none';
   }
+}
+
+// ============================================================
+//  الصفحات/القنوات التابعة للحساب
+// ============================================================
+async function loadMyPages(){
+  const list = document.getElementById('myPagesList');
+  try {
+    const pages = await apiFetch('/api/pages/mine');
+    if (!Array.isArray(pages) || !pages.length) {
+      list.innerHTML = `<div class="post-empty">لا تملك أي صفحة بعد</div>`;
+      return;
+    }
+    list.innerHTML = pages.map(pg => `
+      <div class="post-card" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="location.href='/page?u='+encodeURIComponent('${esc(pg.username)}')">
+        <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(145deg,#000,#333);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;overflow:hidden;flex:0 0 auto;">
+          ${pg.avatar ? `<img src="${esc(pg.avatar)}" style="width:100%;height:100%;object-fit:cover;" alt="">` : esc((pg.name||'?').charAt(0).toUpperCase())}
+        </div>
+        <div style="flex:1;">
+          <div style="font-weight:800;">${esc(pg.name)}</div>
+          <div style="font-size:0.78rem;color:var(--muted);">@${esc(pg.username)}</div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { list.innerHTML = `<div class="post-empty">تعذر تحميل الصفحات</div>`; }
+}
+
+function openCreatePage(){
+  const name = prompt('اسم الصفحة أو القناة:');
+  if (!name || !name.trim()) return;
+  const handle = prompt('معرّف الصفحة (بالإنجليزية بدون مسافات، مثال: my_channel):', name.trim().toLowerCase().replace(/\s+/g,'_'));
+  if (!handle || !handle.trim()) return;
+  createPage(name.trim(), handle.trim());
+}
+
+async function createPage(name, username){
+  try {
+    const d = await apiFetch('/api/pages', 'POST', { name, username });
+    if (d.success) { showToast('تم إنشاء الصفحة'); loadMyPages(); }
+    else showToast(d.error || 'فشل الإنشاء', 'error');
+  } catch(e) { showToast('تعذر الاتصال', 'error'); }
 }
 
 function sharePost(id) {
