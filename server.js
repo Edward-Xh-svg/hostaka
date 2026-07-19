@@ -1,5 +1,6 @@
 const express = require('express');
 const path    = require('path');
+const fs      = require('fs');
 const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
 const { q, initDB } = require('./database');
@@ -11,6 +12,86 @@ const crypto = require('crypto');
 const app = express();
 app.use(express.json({ limit: '25mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ============================================================
+//  Open Graph — حقن ميتاداتا ديناميكية داخل صفحات HTML
+// ============================================================
+const SITE_NAME    = 'Hostaka';
+const DEFAULT_DESC = 'هوستاكا — منصة تواصل اجتماعي عربية للمنشورات والدردشة والمجتمعات.';
+const DEFAULT_IMG  = '/hostaka.png';
+
+function ogEscape(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function ogTruncate(str, len = 160) {
+  const clean = String(str || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return '';
+  return clean.length > len ? clean.slice(0, len - 1).trim() + '…' : clean;
+}
+
+// يحول رابطًا نسبيًا (أو رابطًا كاملًا بالفعل) إلى رابط مطلق
+function absUrl(req, p) {
+  if (!p) return '';
+  if (/^https?:\/\//i.test(p)) return p;
+  const origin = `${req.protocol}://${req.get('host')}`;
+  return origin + (p.startsWith('/') ? p : '/' + p);
+}
+
+// يحقن وسوم Open Graph / Twitter Card داخل ملف HTML قبل إرساله
+function injectOG(html, meta) {
+  const title = ogEscape(meta.title || SITE_NAME);
+  const desc  = ogEscape(meta.description || DEFAULT_DESC);
+  const image = ogEscape(meta.image || '');
+  const url   = ogEscape(meta.url || '');
+  const type  = meta.type || 'website';
+
+  let tags = `
+  <meta property="og:type" content="${type}">
+  <meta property="og:site_name" content="${SITE_NAME}">
+  <meta property="og:title" content="${title}">
+  <meta property="og:description" content="${desc}">
+  ${image ? `<meta property="og:image" content="${image}">` : ''}
+  ${url ? `<meta property="og:url" content="${url}">` : ''}
+  <meta name="twitter:card" content="${image ? 'summary_large_image' : 'summary'}">
+  <meta name="twitter:title" content="${title}">
+  <meta name="twitter:description" content="${desc}">
+  ${image ? `<meta name="twitter:image" content="${image}">` : ''}
+`;
+  if (meta.video) {
+    tags += `  <meta property="og:video" content="${ogEscape(meta.video)}">\n  <meta property="og:video:type" content="video/mp4">\n`;
+  }
+
+  // إزالة أي وسوم OG/Twitter موجودة مسبقًا لتفادي التكرار عند إعادة التوليد
+  html = html.replace(/\s*<meta[^>]+(?:property=["']og:|name=["']twitter:)[^>]*>\n?/gi, '');
+
+  if (/<title>[\s\S]*?<\/title>/.test(html)) {
+    return html.replace(/<title>[\s\S]*?<\/title>/, `<title>${title}</title>${tags}`);
+  }
+  // في حال عدم وجود وسم title (احتياط)
+  return html.replace('</head>', `<title>${title}</title>${tags}</head>`);
+}
+
+// يقرأ ملف HTML ثابت من public، يحقن ميتاداتا ديناميكية، ثم يرسله
+function sendOG(req, res, fileName, meta) {
+  try {
+    const filePath = path.join(__dirname, 'public', fileName);
+    const html = fs.readFileSync(filePath, 'utf8');
+    res.set('Content-Type', 'text/html; charset=utf-8').send(injectOG(html, meta || {}));
+  } catch (e) {
+    res.sendFile(path.join(__dirname, 'public', fileName));
+  }
+}
+
+function baseMeta(req, title) {
+  return {
+    title: `${title} | ${SITE_NAME}`,
+    description: DEFAULT_DESC,
+    image: absUrl(req, DEFAULT_IMG),
+    url: absUrl(req, req.originalUrl)
+  };
+}
 
 const JWT_SECRET  = process.env.JWT_SECRET  || 'hostaka-secret-2026';
 const JWT_EXPIRES = '30d';
@@ -570,6 +651,101 @@ app.post('/api/upload/video/signature', requireAuth, async (req, res) => {
 // ============================================================
 // Posts
 // ============================================================
+// ============================================================
+//  معاينة الروابط (Link Preview) — لعرض بطاقة Open Graph بدل رابط ميت
+// ============================================================
+const linkPreviewCache = new Map(); // href -> { data, ts }
+const LINK_PREVIEW_TTL = 60 * 60 * 1000; // ساعة واحدة
+const LINK_PREVIEW_MAX = 500;            // أقصى عدد عناصر بالكاش
+
+function isPrivateOrLocalHost(hostname) {
+  const h = String(hostname || '').toLowerCase();
+  if (!h || h === 'localhost' || h === '0.0.0.0' || h === '::1') return true;
+  if (/^127\./.test(h)) return true;
+  if (/^10\./.test(h)) return true;
+  if (/^192\.168\./.test(h)) return true;
+  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(h)) return true;
+  if (/^169\.254\./.test(h)) return true; // link-local / cloud metadata
+  return false;
+}
+
+function metaTagPick(html, prop) {
+  const re1 = new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]+content=["']([^"']*)["']`, 'i');
+  const re2 = new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${prop}["']`, 'i');
+  const m = html.match(re1) || html.match(re2);
+  return m ? m[1].trim() : '';
+}
+
+function decodeHtmlEntities(s) {
+  return String(s || '')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+}
+
+app.get('/api/link-preview', async (req, res) => {
+  try {
+    const raw = String(req.query.url || '').trim();
+    if (!raw) return res.status(400).json({ error: 'رابط مطلوب' });
+
+    let u;
+    try { u = new URL(raw); } catch { return res.status(400).json({ error: 'رابط غير صالح' }); }
+    if (!/^https?:$/.test(u.protocol)) return res.status(400).json({ error: 'رابط غير مدعوم' });
+    if (isPrivateOrLocalHost(u.hostname)) return res.status(400).json({ error: 'رابط غير مسموح' });
+
+    const cached = linkPreviewCache.get(u.href);
+    if (cached && (Date.now() - cached.ts) < LINK_PREVIEW_TTL) return res.json(cached.data);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    let data;
+    try {
+      const r = await fetch(u.href, {
+        signal: controller.signal,
+        redirect: 'follow',
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; HostakaLinkPreview/1.0)' }
+      });
+      const finalUrl = r.url && !isPrivateOrLocalHost(new URL(r.url).hostname) ? r.url : u.href;
+      const ct = r.headers.get('content-type') || '';
+      if (!ct.includes('text/html')) {
+        data = { title: u.hostname, description: '', image: '', site: u.hostname, url: finalUrl };
+      } else {
+        let html = await r.text();
+        if (html.length > 400000) html = html.slice(0, 400000);
+        const title = decodeHtmlEntities(
+          metaTagPick(html, 'og:title') || (html.match(/<title>([^<]*)<\/title>/i) || [])[1] || u.hostname
+        );
+        const description = decodeHtmlEntities(
+          metaTagPick(html, 'og:description') || metaTagPick(html, 'description')
+        );
+        let image = metaTagPick(html, 'og:image');
+        if (image && !/^https?:\/\//i.test(image)) {
+          try { image = new URL(image, finalUrl).href; } catch { image = ''; }
+        }
+        const site = decodeHtmlEntities(metaTagPick(html, 'og:site_name')) || u.hostname;
+        data = {
+          title: title.slice(0, 200),
+          description: description.slice(0, 300),
+          image: image || '',
+          site,
+          url: finalUrl
+        };
+      }
+    } catch (e) {
+      data = { title: u.hostname, description: '', image: '', site: u.hostname, url: u.href, error: true };
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (linkPreviewCache.size >= LINK_PREVIEW_MAX) {
+      linkPreviewCache.delete(linkPreviewCache.keys().next().value);
+    }
+    linkPreviewCache.set(u.href, { data, ts: Date.now() });
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: 'تعذر جلب معاينة الرابط' });
+  }
+});
+
 app.get('/api/records', async (req, res) => {
   try {
     const records = await q.listRecords();
@@ -1735,16 +1911,83 @@ app.post('/api/admin/notifications', requireAdmin, async (req, res) => {
 // ============================================================
 // Pages
 // ============================================================
-app.get('/login',   (_, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
-app.get('/admin',   (_, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
-app.get('/profile', (_, res) => res.sendFile(path.join(__dirname, 'public', 'profile.html')));
-app.get('/chat',    (_, res) => res.sendFile(path.join(__dirname, 'public', 'chat.html')));
-app.get('/group',   (_, res) => res.sendFile(path.join(__dirname, 'public', 'group.html')));
-app.get('/shiziai', (_, res) => res.sendFile(path.join(__dirname, 'public', 'shiziai.html')));
-app.get('/support', (_, res) => res.sendFile(path.join(__dirname, 'public', 'support.html')));
-app.get('/short',   (_, res) => res.sendFile(path.join(__dirname, 'public', 'short.html')));
-app.get('/page',    (_, res) => res.sendFile(path.join(__dirname, 'public', 'page.html')));
-app.get('*',        (_, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/login',   (req, res) => sendOG(req, res, 'login.html', baseMeta(req, 'تسجيل الدخول')));
+app.get('/admin',   (req, res) => sendOG(req, res, 'admin.html', baseMeta(req, 'لوحة التحكم')));
+app.get('/chat',    (req, res) => sendOG(req, res, 'chat.html', baseMeta(req, 'الدردشة')));
+app.get('/group',   (req, res) => sendOG(req, res, 'group.html', baseMeta(req, 'المجموعة')));
+app.get('/shiziai', (req, res) => sendOG(req, res, 'shiziai.html', baseMeta(req, 'شيزي الذكاء الاصطناعي')));
+app.get('/support', (req, res) => sendOG(req, res, 'support.html', baseMeta(req, 'الدعم الفني')));
+
+app.get('/profile', async (req, res) => {
+  const meta = baseMeta(req, 'الملف الشخصي');
+  const uname = (req.query.u || '').trim();
+  if (uname) {
+    try {
+      const user = await q.getUserByUsername(uname);
+      if (user && !user.suspended) {
+        meta.title = `${user.display_name || user.username} (@${user.username}) | ${SITE_NAME}`;
+        meta.description = ogTruncate(user.bio) || DEFAULT_DESC;
+        meta.image = absUrl(req, user.avatar || DEFAULT_IMG);
+        meta.type = 'profile';
+      }
+    } catch (e) { /* نستمر بالميتاداتا الافتراضية عند أي خطأ */ }
+  }
+  sendOG(req, res, 'profile.html', meta);
+});
+
+app.get('/page', async (req, res) => {
+  const meta = baseMeta(req, 'صفحة');
+  const uname = (req.query.u || '').trim();
+  if (uname) {
+    try {
+      const page = await q.getPageByUsername(uname);
+      if (page) {
+        meta.title = `${page.name} | ${SITE_NAME}`;
+        meta.description = ogTruncate(page.bio) || DEFAULT_DESC;
+        meta.image = absUrl(req, page.avatar || DEFAULT_IMG);
+      }
+    } catch (e) { /* نستمر بالميتاداتا الافتراضية عند أي خطأ */ }
+  }
+  sendOG(req, res, 'page.html', meta);
+});
+
+app.get('/short', async (req, res) => {
+  const meta = baseMeta(req, 'ريلز');
+  meta.type = 'video.other';
+  const id = (req.query.id || '').trim();
+  if (id) {
+    try {
+      const rec = await q.getRecordById(id);
+      if (rec) {
+        const who = rec.publisher_name || rec.publisher;
+        meta.title = `${who} على ${SITE_NAME}`;
+        meta.description = ogTruncate(rec.content) || DEFAULT_DESC;
+        if (rec.image) meta.image = absUrl(req, rec.image);
+        if (rec.video) meta.video = absUrl(req, rec.video);
+      }
+    } catch (e) { /* نستمر بالميتاداتا الافتراضية عند أي خطأ */ }
+  }
+  sendOG(req, res, 'short.html', meta);
+});
+
+app.get('*', async (req, res) => {
+  const meta = baseMeta(req, SITE_NAME);
+  meta.title = SITE_NAME;
+  const pid = (req.query.p || '').trim();
+  if (pid) {
+    try {
+      const rec = await q.getRecordById(pid);
+      if (rec) {
+        const who = rec.publisher_name || rec.publisher;
+        meta.title = `منشور ${who} | ${SITE_NAME}`;
+        meta.description = ogTruncate(rec.content) || DEFAULT_DESC;
+        if (rec.image) meta.image = absUrl(req, rec.image);
+        meta.type = 'article';
+      }
+    } catch (e) { /* نستمر بالميتاداتا الافتراضية عند أي خطأ */ }
+  }
+  sendOG(req, res, 'index.html', meta);
+});
 
 // ============================================================
 // Start

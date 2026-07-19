@@ -413,6 +413,17 @@ const q = {
     LEFT JOIN pages p ON p.id = r.page_id
     ORDER BY r.created_at DESC
   `).then(rows),
+  getRecordById: (id) => db.execute({ sql: `
+    SELECT r.*,
+           COALESCE(u.avatar, r.user_avatar, '') as user_avatar,
+           COALESCE(u.display_name, u.username, r.publisher, '') as publisher_name,
+           COALESCE(u.verified, 0) as publisher_verified,
+           p.username as page_username
+    FROM records r
+    LEFT JOIN users u ON (u.id = r.user_id) OR (r.user_id IS NULL AND u.username = r.publisher)
+    LEFT JOIN pages p ON p.id = r.page_id
+    WHERE r.id = ?
+  `, args: [id] }).then(first),
   createRecord: async (user_id, publisher, user_role, user_avatar, content, image, video, isReel, videoWidth, videoHeight, pageId) => {
     // video/is_reel/video_width/video_height/page_id معاملات جديدة (اختيارية)
     try {
