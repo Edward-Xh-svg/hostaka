@@ -8,56 +8,93 @@
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
+      /* === Hostaka UI Design System v2.0 === */
       --black: #ffffff;
-      --dark: #f7f7f8;
+      --dark: #f5f5f7;
       --card: #ffffff;
-      --border: #e5e5e5;
-      --text: #1a1a1a;
-      --muted: #6b7280;
-      --pink: #000000;
-      --pink-h: #333333;
-      --accent: #000000;
-      --mine-bg: rgba(0,0,0,0.06);
-      --mine-border: rgba(0,0,0,0.1);
-      --shizi-bg: rgba(0,0,0,0.05);
-      --shizi-border: rgba(0,0,0,0.14);
-      --topbar-bg: rgba(255,255,255,0.85);
-      --input-bg: #f7f7f8;
+      --border: rgba(0,0,0,0.08);
+      --text: #1c1c1e;
+      --muted: #8e8e93;
+      --primary: #0071e3;
+      --primary-h: #0051a2;
+      --primary-light: rgba(0,113,227,0.08);
+      --primary-mid: rgba(0,113,227,0.15);
+      --primary-border: rgba(0,113,227,0.25);
+      --accent: #0071e3;
+      --mine-bg: rgba(0,113,227,0.08);
+      --mine-border: rgba(0,113,227,0.12);
+      --their-bg: rgba(0,0,0,0.03);
+      --their-border: rgba(0,0,0,0.06);
+      --topbar-bg: rgba(255,255,255,0.72);
+      --input-bg: #f2f2f7;
       --modal-bg: #ffffff;
-      --shadow: 0 10px 30px rgba(0,0,0,0.4);
-      --shizi-gradient: linear-gradient(145deg, #000000, #333333);      --glass-bg: rgba(255,255,255,0.68);
+      --post-bg: #ffffff;
+      --sort-btn-bg: rgba(0,0,0,0.04);
+      --surface-elevated: #ffffff;
+      --shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.04);
+      --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
+      --avatar-gradient: linear-gradient(145deg, #0071e3, #42a5f5);
+      --glass-bg: rgba(255,255,255,0.65);
       --glass-bg-strong: rgba(255,255,255,0.82);
-      --glass-border: rgba(255,255,255,0.5);
-      --glass-blur: 22px;
+      --glass-border: rgba(255,255,255,0.4);
+      --glass-blur: 24px;
       --wallpaper-img: none;
       --wallpaper-overlay: rgba(255,255,255,0);
-
+      --radius-sm: 10px;
+      --radius-md: 16px;
+      --radius-lg: 24px;
+      --radius-xl: 32px;
+      --radius-full: 999px;
+      --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      --transition-base: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      --success: #34c759;
+      --warning: #ff9500;
+      --danger: #ff3b30;
+      /* === توافق مع الأسماء القديمة (لا تُحذف) === */
+      --pink: var(--primary);
+      --pink-h: var(--primary-h);
+      --shizi-bg: var(--primary-light);
+      --shizi-border: var(--primary-border);
+      --shizi-gradient: var(--avatar-gradient);
     }
     [data-theme="dark"] {
-      --black: #0d0d0d;
-      --dark: #141414;
-      --card: #1a1a1a;
-      --border: #2a2a2a;
-      --text: #e5e5e5;
-      --muted: #8d8d8d;
-      --pink: #ffffff;
-      --pink-h: #dddddd;
-      --accent: #ffffff;
-      --mine-bg: rgba(255,255,255,0.06);
-      --mine-border: rgba(255,255,255,0.1);
-      --shizi-bg: rgba(255,255,255,0.08);
-      --shizi-border: rgba(255,255,255,0.18);
-      --topbar-bg: rgba(13,13,13,0.85);
-      --input-bg: #222222;
-      --modal-bg: #1a1a1a;
-      --shadow: 0 10px 30px rgba(0,0,0,0.7);
-      --shizi-gradient: linear-gradient(145deg, #ffffff, #dddddd);      --glass-bg: rgba(20,20,20,0.62);
-      --glass-bg-strong: rgba(18,18,18,0.8);
-      --glass-border: rgba(255,255,255,0.1);
-      --glass-blur: 22px;
+      --black: #000000;
+      --dark: #121212;
+      --card: #1c1c1e;
+      --border: rgba(255,255,255,0.08);
+      --text: #f5f5f7;
+      --muted: #8e8e93;
+      --primary: #0a84ff;
+      --primary-h: #409cff;
+      --primary-light: rgba(10,132,255,0.12);
+      --primary-mid: rgba(10,132,255,0.2);
+      --primary-border: rgba(10,132,255,0.3);
+      --accent: #0a84ff;
+      --mine-bg: rgba(10,132,255,0.12);
+      --mine-border: rgba(10,132,255,0.18);
+      --their-bg: rgba(255,255,255,0.04);
+      --their-border: rgba(255,255,255,0.06);
+      --topbar-bg: rgba(0,0,0,0.65);
+      --input-bg: #1c1c1e;
+      --modal-bg: #1c1c1e;
+      --post-bg: #1c1c1e;
+      --sort-btn-bg: rgba(255,255,255,0.04);
+      --surface-elevated: #2c2c2e;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.2);
+      --shadow-lg: 0 12px 40px rgba(0,0,0,0.5);
+      --avatar-gradient: linear-gradient(145deg, #0a84ff, #5e5ce6);
+      --glass-bg: rgba(28,28,30,0.72);
+      --glass-bg-strong: rgba(28,28,30,0.88);
+      --glass-border: rgba(255,255,255,0.08);
+      --glass-blur: 24px;
       --wallpaper-img: none;
       --wallpaper-overlay: rgba(0,0,0,0);
-
+      --pink: var(--primary);
+      --pink-h: var(--primary-h);
+      --shizi-bg: var(--primary-light);
+      --shizi-border: var(--primary-border);
+      --shizi-gradient: var(--avatar-gradient);
     }
     *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
     html,body{height:100%;overflow:hidden;}
@@ -67,7 +104,10 @@
       font-family:'Cairo',sans-serif;
       display:flex;flex-direction:column;
       -webkit-font-smoothing:antialiased;
-      transition:background 0.3s, color 0.3s;
+      transition:background var(--transition-slow), color var(--transition-slow);
+    }
+    html.has-wallpaper * {
+      transition: background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, color 0.4s ease;
     }
     /* ===== خلفية المنصة (Wallpaper) ===== */
     .wallpaper-bg{
@@ -575,18 +615,41 @@ function analyzeWallpaperColors(dataUrl, cb){
   const img = new Image();
   img.onload = () => {
     const c = document.createElement('canvas');
-    const size = 40;
+    const size = 60;
     c.width = size; c.height = size;
     const ctx = c.getContext('2d');
     ctx.drawImage(img, 0, 0, size, size);
     let r=0,g=0,b=0,count=0;
+    let r2=0,g2=0,b2=0,count2=0;
+    let r3=0,g3=0,b3=0,count3=0;
     try{
       const data = ctx.getImageData(0,0,size,size).data;
-      for(let i=0;i<data.length;i+=4){ r+=data[i]; g+=data[i+1]; b+=data[i+2]; count++; }
+      const pixels = [];
+      for(let i=0;i<data.length;i+=4){
+        const pr=data[i], pg=data[i+1], pb=data[i+2];
+        const max = Math.max(pr,pg,pb), min = Math.min(pr,pg,pb);
+        const saturation = max === 0 ? 0 : (max-min)/max;
+        if(saturation > 0.15 && max > 40 && max < 240){
+          pixels.push({r:pr, g:pg, b:pb, sat: saturation, brightness: (pr+pg+pb)/3});
+        }
+      }
+      pixels.sort((a,b) => b.sat - a.sat);
+      const primaryPixels = pixels.slice(0, Math.max(1, Math.floor(pixels.length * 0.15)));
+      for(const p of primaryPixels){ r+=p.r; g+=p.g; b+=p.b; count++; }
+      const midStart = Math.floor(pixels.length * 0.25);
+      const secondaryPixels = pixels.slice(midStart, midStart + Math.max(1, Math.floor(pixels.length * 0.15)));
+      for(const p of secondaryPixels){ r2+=p.r; g2+=p.g; b2+=p.b; count2++; }
+      const brightPixels = pixels.filter(p => p.brightness > 120).slice(0, Math.max(1, Math.floor(pixels.length * 0.1)));
+      for(const p of brightPixels){ r3+=p.r; g3+=p.g; b3+=p.b; count3++; }
+      if(count === 0){
+        for(let i=0;i<data.length;i+=4){ r+=data[i]; g+=data[i+1]; b+=data[i+2]; count++; }
+      }
       r=Math.round(r/count); g=Math.round(g/count); b=Math.round(b/count);
+      r2=count2?Math.round(r2/count2):r; g2=count2?Math.round(g2/count2):g; b2=count2?Math.round(b2/count2):b;
+      r3=count3?Math.round(r3/count3):r; g3=count3?Math.round(g3/count3):g; b3=count3?Math.round(b3/count3):b;
     }catch(e){ cb(null); return; }
     const brightness = (r*299 + g*587 + b*114) / 1000;
-    cb({ r, g, b, brightness });
+    cb({ r, g, b, r2, g2, b2, r3, g3, b3, brightness });
   };
   img.onerror = () => cb(null);
   img.src = dataUrl;
@@ -598,6 +661,15 @@ function applyWallpaper(){
     html.classList.remove('has-wallpaper');
     html.style.removeProperty('--wallpaper-img');
     html.style.removeProperty('--wallpaper-overlay');
+    html.style.removeProperty('--primary');
+    html.style.removeProperty('--primary-h');
+    html.style.removeProperty('--primary-light');
+    html.style.removeProperty('--primary-mid');
+    html.style.removeProperty('--primary-border');
+    html.style.removeProperty('--accent');
+    html.style.removeProperty('--avatar-gradient');
+    html.style.removeProperty('--mine-bg');
+    html.style.removeProperty('--mine-border');
     if(bg) bg.style.filter = '';
     return;
   }
@@ -615,6 +687,29 @@ function applyWallpaper(){
         else if(!shouldBeDark && currentTheme !== 'light'){ setTheme('light'); }
       }
       html.style.setProperty('--wallpaper-overlay', `rgba(${info.r},${info.g},${info.b},${dim*0.55})`);
+
+      const isDark = currentTheme === 'dark';
+      const baseR = info.r, baseG = info.g, baseB = info.b;
+      const secR = info.r2 || baseR, secG = info.g2 || baseG, secB = info.b2 || baseB;
+      const accR = info.r3 || baseR, accG = info.g3 || baseG, accB = info.b3 || baseB;
+      const lighten = (r,g,b,amt) => `rgb(${Math.min(255, Math.round(r + (255-r)*amt))}, ${Math.min(255, Math.round(g + (255-g)*amt))}, ${Math.min(255, Math.round(b + (255-b)*amt))})`;
+      const darken = (r,g,b,amt) => `rgb(${Math.round(r*amt)}, ${Math.round(g*amt)}, ${Math.round(b*amt)})`;
+      const primary = `rgb(${baseR},${baseG},${baseB})`;
+      const primaryH = isDark ? lighten(baseR,baseG,baseB,0.3) : darken(baseR,baseG,baseB,0.75);
+      const primaryLight = isDark ? `rgba(${baseR},${baseG},${baseB},0.15)` : `rgba(${baseR},${baseG},${baseB},0.08)`;
+      const primaryMid = isDark ? `rgba(${baseR},${baseG},${baseB},0.25)` : `rgba(${baseR},${baseG},${baseB},0.15)`;
+      const primaryBorder = isDark ? `rgba(${baseR},${baseG},${baseB},0.35)` : `rgba(${baseR},${baseG},${baseB},0.25)`;
+      const accent = `rgb(${accR},${accG},${accB})`;
+      const avatarGrad = `linear-gradient(145deg, rgb(${baseR},${baseG},${baseB}), rgb(${secR},${secG},${secB}))`;
+      html.style.setProperty('--primary', primary);
+      html.style.setProperty('--primary-h', primaryH);
+      html.style.setProperty('--primary-light', primaryLight);
+      html.style.setProperty('--primary-mid', primaryMid);
+      html.style.setProperty('--primary-border', primaryBorder);
+      html.style.setProperty('--accent', accent);
+      html.style.setProperty('--avatar-gradient', avatarGrad);
+      html.style.setProperty('--mine-bg', isDark ? `rgba(${baseR},${baseG},${baseB},0.12)` : `rgba(${baseR},${baseG},${baseB},0.08)`);
+      html.style.setProperty('--mine-border', isDark ? `rgba(${baseR},${baseG},${baseB},0.18)` : `rgba(${baseR},${baseG},${baseB},0.12)`);
     });
   }
 }
