@@ -1,6 +1,5 @@
 /* ================= admin.html ================= */
 if (document.body.classList.contains('page-admin')) {
-(function () {
 window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
 
 // ===== Theme =====
@@ -290,12 +289,38 @@ async function replyReport(id, status){
     else { toast(d.error || 'فشل الحفظ'); }
   }catch(e){ toast('تعذر الاتصال'); }
 }
-})();
+
+/* expose top-level functions for inline onclick handlers */
+try { window.setTheme = setTheme; } catch(e) {}
+try { window.toggleTheme = toggleTheme; } catch(e) {}
+try { window.api = api; } catch(e) {}
+try { window.toast = toast; } catch(e) {}
+try { window.esc = esc; } catch(e) {}
+try { window.toUTCDate = toUTCDate; } catch(e) {}
+try { window.fmtDate = fmtDate; } catch(e) {}
+try { window.doLogin = doLogin; } catch(e) {}
+try { window.doLogout = doLogout; } catch(e) {}
+try { window.initAdmin = initAdmin; } catch(e) {}
+try { window.showPage = showPage; } catch(e) {}
+try { window.sendAdminNotif = sendAdminNotif; } catch(e) {}
+try { window.loadDashboard = loadDashboard; } catch(e) {}
+try { window.loadUsers = loadUsers; } catch(e) {}
+try { window.promoteUser = promoteUser; } catch(e) {}
+try { window.deleteUser = deleteUser; } catch(e) {}
+try { window.suspendUser = suspendUser; } catch(e) {}
+try { window.unsuspendUser = unsuspendUser; } catch(e) {}
+try { window.loadPosts = loadPosts; } catch(e) {}
+try { window.deletePost = deletePost; } catch(e) {}
+try { window.loadVerify = loadVerify; } catch(e) {}
+try { window.approveVerify = approveVerify; } catch(e) {}
+try { window.rejectVerify = rejectVerify; } catch(e) {}
+try { window.setReportsFilter = setReportsFilter; } catch(e) {}
+try { window.loadReports = loadReports; } catch(e) {}
+try { window.replyReport = replyReport; } catch(e) {}
 }
 
 /* ================= chat.html ================= */
 if (document.body.classList.contains('page-chat')) {
-(function () {
 // ============================================================
 //  الترجمة (i18n)
 // ============================================================
@@ -1384,12 +1409,76 @@ async function saveViewerImage(e){
 
 // ====== بدء التشغيل ======
 init();
-})();
+
+/* expose top-level functions for inline onclick handlers */
+try { window.t = t; } catch(e) {}
+try { window.applyLang = applyLang; } catch(e) {}
+try { window.setTheme = setTheme; } catch(e) {}
+try { window.toggleTheme = toggleTheme; } catch(e) {}
+try { window.loadWallpaperState = loadWallpaperState; } catch(e) {}
+try { window.saveWallpaperState = saveWallpaperState; } catch(e) {}
+try { window.openWallpaperModal = openWallpaperModal; } catch(e) {}
+try { window.onWallpaperFile = onWallpaperFile; } catch(e) {}
+try { window.updateWallpaperTuning = updateWallpaperTuning; } catch(e) {}
+try { window.removeWallpaper = removeWallpaper; } catch(e) {}
+try { window.analyzeWallpaperColors = analyzeWallpaperColors; } catch(e) {}
+try { window.applyWallpaper = applyWallpaper; } catch(e) {}
+try { window.toggleLangMenu = toggleLangMenu; } catch(e) {}
+try { window.setLang = setLang; } catch(e) {}
+try { window.getToken = getToken; } catch(e) {}
+try { window.esc = esc; } catch(e) {}
+try { window.linkifyEscaped = linkifyEscaped; } catch(e) {}
+try { window.extractFirstUrl = extractFirstUrl; } catch(e) {}
+try { window.fetchLinkPreview = fetchLinkPreview; } catch(e) {}
+try { window.linkPreviewCardHtml = linkPreviewCardHtml; } catch(e) {}
+try { window.loadLinkPreviews = loadLinkPreviews; } catch(e) {}
+try { window.toUTCDate = toUTCDate; } catch(e) {}
+try { window.fmtTime = fmtTime; } catch(e) {}
+try { window.fmtDay = fmtDay; } catch(e) {}
+try { window.apiFetch = apiFetch; } catch(e) {}
+try { window.handleSuspended = handleSuspended; } catch(e) {}
+try { window.init = init; } catch(e) {}
+try { window.showNotLogged = showNotLogged; } catch(e) {}
+try { window.showToast = showToast; } catch(e) {}
+try { window.loadSidebar = loadSidebar; } catch(e) {}
+try { window.renderSidebar = renderSidebar; } catch(e) {}
+try { window.userItemHtml = userItemHtml; } catch(e) {}
+try { window.updateTopbarPeer = updateTopbarPeer; } catch(e) {}
+try { window.refreshPeerStatus = refreshPeerStatus; } catch(e) {}
+try { window.fmtRelativeShort = fmtRelativeShort; } catch(e) {}
+try { window.closeModal = closeModal; } catch(e) {}
+try { window.togglePeerOpts = togglePeerOpts; } catch(e) {}
+try { window.checkPeerBlockStatus = checkPeerBlockStatus; } catch(e) {}
+try { window.togglePeerBlock = togglePeerBlock; } catch(e) {}
+try { window.openReportPeerModal = openReportPeerModal; } catch(e) {}
+try { window.openReportMsgModal = openReportMsgModal; } catch(e) {}
+try { window.submitPeerReport = submitPeerReport; } catch(e) {}
+try { window.openChat = openChat; } catch(e) {}
+try { window.loadMsgs = loadMsgs; } catch(e) {}
+try { window.loadMsgReactions = loadMsgReactions; } catch(e) {}
+try { window.renderMsgs = renderMsgs; } catch(e) {}
+try { window.togglePicker = togglePicker; } catch(e) {}
+try { window.reactMsg = reactMsg; } catch(e) {}
+try { window.onChatImg = onChatImg; } catch(e) {}
+try { window.removeChatImg = removeChatImg; } catch(e) {}
+try { window.startEditMsg = startEditMsg; } catch(e) {}
+try { window.showEditBanner = showEditBanner; } catch(e) {}
+try { window.cancelEditMsg = cancelEditMsg; } catch(e) {}
+try { window.deleteMsg = deleteMsg; } catch(e) {}
+try { window.sendMsg = sendMsg; } catch(e) {}
+try { window.onKey = onKey; } catch(e) {}
+try { window.autoResize = autoResize; } catch(e) {}
+try { window.toggleSidebar = toggleSidebar; } catch(e) {}
+try { window.openCreateGroup = openCreateGroup; } catch(e) {}
+try { window.closeCreateGroup = closeCreateGroup; } catch(e) {}
+try { window.createGroup = createGroup; } catch(e) {}
+try { window.openImgViewer = openImgViewer; } catch(e) {}
+try { window.closeImgViewer = closeImgViewer; } catch(e) {}
+try { window.saveViewerImage = saveViewerImage; } catch(e) {}
 }
 
 /* ================= group.html ================= */
 if (document.body.classList.contains('page-group')) {
-(function () {
 const LANG = {
   ar: {
     title:'المجموعة', back:'الرسائل', members:'الأعضاء', add:'إضافة',
@@ -2435,12 +2524,79 @@ async function saveViewerImage(e){
 }
 
 init();
-})();
+
+/* expose top-level functions for inline onclick handlers */
+try { window.getToken = getToken; } catch(e) {}
+try { window.t = t; } catch(e) {}
+try { window.esc = esc; } catch(e) {}
+try { window.linkifyEscaped = linkifyEscaped; } catch(e) {}
+try { window.extractFirstUrl = extractFirstUrl; } catch(e) {}
+try { window.fetchLinkPreview = fetchLinkPreview; } catch(e) {}
+try { window.linkPreviewCardHtml = linkPreviewCardHtml; } catch(e) {}
+try { window.loadLinkPreviews = loadLinkPreviews; } catch(e) {}
+try { window.toUTCDate = toUTCDate; } catch(e) {}
+try { window.fmtTime = fmtTime; } catch(e) {}
+try { window.fmtDay = fmtDay; } catch(e) {}
+try { window.applyLang = applyLang; } catch(e) {}
+try { window.setTheme = setTheme; } catch(e) {}
+try { window.toggleTheme = toggleTheme; } catch(e) {}
+try { window.loadWallpaperState = loadWallpaperState; } catch(e) {}
+try { window.saveWallpaperState = saveWallpaperState; } catch(e) {}
+try { window.openWallpaperModal = openWallpaperModal; } catch(e) {}
+try { window.onWallpaperFile = onWallpaperFile; } catch(e) {}
+try { window.updateWallpaperTuning = updateWallpaperTuning; } catch(e) {}
+try { window.removeWallpaper = removeWallpaper; } catch(e) {}
+try { window.analyzeWallpaperColors = analyzeWallpaperColors; } catch(e) {}
+try { window.applyWallpaper = applyWallpaper; } catch(e) {}
+try { window.toggleLangMenu = toggleLangMenu; } catch(e) {}
+try { window.setLang = setLang; } catch(e) {}
+try { window.apiFetch = apiFetch; } catch(e) {}
+try { window.handleSuspended = handleSuspended; } catch(e) {}
+try { window.showToast = showToast; } catch(e) {}
+try { window.showNotLogged = showNotLogged; } catch(e) {}
+try { window.showError = showError; } catch(e) {}
+try { window.toggleSidebar = toggleSidebar; } catch(e) {}
+try { window.openModal = openModal; } catch(e) {}
+try { window.closeModal = closeModal; } catch(e) {}
+try { window.init = init; } catch(e) {}
+try { window.renderTopbar = renderTopbar; } catch(e) {}
+try { window.renderMembers = renderMembers; } catch(e) {}
+try { window.loadMemberStatuses = loadMemberStatuses; } catch(e) {}
+try { window.toggleMemberMenu = toggleMemberMenu; } catch(e) {}
+try { window.changeRole = changeRole; } catch(e) {}
+try { window.removeMember = removeMember; } catch(e) {}
+try { window.renderGsAvatarPreview = renderGsAvatarPreview; } catch(e) {}
+try { window.onGroupAvatarFile = onGroupAvatarFile; } catch(e) {}
+try { window.openGroupSettings = openGroupSettings; } catch(e) {}
+try { window.saveGroupSettings = saveGroupSettings; } catch(e) {}
+try { window.leaveGroup = leaveGroup; } catch(e) {}
+try { window.deleteGroupConfirm = deleteGroupConfirm; } catch(e) {}
+try { window.openAddMember = openAddMember; } catch(e) {}
+try { window.confirmAddMembers = confirmAddMembers; } catch(e) {}
+try { window.buildChatUI = buildChatUI; } catch(e) {}
+try { window.loadMsgs = loadMsgs; } catch(e) {}
+try { window.loadMsgReactions = loadMsgReactions; } catch(e) {}
+try { window.renderMsgs = renderMsgs; } catch(e) {}
+try { window.togglePicker = togglePicker; } catch(e) {}
+try { window.reactMsg = reactMsg; } catch(e) {}
+try { window.onChatImg = onChatImg; } catch(e) {}
+try { window.removeChatImg = removeChatImg; } catch(e) {}
+try { window.startEditMsg = startEditMsg; } catch(e) {}
+try { window.showEditBanner = showEditBanner; } catch(e) {}
+try { window.cancelEditMsg = cancelEditMsg; } catch(e) {}
+try { window.deleteMsg = deleteMsg; } catch(e) {}
+try { window.openReportMsgModal = openReportMsgModal; } catch(e) {}
+try { window.submitReportMsg = submitReportMsg; } catch(e) {}
+try { window.sendMsg = sendMsg; } catch(e) {}
+try { window.onKey = onKey; } catch(e) {}
+try { window.autoResize = autoResize; } catch(e) {}
+try { window.openImgViewer = openImgViewer; } catch(e) {}
+try { window.closeImgViewer = closeImgViewer; } catch(e) {}
+try { window.saveViewerImage = saveViewerImage; } catch(e) {}
 }
 
 /* ================= index.html ================= */
 if (document.body.classList.contains('page-index')) {
-(function () {
 if(sessionStorage.getItem('hostaka_splash_seen')) document.documentElement.classList.add('splash-seen');
 
 // ============================================================
@@ -4357,12 +4513,124 @@ async function delComment(commentId, postId){
   document.getElementById('lPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
   document.getElementById('lEmail').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 })();
-})();
+
+/* expose top-level functions for inline onclick handlers */
+try { window.splashPeriodIcon = splashPeriodIcon; } catch(e) {}
+try { window.pickSplashGreeting = pickSplashGreeting; } catch(e) {}
+try { window.showSplashLoggedIn = showSplashLoggedIn; } catch(e) {}
+try { window.showSplashGuest = showSplashGuest; } catch(e) {}
+try { window.splashOpenAuth = splashOpenAuth; } catch(e) {}
+try { window.splashClickToDismiss = splashClickToDismiss; } catch(e) {}
+try { window.dismissSplash = dismissSplash; } catch(e) {}
+try { window.readVideoDimensions = readVideoDimensions; } catch(e) {}
+try { window.t = t; } catch(e) {}
+try { window.applyLang = applyLang; } catch(e) {}
+try { window.getEmptySvg = getEmptySvg; } catch(e) {}
+try { window.setTheme = setTheme; } catch(e) {}
+try { window.toggleTheme = toggleTheme; } catch(e) {}
+try { window.loadWallpaperState = loadWallpaperState; } catch(e) {}
+try { window.saveWallpaperState = saveWallpaperState; } catch(e) {}
+try { window.openWallpaperModal = openWallpaperModal; } catch(e) {}
+try { window.onWallpaperFile = onWallpaperFile; } catch(e) {}
+try { window.updateWallpaperTuning = updateWallpaperTuning; } catch(e) {}
+try { window.removeWallpaper = removeWallpaper; } catch(e) {}
+try { window.analyzeWallpaperColors = analyzeWallpaperColors; } catch(e) {}
+try { window.applyWallpaper = applyWallpaper; } catch(e) {}
+try { window.toggleLangMenu = toggleLangMenu; } catch(e) {}
+try { window.setLang = setLang; } catch(e) {}
+try { window.verifiedBadge = verifiedBadge; } catch(e) {}
+try { window.sortPosts = sortPosts; } catch(e) {}
+try { window.setSort = setSort; } catch(e) {}
+try { window.esc = esc; } catch(e) {}
+try { window.toUTCDate = toUTCDate; } catch(e) {}
+try { window.fmtDate = fmtDate; } catch(e) {}
+try { window.stripEmojis = stripEmojis; } catch(e) {}
+try { window.apiFetch = apiFetch; } catch(e) {}
+try { window.handleSuspended = handleSuspended; } catch(e) {}
+try { window.setLoggedInUI = setLoggedInUI; } catch(e) {}
+try { window.clearUser = clearUser; } catch(e) {}
+try { window.getSavedAccounts = getSavedAccounts; } catch(e) {}
+try { window.setSavedAccounts = setSavedAccounts; } catch(e) {}
+try { window.saveAccountToSwitcher = saveAccountToSwitcher; } catch(e) {}
+try { window.renderAccountSwitcher = renderAccountSwitcher; } catch(e) {}
+try { window.switchAccount = switchAccount; } catch(e) {}
+try { window.removeAccountFromSwitcher = removeAccountFromSwitcher; } catch(e) {}
+try { window.toggleDrop = toggleDrop; } catch(e) {}
+try { window.openAuth = openAuth; } catch(e) {}
+try { window.closeModal = closeModal; } catch(e) {}
+try { window.switchTab = switchTab; } catch(e) {}
+try { window.showToast = showToast; } catch(e) {}
+try { window.getToken = getToken; } catch(e) {}
+try { window.doLogin = doLogin; } catch(e) {}
+try { window.doRegister = doRegister; } catch(e) {}
+try { window.doLogout = doLogout; } catch(e) {}
+try { window.loadUnread = loadUnread; } catch(e) {}
+try { window.timeAgo = timeAgo; } catch(e) {}
+try { window.notifMessage = notifMessage; } catch(e) {}
+try { window.loadNotifCount = loadNotifCount; } catch(e) {}
+try { window.loadNotifications = loadNotifications; } catch(e) {}
+try { window.toggleNotifDrop = toggleNotifDrop; } catch(e) {}
+try { window.markAllNotifRead = markAllNotifRead; } catch(e) {}
+try { window.delNotif = delNotif; } catch(e) {}
+try { window.onNotifClick = onNotifClick; } catch(e) {}
+try { window.linkifyContent = linkifyContent; } catch(e) {}
+try { window.extractFirstUrl = extractFirstUrl; } catch(e) {}
+try { window.fetchLinkPreview = fetchLinkPreview; } catch(e) {}
+try { window.linkPreviewCardHtml = linkPreviewCardHtml; } catch(e) {}
+try { window.loadLinkPreviews = loadLinkPreviews; } catch(e) {}
+try { window.filterByHashtag = filterByHashtag; } catch(e) {}
+try { window.loadBlockedSet = loadBlockedSet; } catch(e) {}
+try { window.togglePostOpts = togglePostOpts; } catch(e) {}
+try { window.closePostOpts = closePostOpts; } catch(e) {}
+try { window.openReportModal = openReportModal; } catch(e) {}
+try { window.submitReport = submitReport; } catch(e) {}
+try { window.toggleBlockUser = toggleBlockUser; } catch(e) {}
+try { window.checkVerifyStatus = checkVerifyStatus; } catch(e) {}
+try { window.requestVerify = requestVerify; } catch(e) {}
+try { window.loadPosts = loadPosts; } catch(e) {}
+try { window.renderFeedDone = renderFeedDone; } catch(e) {}
+try { window.renderFeed = renderFeed; } catch(e) {}
+try { window.renderPost = renderPost; } catch(e) {}
+try { window.goProfile = goProfile; } catch(e) {}
+try { window.goPublisher = goPublisher; } catch(e) {}
+try { window.sharePost = sharePost; } catch(e) {}
+try { window.openPostModal = openPostModal; } catch(e) {}
+try { window.loadPostAsOptions = loadPostAsOptions; } catch(e) {}
+try { window.onPostMedia = onPostMedia; } catch(e) {}
+try { window.removePostMedia = removePostMedia; } catch(e) {}
+try { window.fmt = fmt; } catch(e) {}
+try { window.fmtBlock = fmtBlock; } catch(e) {}
+try { window.fmtList = fmtList; } catch(e) {}
+try { window.fmtLine = fmtLine; } catch(e) {}
+try { window.fmtQuote = fmtQuote; } catch(e) {}
+try { window.submitPost = submitPost; } catch(e) {}
+try { window.openEditPost = openEditPost; } catch(e) {}
+try { window.delPost = delPost; } catch(e) {}
+try { window.loadStories = loadStories; } catch(e) {}
+try { window.storyItemHtml = storyItemHtml; } catch(e) {}
+try { window.renderStoriesBar = renderStoriesBar; } catch(e) {}
+try { window.fmtStoryTime = fmtStoryTime; } catch(e) {}
+try { window.openStoryCreate = openStoryCreate; } catch(e) {}
+try { window.onStoryMedia = onStoryMedia; } catch(e) {}
+try { window.submitStory = submitStory; } catch(e) {}
+try { window.openStoryViewer = openStoryViewer; } catch(e) {}
+try { window.currentStoryGroup = currentStoryGroup; } catch(e) {}
+try { window.showStorySlide = showStorySlide; } catch(e) {}
+try { window.animateStoryProgress = animateStoryProgress; } catch(e) {}
+try { window.advanceStory = advanceStory; } catch(e) {}
+try { window.nextStory = nextStory; } catch(e) {}
+try { window.prevStory = prevStory; } catch(e) {}
+try { window.closeStoryViewer = closeStoryViewer; } catch(e) {}
+try { window.deleteCurrentStory = deleteCurrentStory; } catch(e) {}
+try { window.toggleReactMenu = toggleReactMenu; } catch(e) {}
+try { window.toggleReact = toggleReact; } catch(e) {}
+try { window.toggleComments = toggleComments; } catch(e) {}
+try { window.sendComment = sendComment; } catch(e) {}
+try { window.delComment = delComment; } catch(e) {}
 }
 
 /* ================= login.html ================= */
 if (document.body.classList.contains('page-login')) {
-(function () {
 // ----- الثيم (متوافق مع باقي المنصة) -----
 (function(){
   const saved = localStorage.getItem('hostaka_theme');
@@ -4621,12 +4889,28 @@ async function resendForgotCode(){
     }
   } catch(e) { showErr('resetErr','تعذر الاتصال بالخادم'); btn.disabled=false; }
 }
-})();
+
+/* expose top-level functions for inline onclick handlers */
+try { window.apiFetch = apiFetch; } catch(e) {}
+try { window.switchTab = switchTab; } catch(e) {}
+try { window.goToForgot = goToForgot; } catch(e) {}
+try { window.backToForgotStart = backToForgotStart; } catch(e) {}
+try { window.backToStart = backToStart; } catch(e) {}
+try { window.setLoggedIn = setLoggedIn; } catch(e) {}
+try { window.showErr = showErr; } catch(e) {}
+try { window.hideErr = hideErr; } catch(e) {}
+try { window.doLogin = doLogin; } catch(e) {}
+try { window.startRegister = startRegister; } catch(e) {}
+try { window.verifyRegister = verifyRegister; } catch(e) {}
+try { window.startResendCooldown = startResendCooldown; } catch(e) {}
+try { window.resendCode = resendCode; } catch(e) {}
+try { window.startForgot = startForgot; } catch(e) {}
+try { window.doResetPassword = doResetPassword; } catch(e) {}
+try { window.resendForgotCode = resendForgotCode; } catch(e) {}
 }
 
 /* ================= page.html ================= */
 if (document.body.classList.contains('page-page')) {
-(function () {
 if (localStorage.getItem('hostaka_theme') === 'dark') {
   document.documentElement.setAttribute('data-theme', 'dark');
 }
@@ -4778,12 +5062,26 @@ async function savePageEdit(){
 }
 
 loadPage();
-})();
+
+/* expose top-level functions for inline onclick handlers */
+try { window.esc = esc; } catch(e) {}
+try { window.apiFetch = apiFetch; } catch(e) {}
+try { window.toUTCDate = toUTCDate; } catch(e) {}
+try { window.fmtDate = fmtDate; } catch(e) {}
+try { window.loadPage = loadPage; } catch(e) {}
+try { window.showEmpty = showEmpty; } catch(e) {}
+try { window.render = render; } catch(e) {}
+try { window.verifiedBadge = verifiedBadge; } catch(e) {}
+try { window.postCardHtml = postCardHtml; } catch(e) {}
+try { window.toggleFollow = toggleFollow; } catch(e) {}
+try { window.openEditPage = openEditPage; } catch(e) {}
+try { window.closeEditPage = closeEditPage; } catch(e) {}
+try { window.onEditAvatar = onEditAvatar; } catch(e) {}
+try { window.savePageEdit = savePageEdit; } catch(e) {}
 }
 
 /* ================= profile.html ================= */
 if (document.body.classList.contains('page-profile')) {
-(function () {
 window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
 
 // ============================================================
@@ -5587,12 +5885,59 @@ async function save() {
 //  START
 // ============================================================
 init();
-})();
+
+/* expose top-level functions for inline onclick handlers */
+try { window.getToken = getToken; } catch(e) {}
+try { window.t = t; } catch(e) {}
+try { window.applyLang = applyLang; } catch(e) {}
+try { window.toggleTheme = toggleTheme; } catch(e) {}
+try { window.toggleLangMenu = toggleLangMenu; } catch(e) {}
+try { window.setLang = setLang; } catch(e) {}
+try { window.verifiedBadge = verifiedBadge; } catch(e) {}
+try { window.esc = esc; } catch(e) {}
+try { window.toUTCDate = toUTCDate; } catch(e) {}
+try { window.fmtDate = fmtDate; } catch(e) {}
+try { window.apiFetch = apiFetch; } catch(e) {}
+try { window.handleSuspended = handleSuspended; } catch(e) {}
+try { window.followUser = followUser; } catch(e) {}
+try { window.unfollowUser = unfollowUser; } catch(e) {}
+try { window.getFollowStatus = getFollowStatus; } catch(e) {}
+try { window.getFollowers = getFollowers; } catch(e) {}
+try { window.getFollowing = getFollowing; } catch(e) {}
+try { window.init = init; } catch(e) {}
+try { window.loadPublicProfile = loadPublicProfile; } catch(e) {}
+try { window.loadMyProfile = loadMyProfile; } catch(e) {}
+try { window.renderCover = renderCover; } catch(e) {}
+try { window.showToast = showToast; } catch(e) {}
+try { window.closeModal = closeModal; } catch(e) {}
+try { window.renderNotFound = renderNotFound; } catch(e) {}
+try { window.renderNotLogged = renderNotLogged; } catch(e) {}
+try { window.roleBadge = roleBadge; } catch(e) {}
+try { window.avatarInner = avatarInner; } catch(e) {}
+try { window.renderPublic = renderPublic; } catch(e) {}
+try { window.toggleMoreMenu = toggleMoreMenu; } catch(e) {}
+try { window.checkBlockStatus = checkBlockStatus; } catch(e) {}
+try { window.toggleBlockProfile = toggleBlockProfile; } catch(e) {}
+try { window.openReportUserModal = openReportUserModal; } catch(e) {}
+try { window.submitUserReport = submitUserReport; } catch(e) {}
+try { window.renderMyProfile = renderMyProfile; } catch(e) {}
+try { window.renderPosts = renderPosts; } catch(e) {}
+try { window.switchTab = switchTab; } catch(e) {}
+try { window.loadMyPages = loadMyPages; } catch(e) {}
+try { window.openCreatePage = openCreatePage; } catch(e) {}
+try { window.createPage = createPage; } catch(e) {}
+try { window.sharePost = sharePost; } catch(e) {}
+try { window.toggleFollow = toggleFollow; } catch(e) {}
+try { window.showFollowersModal = showFollowersModal; } catch(e) {}
+try { window.showFollowingModal = showFollowingModal; } catch(e) {}
+try { window.renderUserList = renderUserList; } catch(e) {}
+try { window.onAvatar = onAvatar; } catch(e) {}
+try { window.onCover = onCover; } catch(e) {}
+try { window.save = save; } catch(e) {}
 }
 
 /* ================= shiziai.html ================= */
 if (document.body.classList.contains('page-shiziai')) {
-(function () {
 const LANG = {
   ar: {
     back:'Hostaka', status:'متصلة الآن', placeholder:'اكتب رسالتك...', remainingLabel:'متصلة الآن · باقي {n} رسالة اليوم',
@@ -6052,12 +6397,43 @@ async function init(){
 }
 
 init();
-})();
+
+/* expose top-level functions for inline onclick handlers */
+try { window.t = t; } catch(e) {}
+try { window.esc = esc; } catch(e) {}
+try { window.toUTCDate = toUTCDate; } catch(e) {}
+try { window.fmtTime = fmtTime; } catch(e) {}
+try { window.getToken = getToken; } catch(e) {}
+try { window.applyLang = applyLang; } catch(e) {}
+try { window.setTheme = setTheme; } catch(e) {}
+try { window.toggleTheme = toggleTheme; } catch(e) {}
+try { window.loadWallpaperState = loadWallpaperState; } catch(e) {}
+try { window.saveWallpaperState = saveWallpaperState; } catch(e) {}
+try { window.openWallpaperModal = openWallpaperModal; } catch(e) {}
+try { window.onWallpaperFile = onWallpaperFile; } catch(e) {}
+try { window.updateWallpaperTuning = updateWallpaperTuning; } catch(e) {}
+try { window.removeWallpaper = removeWallpaper; } catch(e) {}
+try { window.analyzeWallpaperColors = analyzeWallpaperColors; } catch(e) {}
+try { window.applyWallpaper = applyWallpaper; } catch(e) {}
+try { window.toggleLangMenu = toggleLangMenu; } catch(e) {}
+try { window.setLang = setLang; } catch(e) {}
+try { window.apiFetch = apiFetch; } catch(e) {}
+try { window.showToast = showToast; } catch(e) {}
+try { window.showNotLogged = showNotLogged; } catch(e) {}
+try { window.renderWelcome = renderWelcome; } catch(e) {}
+try { window.quickSend = quickSend; } catch(e) {}
+try { window.renderMsgs = renderMsgs; } catch(e) {}
+try { window.loadHistory = loadHistory; } catch(e) {}
+try { window.updateRemainingBadge = updateRemainingBadge; } catch(e) {}
+try { window.onKey = onKey; } catch(e) {}
+try { window.autoResize = autoResize; } catch(e) {}
+try { window.sendMsg = sendMsg; } catch(e) {}
+try { window.clearChat = clearChat; } catch(e) {}
+try { window.init = init; } catch(e) {}
 }
 
 /* ================= short.html ================= */
 if (document.body.classList.contains('page-short')) {
-(function () {
 const TOKEN = localStorage.getItem('hostaka_token') || '';
 let ME = null;
 try { const stored = localStorage.getItem('hostaka_user'); if (stored) ME = JSON.parse(stored); } catch(e) {}
@@ -6245,12 +6621,28 @@ function showShareToast(){
 }
 
 loadReels();
-})();
+
+/* expose top-level functions for inline onclick handlers */
+try { window.esc = esc; } catch(e) {}
+try { window.apiFetch = apiFetch; } catch(e) {}
+try { window.reactCount = reactCount; } catch(e) {}
+try { window.reelSlideHtml = reelSlideHtml; } catch(e) {}
+try { window.stripHtml = stripHtml; } catch(e) {}
+try { window.loadReels = loadReels; } catch(e) {}
+try { window.setupObserver = setupObserver; } catch(e) {}
+try { window.onSlideTap = onSlideTap; } catch(e) {}
+try { window.goLogin = goLogin; } catch(e) {}
+try { window.toggleReelLike = toggleReelLike; } catch(e) {}
+try { window.openComments = openComments; } catch(e) {}
+try { window.closeComments = closeComments; } catch(e) {}
+try { window.renderComments = renderComments; } catch(e) {}
+try { window.sendReelComment = sendReelComment; } catch(e) {}
+try { window.shareReel = shareReel; } catch(e) {}
+try { window.showShareToast = showShareToast; } catch(e) {}
 }
 
 /* ================= support.html ================= */
 if (document.body.classList.contains('page-support')) {
-(function () {
 // ===== Theme =====
 let currentTheme = localStorage.getItem('hostaka_theme') || 'light';
 function setTheme(theme){
@@ -6414,5 +6806,19 @@ async function loadMe(){
 }
 
 loadMe();
-})();
+
+/* expose top-level functions for inline onclick handlers */
+try { window.setTheme = setTheme; } catch(e) {}
+try { window.toggleTheme = toggleTheme; } catch(e) {}
+try { window.esc = esc; } catch(e) {}
+try { window.getToken = getToken; } catch(e) {}
+try { window.showToast = showToast; } catch(e) {}
+try { window.apiFetch = apiFetch; } catch(e) {}
+try { window.fmtDate = fmtDate; } catch(e) {}
+try { window.renderForm = renderForm; } catch(e) {}
+try { window.submitTicket = submitTicket; } catch(e) {}
+try { window.ticketCard = ticketCard; } catch(e) {}
+try { window.loadMine = loadMine; } catch(e) {}
+try { window.switchTab = switchTab; } catch(e) {}
+try { window.loadMe = loadMe; } catch(e) {}
 }
