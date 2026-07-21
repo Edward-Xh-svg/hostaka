@@ -167,7 +167,7 @@ body.page-admin {
     }
 
     body.page-chat, body.page-chat * {margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-    body.page-chat, body.page-chat {height:100%;overflow:hidden;}
+    html, body.page-chat {height:100%;overflow:hidden;}
     body.page-chat {
       background:radial-gradient(circle at 18% 16%,rgba(0,0,0,0.05),transparent 22%),var(--black);
       color:var(--text);
@@ -177,7 +177,7 @@ body.page-admin {
       -webkit-font-smoothing:antialiased;
       transition:background var(--transition-slow), color var(--transition-slow);
     }
-    body.page-chat html.has-wallpaper * {
+    html.has-wallpaper body.page-chat * {
       transition: background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, color 0.4s ease;
     }
     /* ===== خلفية المنصة (Wallpaper) ===== */
@@ -188,20 +188,20 @@ body.page-admin {
       opacity:0;transition:opacity 0.6s ease;
       transform:scale(1.02);
     }
-    body.page-chat html.has-wallpaper .wallpaper-bg {opacity:1;}
+    html.has-wallpaper body.page-chat .wallpaper-bg {opacity:1;}
     body.page-chat .wallpaper-overlay {
       position:fixed;inset:0;z-index:-1;
       background:var(--wallpaper-overlay);
       pointer-events:none;
       transition:background 0.6s ease;
     }
-    body.page-chat html.has-wallpaper .topbar, body.page-chat html.has-wallpaper .sidebar, body.page-chat html.has-wallpaper .modal-box {
+    html.has-wallpaper body.page-chat .topbar, html.has-wallpaper body.page-chat .sidebar, html.has-wallpaper body.page-chat .modal-box {
       background:var(--glass-bg)!important;
       backdrop-filter:blur(var(--glass-blur)) saturate(1.5);
       -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);
       border-color:var(--glass-border)!important;
     }
-    body.page-chat html.has-wallpaper body {background:transparent;}
+    html.has-wallpaper body.page-chat {background:transparent;}
 
     /* ===== نافذة إعداد الخلفية ===== */
     body.page-chat .wp-overlay {position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;z-index:999;opacity:0;visibility:hidden;transition:all .25s ease;padding:20px;}
@@ -910,14 +910,14 @@ body.page-group {
       --sidebar-bg: var(--glass-bg);
     }
     body.page-group, body.page-group * {margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-    body.page-group, body.page-group {height:100%;overflow:hidden;}
+    html, body.page-group {height:100%;overflow:hidden;}
     body.page-group {
       background:radial-gradient(circle at 18% 16%,rgba(0,0,0,0.05),transparent 22%),var(--black);
       color:var(--text);font-family:'Cairo',sans-serif;
       display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;
       transition:background var(--transition-slow), color var(--transition-slow);
     }
-    body.page-group html.has-wallpaper * {
+    html.has-wallpaper body.page-group * {
       transition: background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, color 0.4s ease;
     }
     /* ===== خلفية المنصة (Wallpaper) ===== */
@@ -928,20 +928,20 @@ body.page-group {
       opacity:0;transition:opacity 0.6s ease;
       transform:scale(1.02);
     }
-    body.page-group html.has-wallpaper .wallpaper-bg {opacity:1;}
+    html.has-wallpaper body.page-group .wallpaper-bg {opacity:1;}
     body.page-group .wallpaper-overlay {
       position:fixed;inset:0;z-index:-1;
       background:var(--wallpaper-overlay);
       pointer-events:none;
       transition:background 0.6s ease;
     }
-    body.page-group html.has-wallpaper .topbar, body.page-group html.has-wallpaper .sidebar, body.page-group html.has-wallpaper .modal-box {
+    html.has-wallpaper body.page-group .topbar, html.has-wallpaper body.page-group .sidebar, html.has-wallpaper body.page-group .modal-box {
       background:var(--glass-bg)!important;
       backdrop-filter:blur(var(--glass-blur)) saturate(1.5);
       -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);
       border-color:var(--glass-border)!important;
     }
-    body.page-group html.has-wallpaper body {background:transparent;}
+    html.has-wallpaper body.page-group {background:transparent;}
 
     /* ===== نافذة إعداد الخلفية ===== */
     body.page-group .wp-overlay {position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;z-index:999;opacity:0;visibility:hidden;transition:all .25s ease;padding:20px;}
@@ -1411,7 +1411,7 @@ body.page-index {
       --surface-elevated: #2c2c2e;
     }
     body.page-index, body.page-index * {margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-    body.page-index {scroll-behavior:smooth;}
+    html {scroll-behavior:smooth;}
     body.page-index {
       background: var(--black);
       color:var(--text);
@@ -1423,7 +1423,7 @@ body.page-index {
       line-height:1.6;
     }
     /* Smooth color transitions when wallpaper changes theme colors */
-    body.page-index html.has-wallpaper * {
+    html.has-wallpaper body.page-index * {
       transition: background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, color 0.4s ease;
     }
     body.page-index::before {
@@ -1451,21 +1451,21 @@ body.page-index {
       opacity:0;transition:opacity 0.6s ease;
       transform:scale(1.02);
     }
-    body.page-index html.has-wallpaper .wallpaper-bg {opacity:1;}
+    html.has-wallpaper body.page-index .wallpaper-bg {opacity:1;}
     body.page-index .wallpaper-overlay {
       position:fixed;inset:0;z-index:-1;
       background:var(--wallpaper-overlay);
       pointer-events:none;
       transition:background 0.6s ease;
     }
-    body.page-index html.has-wallpaper .topbar {background:var(--glass-bg-strong)!important;backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-bottom-color:var(--glass-border);}
-    body.page-index html.has-wallpaper .topbar.scrolled {background:var(--glass-bg-strong)!important;}
-    body.page-index html.has-wallpaper .post-card {background:var(--glass-bg);backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-color:var(--glass-border);}
-    body.page-index html.has-wallpaper .modal-box {background:var(--glass-bg-strong);backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-color:var(--glass-border);}
-    body.page-index html.has-wallpaper .lang-menu, body.page-index html.has-wallpaper .user-dropdown, body.page-index html.has-wallpaper .react-menu, body.page-index html.has-wallpaper .comment-input {background:var(--glass-bg-strong);backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-color:var(--glass-border);}
-    body.page-index html.has-wallpaper .icon-btn {background:var(--glass-bg);border-color:var(--glass-border);}
-    body.page-index html.has-wallpaper .btn-post {background:var(--glass-bg);}
-    body.page-index html.has-wallpaper body {background:transparent;}
+    html.has-wallpaper body.page-index .topbar {background:var(--glass-bg-strong)!important;backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-bottom-color:var(--glass-border);}
+    html.has-wallpaper body.page-index .topbar.scrolled {background:var(--glass-bg-strong)!important;}
+    html.has-wallpaper body.page-index .post-card {background:var(--glass-bg);backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-color:var(--glass-border);}
+    html.has-wallpaper body.page-index .modal-box {background:var(--glass-bg-strong);backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-color:var(--glass-border);}
+    html.has-wallpaper body.page-index .lang-menu, html.has-wallpaper body.page-index .user-dropdown, html.has-wallpaper body.page-index .react-menu, html.has-wallpaper body.page-index .comment-input {background:var(--glass-bg-strong);backdrop-filter:blur(var(--glass-blur)) saturate(1.5);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);border-color:var(--glass-border);}
+    html.has-wallpaper body.page-index .icon-btn {background:var(--glass-bg);border-color:var(--glass-border);}
+    html.has-wallpaper body.page-index .btn-post {background:var(--glass-bg);}
+    html.has-wallpaper body.page-index {background:transparent;}
 
     body.page-index .topbar {
       position:fixed;
@@ -2068,7 +2068,7 @@ body.page-index {
     body.page-index .empty {text-align:center;padding:70px 24px;color:var(--muted);font-size:1rem;}
     body.page-index .empty svg {width:56px;height:56px;margin-bottom:16px;opacity:0.25;}
 
-    body.page-index html.splash-seen .splash-screen {display:none!important;}
+    html.splash-seen body.page-index .splash-screen {display:none!important;}
     body.page-index .splash-screen {
       position:fixed;inset:0;z-index:3000;
       background:var(--black);
@@ -2078,7 +2078,7 @@ body.page-index {
       transition:opacity 0.5s ease, visibility 0.5s ease;
     }
     body.page-index .splash-screen.dismissed {opacity:0;visibility:hidden;pointer-events:none;}
-    body.page-index html.has-wallpaper .splash-screen {
+    html.has-wallpaper body.page-index .splash-screen {
       background:var(--glass-bg-strong);
       backdrop-filter:blur(var(--glass-blur)) saturate(1.5);
       -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);
@@ -2363,7 +2363,7 @@ body.page-login {
     --shadow-lg: 0 12px 40px rgba(0,0,0,0.5);
   }
   body.page-login, body.page-login * {margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  body.page-login, body.page-login {height:100%;}
+  html, body.page-login {height:100%;}
   body.page-login {
     background:radial-gradient(circle at 18% 16%,rgba(0,113,227,0.05),transparent 22%),var(--black);
     color:var(--text); font-family:'Cairo',sans-serif;
@@ -2590,7 +2590,7 @@ body.page-page {
       --badge-verified-check: #000000;
     }
     body.page-profile, body.page-profile * {margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-    body.page-profile {scroll-behavior:smooth;}
+    html {scroll-behavior:smooth;}
     body.page-profile {
       background:radial-gradient(circle at 18% 16%,rgba(128,128,128,0.05),transparent 22%),var(--black);
       color:var(--text);
@@ -2889,7 +2889,7 @@ body.page-shiziai {
       --shizi-gradient: var(--avatar-gradient);
     }
     body.page-shiziai, body.page-shiziai * {margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-    body.page-shiziai, body.page-shiziai {height:100%;overflow:hidden;}
+    html, body.page-shiziai {height:100%;overflow:hidden;}
     body.page-shiziai {
       background:radial-gradient(circle at 18% 16%,rgba(128,128,128,0.06),transparent 22%),var(--black);
       color:var(--text);
@@ -2898,7 +2898,7 @@ body.page-shiziai {
       -webkit-font-smoothing:antialiased;
       transition:background var(--transition-slow), color var(--transition-slow);
     }
-    body.page-shiziai html.has-wallpaper * {
+    html.has-wallpaper body.page-shiziai * {
       transition: background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, color 0.4s ease;
     }
     /* ===== خلفية المنصة (Wallpaper) ===== */
@@ -2909,20 +2909,20 @@ body.page-shiziai {
       opacity:0;transition:opacity 0.6s ease;
       transform:scale(1.02);
     }
-    body.page-shiziai html.has-wallpaper .wallpaper-bg {opacity:1;}
+    html.has-wallpaper body.page-shiziai .wallpaper-bg {opacity:1;}
     body.page-shiziai .wallpaper-overlay {
       position:fixed;inset:0;z-index:-1;
       background:var(--wallpaper-overlay);
       pointer-events:none;
       transition:background 0.6s ease;
     }
-    body.page-shiziai html.has-wallpaper .topbar {
+    html.has-wallpaper body.page-shiziai .topbar {
       background:var(--glass-bg)!important;
       backdrop-filter:blur(var(--glass-blur)) saturate(1.5);
       -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);
       border-color:var(--glass-border)!important;
     }
-    body.page-shiziai html.has-wallpaper body {background:transparent;}
+    html.has-wallpaper body.page-shiziai {background:transparent;}
 
     /* ===== نافذة إعداد الخلفية ===== */
     body.page-shiziai .wp-overlay {position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;z-index:999;opacity:0;visibility:hidden;transition:all .25s ease;padding:20px;}
@@ -3148,7 +3148,7 @@ body.page-shiziai {
     --danger: #ff3b30;
   }
   body.page-short, body.page-short * {margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  body.page-short, body.page-short {height:100%;background:#000;overscroll-behavior:none;}
+  html, body.page-short {height:100%;background:#000;overscroll-behavior:none;}
   body.page-short {font-family:'Cairo',sans-serif;color:#fff;}
 
   body.page-short .topbar {
