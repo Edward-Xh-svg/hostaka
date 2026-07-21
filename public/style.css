@@ -167,7 +167,7 @@ body.page-admin {
     }
 
     body.page-chat, body.page-chat * {margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-    html, body.page-chat {height:100%;overflow:hidden;}
+    html.page-chat, body.page-chat {height:100%;overflow:hidden;}
     body.page-chat {
       background:radial-gradient(circle at 18% 16%,rgba(0,0,0,0.05),transparent 22%),var(--black);
       color:var(--text);
@@ -910,7 +910,7 @@ body.page-group {
       --sidebar-bg: var(--glass-bg);
     }
     body.page-group, body.page-group * {margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-    html, body.page-group {height:100%;overflow:hidden;}
+    html.page-group, body.page-group {height:100%;overflow:hidden;}
     body.page-group {
       background:radial-gradient(circle at 18% 16%,rgba(0,0,0,0.05),transparent 22%),var(--black);
       color:var(--text);font-family:'Cairo',sans-serif;
@@ -1411,7 +1411,7 @@ body.page-index {
       --surface-elevated: #2c2c2e;
     }
     body.page-index, body.page-index * {margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-    html {scroll-behavior:smooth;}
+    html.page-index {scroll-behavior:smooth;}
     body.page-index {
       background: var(--black);
       color:var(--text);
@@ -2363,7 +2363,7 @@ body.page-login {
     --shadow-lg: 0 12px 40px rgba(0,0,0,0.5);
   }
   body.page-login, body.page-login * {margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  html, body.page-login {height:100%;}
+  html.page-login, body.page-login {height:100%;}
   body.page-login {
     background:radial-gradient(circle at 18% 16%,rgba(0,113,227,0.05),transparent 22%),var(--black);
     color:var(--text); font-family:'Cairo',sans-serif;
@@ -2590,7 +2590,7 @@ body.page-page {
       --badge-verified-check: #000000;
     }
     body.page-profile, body.page-profile * {margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-    html {scroll-behavior:smooth;}
+    html.page-profile {scroll-behavior:smooth;}
     body.page-profile {
       background:radial-gradient(circle at 18% 16%,rgba(128,128,128,0.05),transparent 22%),var(--black);
       color:var(--text);
@@ -2889,7 +2889,7 @@ body.page-shiziai {
       --shizi-gradient: var(--avatar-gradient);
     }
     body.page-shiziai, body.page-shiziai * {margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-    html, body.page-shiziai {height:100%;overflow:hidden;}
+    html.page-shiziai, body.page-shiziai {height:100%;overflow:hidden;}
     body.page-shiziai {
       background:radial-gradient(circle at 18% 16%,rgba(128,128,128,0.06),transparent 22%),var(--black);
       color:var(--text);
@@ -3148,7 +3148,7 @@ body.page-shiziai {
     --danger: #ff3b30;
   }
   body.page-short, body.page-short * {margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  html, body.page-short {height:100%;background:#000;overscroll-behavior:none;}
+  html.page-short, body.page-short {height:100%;background:#000;overscroll-behavior:none;}
   body.page-short {font-family:'Cairo',sans-serif;color:#fff;}
 
   body.page-short .topbar {
