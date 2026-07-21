@@ -119,7 +119,6 @@
     }
     html.has-wallpaper .topbar,
     html.has-wallpaper .sidebar,
-    html.has-wallpaper .bubble,
     html.has-wallpaper .modal-box{
       background:var(--glass-bg)!important;
       backdrop-filter:blur(var(--glass-blur)) saturate(1.5);
@@ -285,12 +284,60 @@
     .sender-name{font-size:0.7rem;color:var(--muted);font-weight:700;margin:0 6px 2px;}
     .bubble{
       padding:10px 14px;border-radius:18px;font-size:0.9rem;line-height:1.6;
-      word-break:break-word;position:relative;cursor:pointer;transition:filter 0.15s;
+      word-break:break-word;position:relative;cursor:pointer;
+      transition:background-color 0.3s ease, box-shadow 0.15s ease, transform 0.1s ease;
+      box-shadow:0 1px 2px rgba(0,0,0,0.04);
     }
-    .bubble:hover{filter:brightness(1.12);}
-    .msg-row.mine .bubble{background:var(--mine-bg);border:1px solid var(--mine-border);border-bottom-left-radius:5px;}
-    .msg-row.theirs .bubble{background:var(--their-bg);border:1px solid var(--their-border);border-bottom-right-radius:5px;}
-    .bubble-img{max-width:100%;border-radius:10px;display:block;margin-bottom:5px;max-height:180px;object-fit:cover;}
+    .bubble:active{transform:scale(0.98);}
+    .msg-row.mine .bubble{background:var(--mine-bg);border-bottom-left-radius:5px;}
+    .msg-row.theirs .bubble{background:var(--their-bg);border-bottom-right-radius:5px;}
+    .bubble-media{
+      position:relative;border-radius:18px;overflow:hidden;cursor:pointer;
+      max-width:260px;box-shadow:0 1px 3px rgba(0,0,0,0.08);
+      transition:transform 0.15s ease;
+    }
+    .bubble-media:active{transform:scale(0.98);}
+    .bubble-img{
+      display:block;width:100%;max-height:320px;min-height:120px;
+      object-fit:cover;background:var(--input-bg);
+    }
+    .media-more-btn{
+      position:absolute;top:7px;left:7px;width:26px;height:26px;
+      border-radius:50%;border:none;cursor:pointer;
+      background:rgba(0,0,0,0.35);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+      color:#fff;display:flex;align-items:center;justify-content:center;
+      transition:background 0.15s ease;z-index:2;
+    }
+    .media-more-btn:hover{background:rgba(0,0,0,0.55);}
+    .bubble-media .react-picker{top:calc(100% + 8px);bottom:auto;}
+
+    /* ===== عارض الصور (فتح/حفظ) ===== */
+    .img-viewer-overlay{
+      position:fixed;inset:0;background:rgba(0,0,0,0.92);
+      -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+      z-index:9999;display:none;align-items:center;justify-content:center;
+      opacity:0;transition:opacity 0.25s ease;
+    }
+    .img-viewer-overlay.show{display:flex;opacity:1;}
+    .img-viewer-img{
+      max-width:92vw;max-height:80vh;border-radius:14px;object-fit:contain;
+      box-shadow:0 20px 60px rgba(0,0,0,0.5);
+      animation:ivPop .25s cubic-bezier(.16,1,.3,1);
+    }
+    @keyframes ivPop{from{transform:scale(0.94);opacity:0;}to{transform:scale(1);opacity:1;}}
+    .img-viewer-topbar{
+      position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;
+      padding:calc(14px + env(safe-area-inset-top)) 16px 14px;z-index:2;
+    }
+    .iv-btn{
+      display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.12);
+      -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+      border:1px solid rgba(255,255,255,0.15);color:#fff;padding:9px 16px;
+      border-radius:999px;font-family:'Cairo',sans-serif;font-weight:700;font-size:0.85rem;
+      cursor:pointer;transition:background 0.2s ease;
+    }
+    .iv-btn:hover{background:rgba(255,255,255,0.22);}
+    .iv-btn svg{width:15px;height:15px;}
     .msg-link{color:var(--primary);text-decoration:underline;word-break:break-all;}
     .link-preview-card{
       display:block;margin-top:6px;border:1px solid var(--border);border-radius:12px;
@@ -1456,22 +1503,27 @@ function renderMsgs(msgs, scroll = true){
     const reactionHtml = totalReacts > 0 ?
       `<div class="msg-reaction" onclick="togglePicker(${m.id})">${rc.reactions.map(r => (REACTIONS.find(x=>x.emoji===r.emoji)||{}).icon || '').join('')} <span style="font-size:0.7rem;color:var(--muted);">${totalReacts}</span></div>` : '';
     const firstUrl = extractFirstUrl(m.content);
-    html += `<div class="msg-row ${isMine ? 'mine' : 'theirs'}">
-      ${!isMine ? `<div class="msg-av ${isLast?'':'invisible'}">${av}</div>` : ''}
-      <div class="bubble-wrap">
-        ${!isMine && isLast ? `<div class="sender-name">${esc(m.from_name)}</div>` : ''}
-        <div class="bubble" id="bubble-${m.id}" onclick="togglePicker(${m.id})">
-          ${m.image ? `<img class="bubble-img" src="${esc(m.image)}" loading="lazy" onerror="this.style.display='none'">` : ''}
-          ${m.content ? linkifyEscaped(esc(m.content)) : ''}
-          ${firstUrl ? `<div class="link-preview-slot" data-lp-url="${esc(firstUrl)}"></div>` : ''}
-          <div class="react-picker" id="picker-${m.id}">
+    const pickerHtml = `<div class="react-picker" id="picker-${m.id}">
             ${REACTIONS.map(r => `<button class="r-emoji ${rc.userReaction===r.emoji?'active':''}" onclick="reactMsg(event,${m.id},'${r.emoji}')">${r.icon}</button>`).join('')}
             <div class="picker-sep"></div>
             ${isMine ? `<button class="r-emoji" onclick="startEditMsg(event, ${m.id})" title="${t('editMsg')}">${SVG.editIc}</button>` : ''}
             ${canManageMsg ? `<button class="r-emoji" onclick="deleteMsg(event, ${m.id})" title="${t('deleteMsg')}">${SVG.deleteIc}</button>` : ''}
             ${!isMine ? `<button class="r-emoji" onclick="openReportMsgModal(event, ${m.id})" title="${t('reportMsg')}">${SVG.flagIc}</button>` : ''}
-          </div>
-        </div>
+          </div>`;
+    html += `<div class="msg-row ${isMine ? 'mine' : 'theirs'}">
+      ${!isMine ? `<div class="msg-av ${isLast?'':'invisible'}">${av}</div>` : ''}
+      <div class="bubble-wrap">
+        ${!isMine && isLast ? `<div class="sender-name">${esc(m.from_name)}</div>` : ''}
+        ${m.image ? `<div class="bubble-media" onclick="openImgViewer(this.querySelector('img').src)">
+          <img class="bubble-img" src="${esc(m.image)}" loading="lazy" onerror="this.parentElement.style.display='none'">
+          <button class="media-more-btn" onclick="event.stopPropagation();togglePicker(${m.id})" title="${t('editMsg')}">${SVG.moreIc || '⋮'}</button>
+          ${pickerHtml}
+        </div>` : ''}
+        ${m.content ? `<div class="bubble" id="bubble-${m.id}" onclick="togglePicker(${m.id})">
+          ${linkifyEscaped(esc(m.content))}
+          ${firstUrl ? `<div class="link-preview-slot" data-lp-url="${esc(firstUrl)}"></div>` : ''}
+          ${!m.image ? pickerHtml : ''}
+        </div>` : ''}
         ${reactionHtml}
         <div class="msg-time">${fmtTime(m.created_at)}${Number(m.edited)===1 ? ' · <span class="msg-edited-tag">'+esc(t('msgEdited'))+'</span>' : ''}</div>
       </div>
@@ -1638,7 +1690,61 @@ async function sendMsg(){
 function onKey(e){ if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); } }
 function autoResize(el){ el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }
 
+// ============================================================
+//  عارض الصور (فتح وحفظ)
+// ============================================================
+function openImgViewer(url){
+  if(!url) return;
+  document.querySelectorAll('.react-picker.show').forEach(p => p.classList.remove('show'));
+  const ov = document.getElementById('imgViewerOverlay');
+  const img = document.getElementById('imgViewerImg');
+  img.src = url;
+  ov.classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function closeImgViewer(e){
+  if(e) e.stopPropagation();
+  document.getElementById('imgViewerOverlay').classList.remove('show');
+  document.body.style.overflow = '';
+}
+async function saveViewerImage(e){
+  e.stopPropagation();
+  const img = document.getElementById('imgViewerImg');
+  const url = img.src;
+  if(!url) return;
+  try{
+    const res = await fetch(url, { mode:'cors' });
+    if(!res.ok) throw new Error('fetch failed');
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = 'hostaka-' + Date.now() + '.jpg';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
+  }catch(err){
+    window.open(url, '_blank');
+    showToast('اضغط مطولاً على الصورة لحفظها', 'info');
+  }
+}
+
 init();
 </script>
+
+<div class="img-viewer-overlay" id="imgViewerOverlay" onclick="closeImgViewer(event)">
+  <div class="img-viewer-topbar">
+    <button class="iv-btn" onclick="closeImgViewer(event)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      إغلاق
+    </button>
+    <button class="iv-btn" onclick="saveViewerImage(event)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      حفظ
+    </button>
+  </div>
+  <img class="img-viewer-img" id="imgViewerImg" src="" alt="" onclick="event.stopPropagation()">
+</div>
 </body>
 </html>

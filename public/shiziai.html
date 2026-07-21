@@ -124,8 +124,7 @@
       pointer-events:none;
       transition:background 0.6s ease;
     }
-    html.has-wallpaper .topbar,
-    html.has-wallpaper .bubble{
+    html.has-wallpaper .topbar{
       background:var(--glass-bg)!important;
       backdrop-filter:blur(var(--glass-blur)) saturate(1.5);
       -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.5);
@@ -259,9 +258,11 @@
     .bubble{
       padding:11px 15px;border-radius:18px;font-size:0.9rem;line-height:1.7;
       word-break:break-word;white-space:pre-wrap;
+      transition:background-color 0.3s ease, box-shadow 0.15s ease;
+      box-shadow:0 1px 2px rgba(0,0,0,0.04);
     }
-    .msg-row.mine .bubble{background:var(--mine-bg);border:1px solid var(--mine-border);border-bottom-left-radius:5px;}
-    .msg-row.theirs .bubble{background:var(--shizi-bg);border:1px solid var(--shizi-border);border-bottom-right-radius:5px;}
+    .msg-row.mine .bubble{background:var(--mine-bg);border-bottom-left-radius:5px;}
+    .msg-row.theirs .bubble{background:var(--shizi-bg);border-bottom-right-radius:5px;}
     .msg-time{font-size:0.62rem;color:var(--muted);padding:3px 5px;font-weight:600;}
 
     .typing-row{display:flex;align-items:flex-end;gap:8px;margin-bottom:8px;}
