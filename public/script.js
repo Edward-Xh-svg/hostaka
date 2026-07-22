@@ -6306,7 +6306,7 @@ function showNotLogged(){
 function renderWelcome(){
   document.getElementById('chatMain').innerHTML = `
     <div class="welcome">
-      <div class="shizi-big">S</div>
+      <div class="shizi-big"><img src="shizi-icon.png" alt="Shizi AI"></div>
       <h2>${t('welcomeTitle')}</h2>
       <p>${t('welcomeText')}</p>
       <div class="suggestions">
@@ -6330,7 +6330,7 @@ function renderMsgs(){
   messages.forEach(m => {
     const isMine = m.role === 'user';
     html += `<div class="msg-row ${isMine ? 'mine' : 'theirs'}">
-      <div class="msg-av ${isMine ? 'user' : 'shizi'}">${isMine ? (ME?.username||'?').charAt(0).toUpperCase() : 'S'}</div>
+      <div class="msg-av ${isMine ? 'user' : 'shizi'}">${isMine ? (ME?.username||'?').charAt(0).toUpperCase() : '<img src="shizi-icon.png" alt="Shizi AI">'}</div>
       <div class="bubble-wrap">
         <div class="bubble">${esc(m.content)}</div>
         ${m.created_at ? `<div class="msg-time">${fmtTime(m.created_at)}</div>` : ''}
@@ -6339,7 +6339,7 @@ function renderMsgs(){
   });
   if (sending){
     html += `<div class="typing-row">
-      <div class="msg-av shizi">S</div>
+      <div class="msg-av shizi"><img src="shizi-icon.png" alt="Shizi AI"></div>
       <div class="typing-bubble"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>
     </div>`;
   }
