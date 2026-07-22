@@ -1706,6 +1706,45 @@ html.page-index {
     }
     body.page-index .user-dropdown button:hover {background:var(--primary-light);color:var(--primary);padding-right:24px;}
     body.page-index .user-dropdown button svg {flex-shrink:0;width:17px;height:17px;}
+    body.page-index .user-dropdown .dropdown-sep {height:1px;background:var(--border);margin:6px 0;}
+    body.page-index .user-dropdown a#reelsBtn {
+      width:100%;text-align:right;padding:11px 20px;
+      background:none;border:none;color:var(--muted);
+      cursor:pointer;font-family:'Cairo',sans-serif;
+      font-size:0.9rem;display:flex;align-items:center;gap:12px;
+      transition:all var(--transition-fast);text-decoration:none;
+    }
+    body.page-index .user-dropdown a#reelsBtn:hover {background:var(--primary-light);color:var(--primary);padding-right:24px;}
+    body.page-index .user-dropdown a#reelsBtn svg {flex-shrink:0;width:17px;height:17px;}
+    body.page-index .user-dropdown .lang-selector {
+      width:100%;text-align:right;padding:11px 20px;
+      background:none;color:var(--muted);position:relative;
+      cursor:pointer;font-family:'Cairo',sans-serif;
+      font-size:0.9rem;display:flex;align-items:center;gap:12px;
+      transition:all var(--transition-fast);
+    }
+    body.page-index .user-dropdown .lang-selector:hover {background:var(--primary-light);color:var(--primary);padding-right:24px;}
+    body.page-index .user-dropdown .lang-selector svg {flex-shrink:0;width:17px;height:17px;}
+    body.page-index .user-dropdown .lang-selector .lang-menu {
+      position:static;display:none;min-width:auto;
+      box-shadow:none;border:none;background:transparent;
+      margin:4px 0 0;padding:0 8px 0 0;
+      opacity:1;visibility:visible;transform:none;
+    }
+    body.page-index .user-dropdown .lang-selector .lang-menu.show {display:block;}
+    body.page-index .user-dropdown .lang-selector .lang-menu button {padding:9px 20px;font-size:0.84rem;}
+    .ti-icon {display:contents;}
+    body.page-index .user-dropdown {
+      z-index:60;
+      max-height:calc(100vh - 90px);
+      overflow-y:auto;
+      overflow-x:hidden;
+    }
+    html.has-wallpaper body.page-index .user-dropdown {
+      background:var(--modal-bg) !important;
+      backdrop-filter:blur(28px) saturate(1.3);
+      -webkit-backdrop-filter:blur(28px) saturate(1.3);
+    }
 
     body.page-index .page-header {padding:110px 20px 48px;text-align:center;position:relative;}
     body.page-index .page-header::before {
