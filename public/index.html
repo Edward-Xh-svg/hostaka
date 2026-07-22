@@ -32,53 +32,12 @@
     <span class="topbar-title" id="topbarTitle">Hostaka</span>
   </div>
   <div class="topbar-right">
-    <button class="icon-btn" id="themeToggle" onclick="toggleTheme()" title="تبديل الثيم">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="5"/>
-        <line x1="12" y1="1" x2="12" y2="3"/>
-        <line x1="12" y1="21" x2="12" y2="23"/>
-        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-        <line x1="1" y1="12" x2="3" y2="12"/>
-        <line x1="21" y1="12" x2="23" y2="12"/>
-        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-      </svg>
-    </button>
-    <button class="icon-btn" id="wallpaperToggle" onclick="openWallpaperModal()" title="خلفية المنصة">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="3" width="18" height="18" rx="2"/>
-        <circle cx="8.5" cy="8.5" r="1.5"/>
-        <path d="M21 15l-5-5L5 21"/>
-      </svg>
-    </button>
-    <div class="lang-selector icon-btn" id="langToggle" onclick="toggleLangMenu()" title="تغيير اللغة">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/>
-        <line x1="2" y1="12" x2="22" y2="12"/>
-        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-      </svg>
-      <div class="lang-menu" id="langMenu">
-        <button onclick="setLang('ar')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-ar"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-ar)"><rect width="20" height="20" fill="#006c35"/><rect x="4" y="9" width="12" height="2" rx="1" fill="#fff"/></g></svg></span> العربية</button>
-        <button onclick="setLang('en')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-en"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-en)"><rect width="20" height="20" fill="#012169"/><path d="M0 0L20 20M20 0L0 20" stroke="#fff" stroke-width="3"/><path d="M10 0V20M0 10H20" stroke="#fff" stroke-width="4"/><path d="M10 0V20M0 10H20" stroke="#C8102E" stroke-width="1.6"/></g></svg></span> English</button>
-        <button onclick="setLang('fr')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-fr"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-fr)"><rect width="6.7" height="20" fill="#0055A4"/><rect x="6.7" width="6.6" height="20" fill="#fff"/><rect x="13.3" width="6.7" height="20" fill="#EF4135"/></g></svg></span> Français</button>
-        <button onclick="setLang('ru')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-ru"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-ru)"><rect width="20" height="6.7" fill="#fff"/><rect y="6.7" width="20" height="6.6" fill="#0039A6"/><rect y="13.3" width="20" height="6.7" fill="#D52B1E"/></g></svg></span> Русский</button>
-        <button onclick="setLang('zh')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-zh"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-zh)"><rect width="20" height="20" fill="#DE2910"/><path d="M6 4l1 3h3l-2.5 2 1 3-2.5-2-2.5 2 1-3-2.5-2h3z" fill="#FFDE00"/></g></svg></span> 中文</button>
-        <button onclick="setLang('ja')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-ja"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-ja)"><rect width="20" height="20" fill="#fff"/><circle cx="10" cy="10" r="5.5" fill="#BC002D"/></g></svg></span> 日本語</button>
-      </div>
-    </div>
-    <button class="icon-btn" id="verifyBtn" onclick="requestVerify()" title="طلب التوثيق" style="display:none;">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-    </button>
     <!-- زر Shizi AI أصبح عادياً (لا ألوان خاصة) -->
     <a href="/shiziai" class="icon-btn" id="shiziBtn" title="Shizi AI">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/>
         <path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/>
       </svg>
-    </a>
-    <a href="/short" class="icon-btn" id="reelsBtn" title="الريلز">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2.5"/><polygon points="10.5 9.5 15 12 10.5 14.5" fill="currentColor" stroke="none"/></svg>
     </a>
     <div class="notif-wrap" id="notifWrap" style="position:relative;display:none;">
       <button class="icon-btn" id="notifBtn" onclick="toggleNotifDrop()" title="الإشعارات">
@@ -108,6 +67,52 @@
       <div class="user-dropdown" id="userDrop">
         <div class="dropdown-name" id="dropName"></div>
         <div class="account-switcher" id="accountSwitcher"></div>
+        <a href="/short" id="reelsBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2.5"/><polygon points="10.5 9.5 15 12 10.5 14.5" fill="currentColor" stroke="none"/></svg>
+          <span>الريلز</span>
+        </a>
+        <button id="verifyBtn" onclick="requestVerify()" style="display:none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          <span>طلب التوثيق</span>
+        </button>
+        <button id="themeToggle" onclick="toggleTheme()" data-label="تبديل الثيم">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+        </button>
+        <button id="wallpaperToggle" onclick="openWallpaperModal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <path d="M21 15l-5-5L5 21"/>
+          </svg>
+          <span>خلفية المنصة</span>
+        </button>
+        <div class="lang-selector" id="langToggle" onclick="toggleLangMenu()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          <span>تغيير اللغة</span>
+          <div class="lang-menu" id="langMenu">
+            <button onclick="setLang('ar')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-ar"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-ar)"><rect width="20" height="20" fill="#006c35"/><rect x="4" y="9" width="12" height="2" rx="1" fill="#fff"/></g></svg></span> العربية</button>
+            <button onclick="setLang('en')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-en"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-en)"><rect width="20" height="20" fill="#012169"/><path d="M0 0L20 20M20 0L0 20" stroke="#fff" stroke-width="3"/><path d="M10 0V20M0 10H20" stroke="#fff" stroke-width="4"/><path d="M10 0V20M0 10H20" stroke="#C8102E" stroke-width="1.6"/></g></svg></span> English</button>
+            <button onclick="setLang('fr')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-fr"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-fr)"><rect width="6.7" height="20" fill="#0055A4"/><rect x="6.7" width="6.6" height="20" fill="#fff"/><rect x="13.3" width="6.7" height="20" fill="#EF4135"/></g></svg></span> Français</button>
+            <button onclick="setLang('ru')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-ru"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-ru)"><rect width="20" height="6.7" fill="#fff"/><rect y="6.7" width="20" height="6.6" fill="#0039A6"/><rect y="13.3" width="20" height="6.7" fill="#D52B1E"/></g></svg></span> Русский</button>
+            <button onclick="setLang('zh')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-zh"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-zh)"><rect width="20" height="20" fill="#DE2910"/><path d="M6 4l1 3h3l-2.5 2 1 3-2.5-2-2.5 2 1-3-2.5-2h3z" fill="#FFDE00"/></g></svg></span> 中文</button>
+            <button onclick="setLang('ja')"><span class="flag"><svg viewBox="0 0 20 20" width="16" height="16"><clipPath id="fc-ja"><circle cx="10" cy="10" r="10"/></clipPath><g clip-path="url(#fc-ja)"><rect width="20" height="20" fill="#fff"/><circle cx="10" cy="10" r="5.5" fill="#BC002D"/></g></svg></span> 日本語</button>
+          </div>
+        </div>
+        <div class="dropdown-sep"></div>
         <button id="adminBtn" onclick="location.href='/admin'" style="display:none;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M21 12h-2M5 12H3M12 21v-2M12 5V3"/></svg>
           <span class="drop-admin">لوحة الإدارة</span>
