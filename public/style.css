@@ -94,9 +94,9 @@ html.page-admin {
       --primary-mid: rgba(0,113,227,0.15);
       --primary-border: rgba(0,113,227,0.25);
       --accent: #0071e3;
-      --mine-bg: rgba(0,113,227,0.08);
+      --mine-bg: linear-gradient(135deg, var(--primary), var(--primary-h));
       --mine-border: rgba(0,113,227,0.12);
-      --their-bg: rgba(0,0,0,0.03);
+      --their-bg: var(--card);
       --their-border: rgba(0,0,0,0.06);
       --topbar-bg: rgba(255,255,255,0.72);
       --input-bg: #f2f2f7;
@@ -142,9 +142,9 @@ html.page-admin {
       --primary-mid: rgba(10,132,255,0.2);
       --primary-border: rgba(10,132,255,0.3);
       --accent: #0a84ff;
-      --mine-bg: rgba(10,132,255,0.12);
+      --mine-bg: linear-gradient(135deg, var(--primary), var(--primary-h));
       --mine-border: rgba(10,132,255,0.18);
-      --their-bg: rgba(255,255,255,0.04);
+      --their-bg: var(--card);
       --their-border: rgba(255,255,255,0.06);
       --topbar-bg: rgba(0,0,0,0.65);
       --input-bg: #1c1c1e;
@@ -476,10 +476,14 @@ html.page-admin {
     body.page-chat .bubble:active {transform:scale(0.98);}
     body.page-chat .msg-row.mine .bubble {
       background:var(--mine-bg);
+      color:#fff;
       border-bottom-left-radius:5px;
+      box-shadow:0 2px 8px rgba(0,113,227,0.22);
     }
+    body.page-chat .msg-row.mine .bubble .msg-link {color:#fff;}
     body.page-chat .msg-row.theirs .bubble {
       background:var(--their-bg);
+      border:1px solid var(--their-border);
       border-bottom-right-radius:5px;
     }
     body.page-chat .bubble-media {
@@ -839,9 +843,9 @@ html.page-group {
       --primary-mid: rgba(0,113,227,0.15);
       --primary-border: rgba(0,113,227,0.25);
       --accent: #0071e3;
-      --mine-bg: rgba(0,113,227,0.08);
+      --mine-bg: linear-gradient(135deg, var(--primary), var(--primary-h));
       --mine-border: rgba(0,113,227,0.12);
-      --their-bg: rgba(0,0,0,0.03);
+      --their-bg: var(--card);
       --their-border: rgba(0,0,0,0.06);
       --topbar-bg: rgba(255,255,255,0.72);
       --input-bg: #f2f2f7;
@@ -886,9 +890,9 @@ html.page-group {
       --primary-mid: rgba(10,132,255,0.2);
       --primary-border: rgba(10,132,255,0.3);
       --accent: #0a84ff;
-      --mine-bg: rgba(10,132,255,0.12);
+      --mine-bg: linear-gradient(135deg, var(--primary), var(--primary-h));
       --mine-border: rgba(10,132,255,0.18);
-      --their-bg: rgba(255,255,255,0.04);
+      --their-bg: var(--card);
       --their-border: rgba(255,255,255,0.06);
       --topbar-bg: rgba(0,0,0,0.65);
       --input-bg: #1c1c1e;
@@ -1105,8 +1109,9 @@ html.page-group {
       box-shadow:0 1px 2px rgba(0,0,0,0.04);
     }
     body.page-group .bubble:active {transform:scale(0.98);}
-    body.page-group .msg-row.mine .bubble {background:var(--mine-bg);border-bottom-left-radius:5px;}
-    body.page-group .msg-row.theirs .bubble {background:var(--their-bg);border-bottom-right-radius:5px;}
+    body.page-group .msg-row.mine .bubble {background:var(--mine-bg);color:#fff;border-bottom-left-radius:5px;box-shadow:0 2px 8px rgba(0,113,227,0.22);}
+    body.page-group .msg-row.mine .bubble .msg-link {color:#fff;}
+    body.page-group .msg-row.theirs .bubble {background:var(--their-bg);border:1px solid var(--their-border);border-bottom-right-radius:5px;}
     body.page-group .bubble-media {
       position:relative;border-radius:18px;overflow:hidden;cursor:pointer;
       max-width:260px;box-shadow:0 1px 3px rgba(0,0,0,0.08);
@@ -2852,9 +2857,9 @@ html.page-shiziai {
       --primary-mid: rgba(0,113,227,0.15);
       --primary-border: rgba(0,113,227,0.25);
       --accent: #0071e3;
-      --mine-bg: rgba(0,113,227,0.08);
+      --mine-bg: linear-gradient(135deg, var(--primary), var(--primary-h));
       --mine-border: rgba(0,113,227,0.12);
-      --their-bg: rgba(0,0,0,0.03);
+      --their-bg: var(--card);
       --their-border: rgba(0,0,0,0.06);
       --topbar-bg: rgba(255,255,255,0.72);
       --input-bg: #f2f2f7;
@@ -2902,9 +2907,9 @@ html.page-shiziai {
       --primary-mid: rgba(10,132,255,0.2);
       --primary-border: rgba(10,132,255,0.3);
       --accent: #0a84ff;
-      --mine-bg: rgba(10,132,255,0.12);
+      --mine-bg: linear-gradient(135deg, var(--primary), var(--primary-h));
       --mine-border: rgba(10,132,255,0.18);
-      --their-bg: rgba(255,255,255,0.04);
+      --their-bg: var(--card);
       --their-border: rgba(255,255,255,0.06);
       --topbar-bg: rgba(0,0,0,0.65);
       --input-bg: #1c1c1e;
@@ -3092,8 +3097,8 @@ html.page-shiziai {
       transition:background-color 0.3s ease, box-shadow 0.15s ease;
       box-shadow:0 1px 2px rgba(0,0,0,0.04);
     }
-    body.page-shiziai .msg-row.mine .bubble {background:var(--mine-bg);border-bottom-left-radius:5px;}
-    body.page-shiziai .msg-row.theirs .bubble {background:var(--shizi-bg);border-bottom-right-radius:5px;}
+    body.page-shiziai .msg-row.mine .bubble {background:var(--mine-bg);color:#fff;border-bottom-left-radius:5px;box-shadow:0 2px 8px rgba(0,113,227,0.22);}
+    body.page-shiziai .msg-row.theirs .bubble {background:var(--card);border:1px solid var(--shizi-border);border-bottom-right-radius:5px;}
     body.page-shiziai .msg-time {font-size:0.62rem;color:var(--muted);padding:3px 5px;font-weight:600;}
 
     body.page-shiziai .typing-row {display:flex;align-items:flex-end;gap:8px;margin-bottom:8px;}
