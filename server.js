@@ -14,6 +14,22 @@ app.use(express.json({ limit: '25mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ============================================================
+// انتظار جاهزية قاعدة البيانات قبل معالجة أي طلب
+// (ضروري على Vercel/serverless: التصدير module.exports = app يجعل
+// كل طلب يُعالج مباشرة دون انتظار initDB()/app.listen، فقد تصل
+// طلبات فور بدء التشغيل قبل اكتمال إنشاء/تعديل الجداول)
+// ============================================================
+const dbReadyPromise = initDB().catch(err => {
+  console.error('❌ DB init failed:', err);
+  throw err;
+});
+app.use((req, res, next) => {
+  dbReadyPromise
+    .then(() => next())
+    .catch(() => res.status(503).json({ error: 'الخادم لا يزال يهيّئ قاعدة البيانات، الرجاء المحاولة بعد قليل' }));
+});
+
+// ============================================================
 //  Open Graph — حقن ميتاداتا ديناميكية داخل صفحات HTML
 // ============================================================
 const SITE_NAME    = 'Hostaka';
@@ -2237,7 +2253,7 @@ app.get('*', async (req, res) => {
 // Start
 // ============================================================
 const PORT = process.env.PORT || 3000;
-initDB()
+dbReadyPromise
   .then(() => app.listen(PORT, () => console.log(`Hostaka running on port ${PORT}`)))
   .catch(err => { console.error('DB init failed:', err); process.exit(1); });
 
