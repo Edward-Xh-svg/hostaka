@@ -652,27 +652,7 @@ app.get('/api/user/:username/posts', async (req, res) => {
   try {
     const u = await q.getPublicProfile(req.params.username);
     if (!u) return res.status(404).json({ error: 'غير موجود' });
-    const viewer = verifyToken(req);
-    const posts = await q.getUserPosts(u.id, viewer ? viewer.id : null);
-    if (!posts.length) return res.json([]);
-    const [allR, allC, urList] = await Promise.all([
-      q.getAllReactions(),
-      q.getAllComments(),
-      viewer ? q.getUserAllReactions(viewer.id) : Promise.resolve([])
-    ]);
-    const rMap = {}, cMap = {}, urMap = {};
-    allR.forEach(r => { (rMap[r.record_id] ||= []).push({ emoji: r.emoji, count: r.count }); });
-    allC.forEach(c => { (cMap[c.record_id] ||= []).push(c); });
-    urList.forEach(r => { urMap[r.record_id] = r.emoji; });
-    res.json(posts.map(p => ({
-      ...p,
-      publisher_name: u.display_name || u.username,
-      user_avatar: u.avatar || '',
-      publisher_verified: u.verified || 0,
-      reactions: rMap[p.id] || [],
-      comments: cMap[p.id] || [],
-      userReaction: urMap[p.id] || null
-    })));
+    res.json(await q.getUserPosts(u.id));
   } catch(e) {
     res.status(500).json({ error: 'خطأ في الخادم' });
   }
@@ -834,9 +814,9 @@ app.get('/api/link-preview', async (req, res) => {
 
 app.get('/api/records', async (req, res) => {
   try {
-    const u = verifyToken(req);
-    const records = await q.listRecords(u ? u.id : 0);
+    const records = await q.listRecords();
     if (!records.length) return res.json([]);
+    const u = verifyToken(req);
     const [allR, allC, urList] = await Promise.all([
       q.getAllReactions(),
       q.getAllComments(),
@@ -865,22 +845,12 @@ app.get('/api/records', async (req, res) => {
 
 app.post('/api/records', requireAuth, async (req, res) => {
   try {
-    const { content, image, video, video_width, video_height, page_id, privacy, scheduled_at } = req.body || {};
+    const { content, image, video, video_width, video_height, page_id } = req.body || {};
     if (!content?.trim() && !image && !video) {
       return res.status(400).json({ error: 'المحتوى أو الملف مطلوب' });
     }
     const user = await q.getUserById(req.user.id);
     if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
-
-    // خصوصية المنشور: عام (public) / خاص (private) / مسودة (draft) + جدولة نشر لاحقاً
-    const allowedPrivacy = ['public', 'private', 'draft'];
-    const finalPrivacy = allowedPrivacy.includes(privacy) ? privacy : 'public';
-    let finalScheduledAt = null;
-    if (scheduled_at) {
-      const d = new Date(scheduled_at);
-      if (isNaN(d.getTime())) return res.status(400).json({ error: 'موعد النشر غير صحيح' });
-      finalScheduledAt = d.toISOString().replace('T',' ').slice(0,19);
-    }
 
     // النشر باسم صفحة/قناة تابعة لحسابي (اختياري)
     let publisher = user.display_name || user.username;
@@ -914,12 +884,10 @@ app.post('/api/records', requireAuth, async (req, res) => {
       isReel,
       w,
       h,
-      pageId,
-      finalPrivacy,
-      finalScheduledAt
+      pageId
     );
     const recordId = Number(result.lastInsertRowid);
-    if (!pageId && finalPrivacy === 'public' && !finalScheduledAt) notifyMentions(content, user, recordId, null, '/?p=' + recordId);
+    if (!pageId) notifyMentions(content, user, recordId, null, '/?p=' + recordId);
     res.json({ success: true, id: recordId, is_reel: isReel });
   } catch(e) {
     console.error('Create record error:', e);
@@ -1023,9 +991,9 @@ app.post('/api/pages/:id/unfollow', requireAuth, async (req, res) => {
 // ============================================================
 app.get('/api/reels', async (req, res) => {
   try {
-    const u = verifyToken(req);
-    const records = await q.listReels(u ? u.id : 0);
+    const records = await q.listReels();
     if (!records.length) return res.json([]);
+    const u = verifyToken(req);
     const [allR, allC, urList] = await Promise.all([
       q.getAllReactions(),
       q.getAllComments(),
@@ -1138,25 +1106,11 @@ app.put('/api/records/:id', requireAuth, async (req, res) => {
     if (req.user.role !== 'admin' && rec.user_id != req.user.id) {
       return res.status(403).json({ error: 'غير مسموح' });
     }
-    const { content, image, privacy, scheduled_at } = req.body || {};
+    const { content, image } = req.body || {};
     if (!content?.trim() && !image && !rec.video) {
       return res.status(400).json({ error: 'المحتوى مطلوب' });
     }
     await q.updateRecord(req.params.id, content?.trim() || '', image !== undefined ? image : rec.image);
-    if (privacy !== undefined || scheduled_at !== undefined) {
-      const allowedPrivacy = ['public', 'private', 'draft'];
-      const finalPrivacy = allowedPrivacy.includes(privacy) ? privacy : (rec.privacy || 'public');
-      let finalScheduledAt = rec.scheduled_at || null;
-      if (scheduled_at !== undefined) {
-        if (!scheduled_at) finalScheduledAt = null;
-        else {
-          const d = new Date(scheduled_at);
-          if (isNaN(d.getTime())) return res.status(400).json({ error: 'موعد النشر غير صحيح' });
-          finalScheduledAt = d.toISOString().replace('T',' ').slice(0,19);
-        }
-      }
-      await q.updateRecordPrivacy(req.params.id, finalPrivacy, finalScheduledAt);
-    }
     res.json({ success: true });
   } catch(e) {
     console.error('Update record error:', e);
@@ -1205,7 +1159,7 @@ app.get('/api/records/:id/comments', async (req, res) => {
 
 app.post('/api/records/:id/comments', requireAuth, async (req, res) => {
   try {
-    const { content, parent_id } = req.body || {};
+    const { content } = req.body || {};
     if (!content?.trim()) return res.status(400).json({ error: 'فارغ' });
     const user = await q.getUserById(req.user.id);
     const recordId = Number(req.params.id);
@@ -1216,8 +1170,7 @@ app.post('/api/records/:id/comments', requireAuth, async (req, res) => {
       user.display_name || '',
       user.avatar || '',
       user.role === 'admin' ? 'Admin' : 'Member',
-      content.trim(),
-      parent_id ? Number(parent_id) : null
+      content.trim()
     );
     const commentId = Number(result.lastInsertRowid);
     const link = '/?p=' + recordId;
@@ -1732,7 +1685,7 @@ app.get('/api/messages/:username', requireAuth, async (req, res) => {
 });
 app.post('/api/messages/:username', requireAuth, async (req, res) => {
   try {
-    const { content, image, reply_to } = req.body || {};
+    const { content, image } = req.body || {};
     if (!content?.trim() && !image) return res.status(400).json({ error: 'فارغة' });
     const other = await q.getPublicProfile(req.params.username);
     if (!other) return res.status(404).json({ error: 'غير موجود' });
@@ -1746,8 +1699,7 @@ app.post('/api/messages/:username', requireAuth, async (req, res) => {
       me.display_name || me.username,
       other.display_name || other.username,
       content?.trim() || '',
-      image || '',
-      reply_to ? Number(reply_to) : null
+      image || ''
     );
     res.json({ success: true });
   } catch(e) {
@@ -1948,7 +1900,7 @@ app.post('/api/groups/:id/messages', requireAuth, async (req, res) => {
   try {
     const m = await q.isMember(req.params.id, req.user.id);
     if (!m) return res.status(403).json({ error: 'لست عضواً' });
-    const { content, image, reply_to } = req.body || {};
+    const { content, image } = req.body || {};
     if (!content?.trim() && !image) return res.status(400).json({ error: 'فارغة' });
     const user = await q.getUserById(req.user.id);
     await q.sendGroupMessage(
@@ -1957,8 +1909,7 @@ app.post('/api/groups/:id/messages', requireAuth, async (req, res) => {
       user.display_name || user.username,
       user.avatar || '',
       content?.trim() || '',
-      image || '',
-      reply_to ? Number(reply_to) : null
+      image || ''
     );
     res.json({ success: true });
   } catch(e) {
