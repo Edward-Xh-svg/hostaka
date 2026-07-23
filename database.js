@@ -328,6 +328,11 @@ async function initDB() {
     "CREATE TABLE IF NOT EXISTS page_follows (id INTEGER PRIMARY KEY AUTOINCREMENT, page_id INTEGER NOT NULL, user_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(page_id, user_id))",
     "ALTER TABLE users ADD COLUMN birth_date TEXT DEFAULT ''",  // ✅ تاريخ الميلاد — صفحة إدارة الحساب
     "CREATE TABLE IF NOT EXISTS account_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '', target_email TEXT NOT NULL DEFAULT '', code TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, expires_at TEXT NOT NULL, last_sent_at TEXT NOT NULL DEFAULT (datetime('now')), created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(user_id, purpose))",
+    "ALTER TABLE records ADD COLUMN privacy TEXT DEFAULT 'public'",       // public | private | draft
+    "ALTER TABLE records ADD COLUMN scheduled_at TEXT DEFAULT NULL",      // نشر مجدوَل بوقت لاحق
+    "ALTER TABLE record_comments ADD COLUMN parent_id INTEGER DEFAULT NULL", // الرد على تعليق
+    "ALTER TABLE messages ADD COLUMN reply_to INTEGER DEFAULT NULL",         // الرد على رسالة (دردشة خاصة)
+    "ALTER TABLE group_messages ADD COLUMN reply_to INTEGER DEFAULT NULL",  // الرد على رسالة (مجموعة)
   ];
   for (const sql of migrations) {
     try { await db.execute(sql); } catch(e) { /* column/table already exists */ }
@@ -430,17 +435,21 @@ const q = {
   unsuspendUser:    (id) => db.execute({ sql:"UPDATE users SET suspended=0,suspend_reason='' WHERE id=?", args:[id] }),
 
   // ── Records ──
-  listRecords: () => db.execute(`
+  listRecords: (viewerId) => db.execute({ sql: `
     SELECT r.*,
            COALESCE(u.avatar, r.user_avatar, '') as user_avatar,
            COALESCE(u.display_name, u.username, r.publisher, '') as publisher_name,
            COALESCE(u.verified, 0) as publisher_verified,
-           p.username as page_username
+           p.username as page_username,
+           CASE WHEN f.follower_id IS NOT NULL THEN 1 ELSE 0 END as is_followed_author
     FROM records r
     LEFT JOIN users u ON (u.id = r.user_id) OR (r.user_id IS NULL AND u.username = r.publisher)
     LEFT JOIN pages p ON p.id = r.page_id
+    LEFT JOIN follows f ON f.follower_id = ? AND f.followed_id = r.user_id
+    WHERE COALESCE(r.privacy,'public') = 'public'
+      AND (r.scheduled_at IS NULL OR r.scheduled_at = '' OR r.scheduled_at <= datetime('now'))
     ORDER BY r.created_at DESC
-  `).then(rows),
+  `, args: [viewerId || 0] }).then(rows),
   getRecordById: (id) => db.execute({ sql: `
     SELECT r.*,
            COALESCE(u.avatar, r.user_avatar, '') as user_avatar,
@@ -452,16 +461,16 @@ const q = {
     LEFT JOIN pages p ON p.id = r.page_id
     WHERE r.id = ?
   `, args: [id] }).then(first),
-  createRecord: async (user_id, publisher, user_role, user_avatar, content, image, video, isReel, videoWidth, videoHeight, pageId) => {
-    // video/is_reel/video_width/video_height/page_id معاملات جديدة (اختيارية)
+  createRecord: async (user_id, publisher, user_role, user_avatar, content, image, video, isReel, videoWidth, videoHeight, pageId, privacy, scheduledAt) => {
+    // video/is_reel/video_width/video_height/page_id/privacy/scheduled_at معاملات جديدة (اختيارية)
     try {
       return await db.execute({
-        sql: 'INSERT INTO records (user_id,publisher,user_role,user_avatar,content,image,video,is_reel,video_width,video_height,page_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-        args: [user_id, publisher, user_role, user_avatar, content, image || '', video || '', isReel ? 1 : 0, videoWidth || 0, videoHeight || 0, pageId || null]
+        sql: 'INSERT INTO records (user_id,publisher,user_role,user_avatar,content,image,video,is_reel,video_width,video_height,page_id,privacy,scheduled_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        args: [user_id, publisher, user_role, user_avatar, content, image || '', video || '', isReel ? 1 : 0, videoWidth || 0, videoHeight || 0, pageId || null, privacy || 'public', scheduledAt || null]
       });
     } catch(e) {
       // إذا فشل (مثلاً لعدم وجود أعمدة الريلز/الصفحات في الإصدارات القديمة)، نعيد المحاولة بالمخطط القديم
-      console.warn('⚠️ Reel/page columns missing, falling back to older schema');
+      console.warn('⚠️ Reel/page/privacy columns missing, falling back to older schema');
       try {
         return await db.execute({
           sql: 'INSERT INTO records (user_id,publisher,user_role,user_avatar,content,image,video) VALUES (?,?,?,?,?,?,?)',
@@ -479,21 +488,34 @@ const q = {
     sql: 'UPDATE records SET content=?, image=?, edited=1 WHERE id=?',
     args: [content || '', image || '', id]
   }),
+  updateRecordPrivacy: (id, privacy, scheduledAt) => db.execute({
+    sql: 'UPDATE records SET privacy=?, scheduled_at=? WHERE id=?',
+    args: [privacy || 'public', scheduledAt || null, id]
+  }),
   deleteRecord: (id) => db.execute({ sql:'DELETE FROM records WHERE id=?', args:[id] }),
   getRecord:    (id) => db.execute({ sql:'SELECT * FROM records WHERE id=?', args:[id] }).then(first),
-  getUserPosts: (uid) => db.execute({ sql:'SELECT * FROM records WHERE user_id=? ORDER BY created_at DESC', args:[uid] }).then(rows),
+  getUserPosts: (uid, viewerId) => (Number(viewerId) === Number(uid)
+    ? db.execute({ sql:'SELECT * FROM records WHERE user_id=? ORDER BY created_at DESC', args:[uid] }).then(rows)
+    : db.execute({ sql:`SELECT * FROM records WHERE user_id=?
+        AND COALESCE(privacy,'public') = 'public'
+        AND (scheduled_at IS NULL OR scheduled_at = '' OR scheduled_at <= datetime('now'))
+        ORDER BY created_at DESC`, args:[uid] }).then(rows)),
 
   // ── Reels (فيديوهات عمودية) ──
-  listReels: () => db.execute(`
+  listReels: (viewerId) => db.execute({ sql: `
     SELECT r.*,
            COALESCE(u.avatar, r.user_avatar, '') as user_avatar,
            COALESCE(u.display_name, u.username, r.publisher, '') as publisher_name,
-           COALESCE(u.verified, 0) as publisher_verified
+           COALESCE(u.verified, 0) as publisher_verified,
+           CASE WHEN f.follower_id IS NOT NULL THEN 1 ELSE 0 END as is_followed_author
     FROM records r
     LEFT JOIN users u ON (u.id = r.user_id) OR (r.user_id IS NULL AND u.username = r.publisher)
+    LEFT JOIN follows f ON f.follower_id = ? AND f.followed_id = r.user_id
     WHERE r.video IS NOT NULL AND r.video != '' AND r.is_reel = 1
+      AND COALESCE(r.privacy,'public') = 'public'
+      AND (r.scheduled_at IS NULL OR r.scheduled_at = '' OR r.scheduled_at <= datetime('now'))
     ORDER BY RANDOM()
-  `).then(rows),
+  `, args: [viewerId || 0] }).then(rows),
 
   // ── Reactions ──
   getAllReactions:      () => db.execute('SELECT record_id,emoji,COUNT(*) as count FROM record_reactions GROUP BY record_id,emoji').then(rows),
@@ -510,9 +532,9 @@ const q = {
     ORDER BY rc.record_id ASC, rc.created_at ASC
   `).then(rows),
   getComments: (rid) => db.execute({ sql:'SELECT * FROM record_comments WHERE record_id=? ORDER BY created_at ASC', args:[rid] }).then(rows),
-  addComment: async (rid,uid,username,display_name,avatar,user_role,content) => {
+  addComment: async (rid,uid,username,display_name,avatar,user_role,content,parentId) => {
     try {
-      return await db.execute({ sql:'INSERT INTO record_comments (record_id,user_id,username,display_name,avatar,user_role,content) VALUES (?,?,?,?,?,?,?)', args:[rid,uid,username,display_name,avatar,user_role,content] });
+      return await db.execute({ sql:'INSERT INTO record_comments (record_id,user_id,username,display_name,avatar,user_role,content,parent_id) VALUES (?,?,?,?,?,?,?,?)', args:[rid,uid,username,display_name,avatar,user_role,content,parentId||null] });
     } catch(e) {
       return await db.execute({ sql:'INSERT INTO record_comments (record_id,user_id,username,content) VALUES (?,?,?,?)', args:[rid,uid,username,content] });
     }
@@ -528,7 +550,7 @@ const q = {
     WHERE m.id IN (SELECT MAX(id) FROM messages WHERE from_id=? OR to_id=? GROUP BY CASE WHEN from_id=? THEN to_id ELSE from_id END)
     ORDER BY m.created_at DESC`, args:[uid,uid,uid] }).then(rows),
   getMessages:  (uid,oid) => db.execute({ sql:'SELECT m.*,u.avatar as from_avatar FROM messages m JOIN users u ON u.id=m.from_id WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?) ORDER BY created_at ASC', args:[uid,oid,oid,uid] }).then(rows),
-  sendMessage:  (fid,tid,fn,tn,content,image) => db.execute({ sql:'INSERT INTO messages (from_id,to_id,from_name,to_name,content,image) VALUES (?,?,?,?,?,?)', args:[fid,tid,fn,tn,content,image||''] }),
+  sendMessage:  (fid,tid,fn,tn,content,image,replyTo) => db.execute({ sql:'INSERT INTO messages (from_id,to_id,from_name,to_name,content,image,reply_to) VALUES (?,?,?,?,?,?,?)', args:[fid,tid,fn,tn,content,image||'',replyTo||null] }),
   getMessage:   (id) => db.execute({ sql:'SELECT * FROM messages WHERE id=?', args:[id] }).then(first),
   updateMessage:(id,content) => db.execute({ sql:'UPDATE messages SET content=?, edited=1 WHERE id=?', args:[content,id] }),
   deleteMessage:(id) => db.execute({ sql:'DELETE FROM messages WHERE id=?', args:[id] }),
@@ -556,7 +578,7 @@ const q = {
 
   // ── Group Messages ──
   getGroupMessages:       (gid) => db.execute({ sql:'SELECT * FROM group_messages WHERE group_id=? ORDER BY created_at ASC', args:[gid] }).then(rows),
-  sendGroupMessage:       (gid,uid,fn,fa,content,image) => db.execute({ sql:'INSERT INTO group_messages (group_id,user_id,from_name,from_avatar,content,image) VALUES (?,?,?,?,?,?)', args:[gid,uid,fn,fa,content,image||''] }),
+  sendGroupMessage:       (gid,uid,fn,fa,content,image,replyTo) => db.execute({ sql:'INSERT INTO group_messages (group_id,user_id,from_name,from_avatar,content,image,reply_to) VALUES (?,?,?,?,?,?,?)', args:[gid,uid,fn,fa,content,image||'',replyTo||null] }),
   getGroupMessage:        (id) => db.execute({ sql:'SELECT * FROM group_messages WHERE id=?', args:[id] }).then(first),
   updateGroupMessage:     (id,content) => db.execute({ sql:'UPDATE group_messages SET content=?, edited=1 WHERE id=?', args:[content,id] }),
   deleteGroupMessage:     (id) => db.execute({ sql:'DELETE FROM group_messages WHERE id=?', args:[id] }),
