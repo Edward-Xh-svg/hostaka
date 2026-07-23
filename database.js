@@ -268,6 +268,21 @@ async function initDB() {
       viewed_at  TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE(story_id, user_id)
     );
+
+    -- ===== جدول طلبات تعديل الحساب (يوزر نيم/بريد/كلمة مرور/حذف) بانتظار تأكيد كود البريد =====
+    CREATE TABLE IF NOT EXISTS account_changes (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      purpose      TEXT NOT NULL,
+      payload      TEXT NOT NULL DEFAULT '',
+      target_email TEXT NOT NULL DEFAULT '',
+      code         TEXT NOT NULL,
+      attempts     INTEGER NOT NULL DEFAULT 0,
+      expires_at   TEXT NOT NULL,
+      last_sent_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(user_id, purpose)
+    );
   `);
 
   // Migrations — إضافة أعمدة مفقودة
@@ -311,6 +326,8 @@ async function initDB() {
     "CREATE TABLE IF NOT EXISTS pages (id INTEGER PRIMARY KEY AUTOINCREMENT, owner_id INTEGER NOT NULL, username TEXT NOT NULL UNIQUE, name TEXT NOT NULL, avatar TEXT DEFAULT '', cover TEXT DEFAULT '', bio TEXT DEFAULT '', category TEXT DEFAULT '', verified INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')))",
     "CREATE INDEX IF NOT EXISTS idx_pages_owner ON pages(owner_id)",
     "CREATE TABLE IF NOT EXISTS page_follows (id INTEGER PRIMARY KEY AUTOINCREMENT, page_id INTEGER NOT NULL, user_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(page_id, user_id))",
+    "ALTER TABLE users ADD COLUMN birth_date TEXT DEFAULT ''",  // ✅ تاريخ الميلاد — صفحة إدارة الحساب
+    "CREATE TABLE IF NOT EXISTS account_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '', target_email TEXT NOT NULL DEFAULT '', code TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, expires_at TEXT NOT NULL, last_sent_at TEXT NOT NULL DEFAULT (datetime('now')), created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(user_id, purpose))",
   ];
   for (const sql of migrations) {
     try { await db.execute(sql); } catch(e) { /* column/table already exists */ }
@@ -367,7 +384,7 @@ async function initDB() {
 const q = {
   // ── Users ──
   getUserByEmail:   (email)    => db.execute({ sql:'SELECT * FROM users WHERE email=?', args:[email] }).then(first),
-  getUserById:      (id)       => db.execute({ sql:'SELECT id,username,email,role,avatar,bio,game_id,display_name,cover,verified,suspended,suspend_reason,last_seen,created_at FROM users WHERE id=?', args:[id] }).then(first),
+  getUserById:      (id)       => db.execute({ sql:'SELECT id,username,email,role,avatar,bio,game_id,display_name,cover,verified,suspended,suspend_reason,birth_date,last_seen,created_at FROM users WHERE id=?', args:[id] }).then(first),
   touchLastSeen: (id) => db.execute({ sql:"UPDATE users SET last_seen=datetime('now') WHERE id=?", args:[id] }).catch(()=>{}),
   getUserStatus: async (username) => {
     const u = await db.execute({ sql:'SELECT id, last_seen FROM users WHERE username=?', args:[username] }).then(first);
@@ -393,6 +410,31 @@ const q = {
   getUserByUsername: (username) => db.execute({ sql:'SELECT * FROM users WHERE username=?', args:[username] }).then(first),
   updateUserPasswordByEmail: (email, passwordHash) => db.execute({ sql:'UPDATE users SET password=? WHERE email=?', args:[passwordHash, email] }),
   updateProfile:    (display_name,bio,game_id,avatar,cover,id) => db.execute({ sql:'UPDATE users SET display_name=?,bio=?,game_id=?,avatar=?,cover=? WHERE id=?', args:[display_name,bio,game_id,avatar,cover,id] }),
+  updateUsername:      (id, username) => db.execute({ sql:'UPDATE users SET username=? WHERE id=?', args:[username, id] }),
+  updateEmail:          (id, email)    => db.execute({ sql:'UPDATE users SET email=? WHERE id=?', args:[email, id] }),
+  updateUserPassword:   (id, passwordHash) => db.execute({ sql:'UPDATE users SET password=? WHERE id=?', args:[passwordHash, id] }),
+  updateBirthDate:      (id, birth_date) => db.execute({ sql:'UPDATE users SET birth_date=? WHERE id=?', args:[birth_date||'', id] }),
+
+  // ── Account Changes (تعديل يوزر نيم/بريد/كلمة مرور/حذف حساب بتأكيد كود بريد) ──
+  getAccountChange: (userId, purpose) => db.execute({ sql:'SELECT * FROM account_changes WHERE user_id=? AND purpose=?', args:[userId, purpose] }).then(first),
+  upsertAccountChange: (userId, purpose, payload, targetEmail, code, expiresAt) => db.execute({
+    sql: `INSERT INTO account_changes (user_id,purpose,payload,target_email,code,attempts,expires_at,last_sent_at)
+          VALUES (?,?,?,?,?,0,?,datetime('now'))
+          ON CONFLICT(user_id,purpose) DO UPDATE SET
+            payload=excluded.payload,
+            target_email=excluded.target_email,
+            code=excluded.code,
+            attempts=0,
+            expires_at=excluded.expires_at,
+            last_sent_at=datetime('now')`,
+    args: [userId, purpose, payload, targetEmail, code, expiresAt]
+  }),
+  bumpAccountChangeCode: (userId, purpose, code, expiresAt) => db.execute({
+    sql: `UPDATE account_changes SET code=?, attempts=0, expires_at=?, last_sent_at=datetime('now') WHERE user_id=? AND purpose=?`,
+    args: [code, expiresAt, userId, purpose]
+  }),
+  incrementAccountChangeAttempts: (userId, purpose) => db.execute({ sql:'UPDATE account_changes SET attempts=attempts+1 WHERE user_id=? AND purpose=?', args:[userId, purpose] }),
+  deleteAccountChange: (userId, purpose) => db.execute({ sql:'DELETE FROM account_changes WHERE user_id=? AND purpose=?', args:[userId, purpose] }),
   listUsers:        () => db.execute('SELECT id,username,email,role,avatar,display_name,verified,suspended,suspend_reason,created_at FROM users ORDER BY created_at DESC').then(rows),
   listPublicUsers:  () => db.execute('SELECT id,username,display_name,avatar,role,verified FROM users ORDER BY username ASC').then(rows),
   deleteUser:       (id) => db.execute({ sql:"DELETE FROM users WHERE id=? AND role!='admin'", args:[id] }),
