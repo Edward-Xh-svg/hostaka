@@ -469,7 +469,7 @@ const LANG = {
   }
 };
 
-let currentLang = localStorage.getItem('hostaka_lang') || 'ar';
+let currentLang = localStorage.getItem('hostaka_lang') || 'en';
 let currentTheme = localStorage.getItem('hostaka_theme') || 'light';
 
 // ============================================================
@@ -1174,6 +1174,7 @@ async function loadMsgReactions(msgs) {
 function renderMsgs(msgs, scroll = true) {
   const area = document.getElementById('msgsArea');
   if (!area) return;
+  lastLoadedMsgs = msgs || [];
   if (!msgs || !msgs.length) {
     area.innerHTML = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:0.85rem;font-weight:600;">' + t('noMessages') + '</div>';
     return;
@@ -1194,9 +1195,12 @@ function renderMsgs(msgs, scroll = true) {
     const reactionHtml = totalReacts > 0 ?
       `<div class="msg-reaction" onclick="togglePicker(${m.id})">${rc.reactions.map(r => r.icon || r.emoji).join('')} <span style="font-size:0.7rem;color:var(--muted);">${totalReacts}</span></div>` : '';
     const firstUrl = extractFirstUrl(m.content);
+    const replySrc = m.reply_to ? msgs.find(x => x.id === m.reply_to) : null;
+    const replyQuoteHtml = replySrc ? `<div class="msg-reply-quote">${esc((replySrc.content || (replySrc.image ? '📷 صورة' : '')).slice(0,80))}</div>` : (m.reply_to ? `<div class="msg-reply-quote">${t('reply')}</div>` : '');
     const pickerHtml = `<div class="react-picker" id="picker-${m.id}">
             ${REACTIONS.map(r => `<button class="r-emoji ${rc.userReaction === r.emoji ? 'active' : ''}" onclick="reactMsg(event,${m.id},'${r.emoji}')" title="${r.label}">${r.icon}</button>`).join('')}
             <div class="picker-sep"></div>
+            <button class="r-emoji" onclick="startReplyMsg(event, ${m.id})" title="${t('reply')}">${SVG.arrow}</button>
             ${isMine
               ? `<button class="r-emoji" onclick="startEditMsg(event, ${m.id})" title="${t('editMsg')}">${SVG.editIc}</button>
                  <button class="r-emoji" onclick="deleteMsg(event, ${m.id})" title="${t('deleteMsg')}">${SVG.deleteIc}</button>`
@@ -1206,11 +1210,13 @@ function renderMsgs(msgs, scroll = true) {
       ${!isMine ? `<div class="msg-av ${isLast ? '' : 'invisible'}">${av}</div>` : ''}
       <div class="bubble-wrap">
         ${m.image ? `<div class="bubble-media" onclick="openImgViewer(this.querySelector('img').src)">
+          ${replyQuoteHtml}
           <img class="bubble-img" src="${esc(m.image)}" loading="lazy" onerror="this.parentElement.style.display='none'">
           <button class="media-more-btn" onclick="event.stopPropagation();togglePicker(${m.id})" title="${t('editMsg')}">${SVG.moreIc || '⋮'}</button>
           ${pickerHtml}
         </div>` : ''}
         ${m.content ? `<div class="bubble" id="bubble-${m.id}" onclick="togglePicker(${m.id})">
+          ${replyQuoteHtml}
           ${linkifyEscaped(esc(m.content))}
           ${firstUrl ? `<div class="link-preview-slot" data-lp-url="${esc(firstUrl)}"></div>` : ''}
           ${!m.image ? pickerHtml : ''}
@@ -1276,6 +1282,33 @@ function removeChatImg() {
 }
 
 let editingMsgId = null;
+let replyingToMsgId = null;
+let lastLoadedMsgs = [];
+
+function startReplyMsg(e, mid){
+  e.stopPropagation();
+  document.querySelectorAll('.react-picker.show').forEach(p => p.classList.remove('show'));
+  const src = lastLoadedMsgs.find(x => x.id === mid);
+  replyingToMsgId = mid;
+  showReplyBanner(src ? (src.content || (src.image ? '📷 صورة' : '')) : '');
+  document.getElementById('msgInput')?.focus();
+}
+function showReplyBanner(snippet){
+  let banner = document.getElementById('replyMsgBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'replyMsgBanner';
+    banner.className = 'edit-msg-banner';
+    document.getElementById('msgInput')?.closest('.input-area')?.prepend(banner);
+  }
+  banner.innerHTML = `<span>${t('reply')}: ${esc((snippet||'').slice(0,60))}</span><button onclick="cancelReplyMsg()">${SVG.close}</button>`;
+  banner.style.display = 'flex';
+}
+function cancelReplyMsg(){
+  replyingToMsgId = null;
+  const banner = document.getElementById('replyMsgBanner');
+  if (banner) banner.style.display = 'none';
+}
 
 function startEditMsg(e, mid){
   e.stopPropagation();
@@ -1353,7 +1386,9 @@ async function sendMsg() {
       if (up.url) imageUrl = up.url;
       removeChatImg();
     }
-    await apiFetch('/api/messages/' + encodeURIComponent(currentPeer), 'POST', { content, image: imageUrl });
+    const replyTo = replyingToMsgId;
+    cancelReplyMsg();
+    await apiFetch('/api/messages/' + encodeURIComponent(currentPeer), 'POST', { content, image: imageUrl, reply_to: replyTo });
     await loadMsgs(currentPeer);
     loadSidebar();
   } catch (e) {
@@ -1620,7 +1655,7 @@ const LANG = {
   }
 };
 
-let currentLang = localStorage.getItem('hostaka_lang') || 'ar';
+let currentLang = localStorage.getItem('hostaka_lang') || 'en';
 let currentTheme = localStorage.getItem('hostaka_theme') || 'light';
 const getToken = () => localStorage.getItem('hostaka_token') || '';
 const GROUP_ID = new URLSearchParams(location.search).get('g');
@@ -2344,9 +2379,12 @@ function renderMsgs(msgs, scroll = true){
     const reactionHtml = totalReacts > 0 ?
       `<div class="msg-reaction" onclick="togglePicker(${m.id})">${rc.reactions.map(r => (REACTIONS.find(x=>x.emoji===r.emoji)||{}).icon || '').join('')} <span style="font-size:0.7rem;color:var(--muted);">${totalReacts}</span></div>` : '';
     const firstUrl = extractFirstUrl(m.content);
+    const replySrc = m.reply_to ? msgs.find(x => x.id === m.reply_to) : null;
+    const replyQuoteHtml = replySrc ? `<div class="msg-reply-quote">${esc((replySrc.content || (replySrc.image ? '📷 صورة' : '')).slice(0,80))}</div>` : (m.reply_to ? `<div class="msg-reply-quote">${t('reply')}</div>` : '');
     const pickerHtml = `<div class="react-picker" id="picker-${m.id}">
             ${REACTIONS.map(r => `<button class="r-emoji ${rc.userReaction===r.emoji?'active':''}" onclick="reactMsg(event,${m.id},'${r.emoji}')">${r.icon}</button>`).join('')}
             <div class="picker-sep"></div>
+            <button class="r-emoji" onclick="startReplyMsg(event, ${m.id})" title="${t('reply')}">${SVG.arrow}</button>
             ${isMine ? `<button class="r-emoji" onclick="startEditMsg(event, ${m.id})" title="${t('editMsg')}">${SVG.editIc}</button>` : ''}
             ${canManageMsg ? `<button class="r-emoji" onclick="deleteMsg(event, ${m.id})" title="${t('deleteMsg')}">${SVG.deleteIc}</button>` : ''}
             ${!isMine ? `<button class="r-emoji" onclick="openReportMsgModal(event, ${m.id})" title="${t('reportMsg')}">${SVG.flagIc}</button>` : ''}
@@ -2356,11 +2394,13 @@ function renderMsgs(msgs, scroll = true){
       <div class="bubble-wrap">
         ${!isMine && isLast ? `<div class="sender-name">${esc(m.from_name)}</div>` : ''}
         ${m.image ? `<div class="bubble-media" onclick="openImgViewer(this.querySelector('img').src)">
+          ${replyQuoteHtml}
           <img class="bubble-img" src="${esc(m.image)}" loading="lazy" onerror="this.parentElement.style.display='none'">
           <button class="media-more-btn" onclick="event.stopPropagation();togglePicker(${m.id})" title="${t('editMsg')}">${SVG.moreIc || '⋮'}</button>
           ${pickerHtml}
         </div>` : ''}
         ${m.content ? `<div class="bubble" id="bubble-${m.id}" onclick="togglePicker(${m.id})">
+          ${replyQuoteHtml}
           ${linkifyEscaped(esc(m.content))}
           ${firstUrl ? `<div class="link-preview-slot" data-lp-url="${esc(firstUrl)}"></div>` : ''}
           ${!m.image ? pickerHtml : ''}
@@ -2374,6 +2414,32 @@ function renderMsgs(msgs, scroll = true){
   area.innerHTML = html;
   if (scroll) area.scrollTop = area.scrollHeight;
   loadLinkPreviews(area);
+}
+
+let replyingToMsgId = null;
+function startReplyMsg(e, mid){
+  e.stopPropagation();
+  document.querySelectorAll('.react-picker.show').forEach(p => p.classList.remove('show'));
+  const src = _lastMsgs.find(x => x.id === mid);
+  replyingToMsgId = mid;
+  showReplyBanner(src ? (src.content || (src.image ? '📷 صورة' : '')) : '');
+  document.getElementById('msgInput')?.focus();
+}
+function showReplyBanner(snippet){
+  let banner = document.getElementById('replyMsgBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'replyMsgBanner';
+    banner.className = 'edit-msg-banner';
+    document.getElementById('msgInput')?.closest('.input-area')?.prepend(banner);
+  }
+  banner.innerHTML = `<span>${t('reply')}: ${esc((snippet||'').slice(0,60))}</span><button onclick="cancelReplyMsg()">${SVG.close}</button>`;
+  banner.style.display = 'flex';
+}
+function cancelReplyMsg(){
+  replyingToMsgId = null;
+  const banner = document.getElementById('replyMsgBanner');
+  if (banner) banner.style.display = 'none';
 }
 
 function togglePicker(id){
@@ -2519,7 +2585,9 @@ async function sendMsg(){
       if (up.url) imageUrl = up.url;
       removeChatImg();
     }
-    await apiFetch(`/api/groups/${GROUP_ID}/messages`, 'POST', { content, image: imageUrl });
+    const replyTo = replyingToMsgId;
+    cancelReplyMsg();
+    await apiFetch(`/api/groups/${GROUP_ID}/messages`, 'POST', { content, image: imageUrl, reply_to: replyTo });
     await loadMsgs(true);
   } catch(e){
     console.error('sendMsg failed:', e);
@@ -2874,7 +2942,7 @@ function dismissSplash(){
   try { sessionStorage.setItem('hostaka_splash_seen', '1'); } catch(e){}
 }
 
-let currentLang = localStorage.getItem('hostaka_lang') || 'ar';
+let currentLang = localStorage.getItem('hostaka_lang') || 'en';
 let currentTheme = localStorage.getItem('hostaka_theme') || 'light';
 let currentSort = 'latest'; // latest, popular, random
 
@@ -3257,15 +3325,28 @@ function sortPosts(posts, mode) {
   }
 }
 
-function setSort(mode) {
-  currentSort = mode;
-  document.querySelectorAll('.sort-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.sort === mode);
-  });
-  if (allPosts.length) {
-    const sorted = sortPosts(allPosts, mode);
-    renderFeed(sorted);
+// ترتيب عشوائي تلقائي للتغذية، مع أولوية 60% لمنشورات الحسابات التي يتابعها المستخدم
+function weightedRandomSort(posts) {
+  const followed = [], others = [];
+  posts.forEach(p => (p.is_followed_author ? followed : others).push(p));
+  function shuffle(arr){
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
   }
+  shuffle(followed); shuffle(others);
+  const result = [];
+  let fi = 0, oi = 0;
+  while (fi < followed.length || oi < others.length) {
+    const pickFollowed = Math.random() < 0.6;
+    if (pickFollowed && fi < followed.length) result.push(followed[fi++]);
+    else if (!pickFollowed && oi < others.length) result.push(others[oi++]);
+    else if (fi < followed.length) result.push(followed[fi++]);
+    else result.push(others[oi++]);
+  }
+  return result;
 }
 
 // ============================================================
@@ -3343,7 +3424,6 @@ function setLoggedInUI(user){
   el.innerHTML = user.avatar ? `<img src="${esc(user.avatar)}" alt="">` : user.username.charAt(0).toUpperCase();
   const ab = document.getElementById('adminBtn');
   if(ab) ab.style.display = user.role==='admin' ? 'flex' : 'none';
-  document.getElementById('actionBar').style.display = 'flex';
   checkVerifyStatus();
   loadNotifCount();
   renderStoriesBar();
@@ -3358,7 +3438,6 @@ function clearUser(){
   localStorage.removeItem('hostaka_role');
   document.getElementById('btnLogin').style.display = 'flex';
   document.getElementById('userBadgeWrap').style.display = 'none';
-  document.getElementById('actionBar').style.display = 'none';
   document.getElementById('notifWrap').style.display = 'none';
   renderStoriesBar();
   renderAccountSwitcher();
@@ -3827,20 +3906,34 @@ async function requestVerify(){
 }
 
 // ----- Posts & Feed -----
+let feedOrder = [];
+let feedVisibleCount = 10;
+const FEED_PAGE_SIZE = 10;
+
 async function loadPosts(){
   try {
     const data = await apiFetch('/api/records');
     allPosts = (Array.isArray(data) ? data : []).filter(p => !blockedUsernames.has(p.publisher));
-    const sorted = sortPosts(allPosts, currentSort);
-    renderFeed(sorted);
+    feedOrder = weightedRandomSort(allPosts);
+    feedVisibleCount = FEED_PAGE_SIZE;
+    renderFeed(feedOrder.slice(0, feedVisibleCount));
   } catch(e){ document.getElementById('feed').innerHTML='<div class="empty">'+SVG.empty+'<br>'+t('empty')+'</div>'; }
+}
+
+function loadMoreFeed(){
+  feedVisibleCount += FEED_PAGE_SIZE;
+  renderFeed(feedOrder.slice(0, feedVisibleCount));
 }
 
 function renderFeedDone(){ loadLinkPreviews(document.getElementById('feed')); }
 function renderFeed(posts){
   const feed = document.getElementById('feed');
   if(!posts.length){ feed.innerHTML='<div class="empty">'+SVG.empty+'<br>'+t('empty')+'</div>'; return; }
-  feed.innerHTML = posts.map(p => renderPost(p)).join('');
+  let html = posts.map(p => renderPost(p)).join('');
+  if (feedOrder.length > posts.length) {
+    html += `<button class="load-more-btn" onclick="loadMoreFeed()">${t('loadMorePosts')}</button>`;
+  }
+  feed.innerHTML = html;
   renderFeedDone();
 }
 
@@ -3879,20 +3972,33 @@ function renderPost(p){
   </div>`;
 
   const commCount = (p.comments||[]).length;
-  const commentsHtml = (p.comments||[]).map(c=>{
+  const allComments = p.comments || [];
+  const topComments = allComments.filter(c => !c.parent_id);
+  function repliesOf(cid){ return allComments.filter(c => Number(c.parent_id) === Number(cid)); }
+  function oneCommentHtml(c, postId){
     const ca = c.avatar ? `<img src="${esc(c.avatar)}" alt="">` : esc((c.display_name||c.username||'?').charAt(0).toUpperCase());
     const cBadge = c.user_role==='Admin' ? `<span class="role-badge badge-admin">${t('adminRole')}</span>` : '';
     const canDelC = ME && (ME.role==='admin' || c.user_id==ME?.id);
-    // إزالة الإيموجيات من نص التعليق + تفعيل الإشارة (@) والهاشتاغ (#)
     const cleanContent = linkifyContent(stripEmojis(esc(c.content)));
+    const replies = repliesOf(c.id);
+    const repliesHtml = replies.length ? `<div class="replies-list">${replies.map(r=>oneCommentHtml(r, postId)).join('')}</div>` : '';
     return `<div class="comment" id="cmt-${c.id}">
       <div class="c-avatar">${ca}</div>
       <div class="c-bubble">
-        <div class="c-name">${esc(c.display_name||c.username)} ${cBadge} ${canDelC?`<button class="c-del" onclick="delComment(${c.id},${p.id})">${SVG.delete}</button>`:''}</div>
+        <div class="c-name">${esc(c.display_name||c.username)} ${cBadge}
+          ${ME ? `<button class="reply-btn" onclick="toggleReplyInput(${postId},${c.id})">${t('reply')}</button>` : ''}
+          ${canDelC?`<button class="c-del" onclick="delComment(${c.id},${postId})">${SVG.delete}</button>`:''}
+        </div>
         <div class="c-text">${cleanContent}</div>
       </div>
-    </div>`;
-  }).join('');
+    </div>
+    <div class="reply-input-row" id="replyRow-${c.id}" style="display:none;">
+      <input class="comment-input" type="text" placeholder="${t('reply')} @${esc(c.username||'')}" id="ri-${c.id}" onkeydown="if(event.key==='Enter')sendComment(${postId},${c.id})">
+      <button class="btn-send-comment" onclick="sendComment(${postId},${c.id})">${SVG.send}</button>
+    </div>
+    ${repliesHtml}`;
+  }
+  const commentsHtml = topComments.map(c => oneCommentHtml(c, p.id)).join('');
 
   const commentInputHtml = ME ? `<div class="comment-input-row">
     <input class="comment-input" type="text" placeholder="${t('reply')}" id="ci-${p.id}" onkeydown="if(event.key==='Enter')sendComment(${p.id})">
@@ -3967,7 +4073,7 @@ function sharePost(id){
 document.getElementById('searchInput').addEventListener('input', function(){
   const q = this.value.trim().toLowerCase();
   const filtered = q ? allPosts.filter(p=>p.content.toLowerCase().includes(q)||p.publisher.toLowerCase().includes(q)) : allPosts;
-  const sorted = sortPosts(filtered, currentSort);
+  const sorted = q ? filtered : feedOrder.slice(0, feedVisibleCount);
   renderFeed(sorted);
 });
 
@@ -4477,12 +4583,20 @@ function toggleComments(id){
   }
 }
 
-async function sendComment(postId){
+function toggleReplyInput(postId, commentId){
+  const row = document.getElementById('replyRow-'+commentId);
+  if(!row) return;
+  const showing = row.style.display === 'none';
+  row.style.display = showing ? 'flex' : 'none';
+  if(showing) document.getElementById('ri-'+commentId)?.focus();
+}
+
+async function sendComment(postId, parentId){
   if(!ME){openAuth();return;}
-  const input=document.getElementById('ci-'+postId);
+  const input = parentId ? document.getElementById('ri-'+parentId) : document.getElementById('ci-'+postId);
   if(!input||!input.value.trim()) return;
   const content=input.value.trim(); input.value='';
-  const d=await apiFetch('/api/records/'+postId+'/comments','POST',{content});
+  const d=await apiFetch('/api/records/'+postId+'/comments','POST',{content, parent_id: parentId||null});
   if(!d.success) return;
   const comments=await apiFetch('/api/records/'+postId+'/comments');
   const post=allPosts.find(p=>p.id===postId);
@@ -4674,6 +4788,7 @@ try { window.toggleReactMenu = toggleReactMenu; } catch(e) {}
 try { window.toggleReact = toggleReact; } catch(e) {}
 try { window.toggleComments = toggleComments; } catch(e) {}
 try { window.sendComment = sendComment; } catch(e) {}
+try { window.toggleReplyInput = toggleReplyInput; } catch(e) {}
 try { window.delComment = delComment; } catch(e) {}
 }
 
@@ -5222,7 +5337,7 @@ const LANG = {
   }
 };
 
-let currentLang = localStorage.getItem('hostaka_lang') || 'ar';
+let currentLang = localStorage.getItem('hostaka_lang') || 'en';
 let currentTheme = localStorage.getItem('hostaka_theme') || 'light';
 
 // ============================================================
@@ -5252,9 +5367,8 @@ function applyLang() {
   if (tabPosts) tabPosts.textContent = t('posts');
   if (tabEdit) tabEdit.textContent = t('edit');
   const labels = document.querySelectorAll('.fg label');
-  if (labels.length >= 2) {
+  if (labels.length >= 1) {
     labels[0].textContent = t('editProfile');
-    labels[1].textContent = t('gameId');
   }
   const bioLabel = document.querySelector('.fg label[for="fBio"]');
   if (bioLabel) bioLabel.textContent = t('bio');
@@ -5330,7 +5444,79 @@ const SVG = {
   arrow:   `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>`,
   follow:  `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
   check:   `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`,
+  like:     `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`,
+  heart:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`,
+  haha:     `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
+  sad:      `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 16c-1.5-1-2.5-1.5-4-1.5s-2.5.5-4 1.5"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
+  angry:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 16c-1.5-1-2.5-1.5-4-1.5s-2.5.5-4 1.5"/><path d="M8 8l2 2"/><path d="M16 8l-2 2"/></svg>`,
+  send:     `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`,
+  delete:   `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`,
+  comment:  `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+  reel:     `<svg width="22" height="22" viewBox="0 0 24 24" fill="white" stroke="none"><polygon points="6 4 20 12 6 20"/></svg>`,
 };
+
+const REACTIONS = [
+  { emoji:'like',  label:'أعجبني',  icon:SVG.like },
+  { emoji:'heart', label:'أحببته',  icon:SVG.heart },
+  { emoji:'haha',  label:'أضحكني',  icon:SVG.haha },
+  { emoji:'sad',   label:'أحزنني',  icon:SVG.sad },
+  { emoji:'angry', label:'أغضبني',  icon:SVG.angry },
+];
+
+function stripEmojis(text) {
+  return text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FEFF}\u{1F1E0}-\u{1F1FF}]/gu, '');
+}
+function extractFirstUrl(text){
+  const m = String(text||'').match(/https?:\/\/[^\s<]+/);
+  if(!m) return null;
+  return m[0].replace(/[.,!?)\]]+$/, '');
+}
+function linkifyContent(html){
+  try {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    const walker = document.createTreeWalker(wrapper, NodeFilter.SHOW_TEXT);
+    const textNodes = [];
+    let node;
+    while((node = walker.nextNode())) textNodes.push(node);
+    const re = /(^|[\s(])(?:([@#])([A-Za-z0-9_\u0600-\u06FF]{2,32})|(https?:\/\/[^\s<]+))/gu;
+    textNodes.forEach(tn=>{
+      const text = tn.nodeValue;
+      if(!text || !/[@#]|https?:\/\//.test(text)) return;
+      let last = 0, m, changed = false;
+      const frag = document.createDocumentFragment();
+      re.lastIndex = 0;
+      while((m = re.exec(text))){
+        changed = true;
+        const [full, pre, sym, word, rawUrl] = m;
+        const start = m.index;
+        if(start > last) frag.appendChild(document.createTextNode(text.slice(last, start)));
+        if(pre) frag.appendChild(document.createTextNode(pre));
+        if(rawUrl){
+          const cleanUrl = rawUrl.replace(/[.,!?)\]]+$/, '');
+          const trail = rawUrl.slice(cleanUrl.length);
+          const a = document.createElement('a');
+          a.textContent = cleanUrl; a.className = 'post-link'; a.href = cleanUrl; a.target = '_blank'; a.rel = 'noopener noreferrer';
+          frag.appendChild(a);
+          if(trail) frag.appendChild(document.createTextNode(trail));
+          last = start + full.length;
+          continue;
+        }
+        const a = document.createElement('a');
+        a.textContent = sym + word;
+        if(sym === '@'){ a.className = 'mention-tag'; a.href = '/profile?u=' + encodeURIComponent(word); }
+        else { a.className = 'hashtag-tag'; a.href = '/?tag=' + encodeURIComponent(word); }
+        frag.appendChild(a);
+        last = start + full.length;
+      }
+      if(!changed) return;
+      if(last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      tn.parentNode.replaceChild(frag, tn);
+    });
+    return wrapper.innerHTML;
+  } catch(e){ return html; }
+}
+function goPublisher(username){ window.location = '/profile?u=' + encodeURIComponent(username); }
 
 // ============================================================
 //  FOLLOW FUNCTIONS (Real API)
@@ -5543,7 +5729,6 @@ function renderPublic(user, posts, followStatus) {
       ${roleBadge(user.role)}
       ${user.bio ? `<div class="meta-bio">${esc(user.bio)}</div>` : ''}
       <div class="meta-info">
-        ${user.game_id ? `<div class="info-item">${SVG.mail}<strong>${esc(user.game_id)}</strong></div>` : ''}
         <div class="info-item">${SVG.clock}${t('since')} ${fmtDate(user.created_at)}</div>
       </div>
       <div class="meta-stats">
@@ -5639,7 +5824,6 @@ function renderMyProfile(user, posts) {
       ${roleBadge(user.role)}
       ${user.bio ? `<div class="meta-bio">${esc(user.bio)}</div>` : ''}
       <div class="meta-info">
-        ${user.game_id ? `<div class="info-item">${SVG.mail}<strong>${esc(user.game_id)}</strong></div>` : ''}
         <div class="info-item">${SVG.clock}${t('since')} ${fmtDate(user.created_at)}</div>
       </div>
       <div class="meta-stats">
@@ -5653,13 +5837,17 @@ function renderMyProfile(user, posts) {
       <button class="tab-btn" id="tabEdit" onclick="switchTab('edit')">${t('editProfile')}</button>
       <button class="tab-btn" id="tabPages" onclick="switchTab('pages')">الصفحات</button>
     </div>
-    <div class="posts-tab" id="postsTab">${renderPosts(posts)}</div>
-    <div class="edit-section" id="editTab" style="display:none;">
+    <div class="posts-tab" id="postsTab">
+      <button class="create-post-cta" onclick="openPostModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        منشور جديد
+      </button>
+      ${renderPosts(posts)}
+    </div>
       <div class="alert alert-err" id="pErr"></div>
       <div class="alert alert-ok" id="pOk"></div>
       <div class="fg-row">
         <div class="fg"><label>${t('editProfile')}</label><input type="text" id="fName" value="${esc(user.display_name || '')}" placeholder="${t('editProfile')}"></div>
-        <div class="fg"><label>${t('gameId')}</label><input type="text" id="fGame" value="${esc(user.game_id || '')}" dir="ltr" placeholder="#0000"></div>
       </div>
       <div class="fg"><label>${t('bio')}</label><textarea id="fBio" placeholder="${t('bio')}">${esc(user.bio || '')}</textarea></div>
       <button class="btn-save" id="saveBtn" onclick="save()">${SVG.save}${t('save')}</button>
@@ -5673,18 +5861,348 @@ function renderMyProfile(user, posts) {
     </div>`;
 }
 
+let profilePosts = [];
+
+function postStatusBadge(p){
+  if (p.privacy === 'draft') return `<span class="post-status-badge st-draft">مسودة</span>`;
+  if (p.privacy === 'private') return `<span class="post-status-badge st-private">خاص</span>`;
+  if (p.scheduled_at && new Date(p.scheduled_at.replace(' ','T')+'Z').getTime() > Date.now()) return `<span class="post-status-badge st-scheduled">مجدول</span>`;
+  return '';
+}
+
 function renderPosts(posts) {
-  if (!posts || !posts.length) return `<div class="post-empty">${SVG.post}<div>${t('noPosts')}</div></div>`;
-  return posts.map(p => `
-    <div class="post-card">
-      ${p.image ? `<img class="post-img" src="${esc(p.image)}" loading="lazy" onerror="this.style.display='none'">` : ''}
-      <div class="post-text">${p.content || ''}</div>
-      <div class="post-date">
-        ${SVG.clock}
-        ${fmtDate(p.created_at)}
-        <button class="post-share" onclick="sharePost(${p.id})" title="${t('shareLink')}">${SVG.share}</button>
+  profilePosts = Array.isArray(posts) ? posts : [];
+  if (!profilePosts.length) return `<div class="post-empty">${SVG.post}<div>${t('noPosts')}</div></div>`;
+  return profilePosts.map(p => renderOnePost(p)).join('');
+}
+
+function renderOnePost(p){
+  const canDel = ME && (ME.role==='admin' || p.user_id==ME?.id);
+  let mediaHtml = '';
+  if (p.video && Number(p.is_reel) === 1) {
+    mediaHtml = `<div class="reel-card" onclick="location.href='/short?id=${p.id}'">
+      <video class="reel-thumb-video" muted playsinline preload="metadata"><source src="${esc(p.video)}#t=0.1" type="video/mp4"></video>
+      <div class="reel-play-badge">${SVG.reel}</div>
+      <div class="reel-tag">ريلز</div>
+    </div>`;
+  } else if (p.video) {
+    mediaHtml = `<video class="card-video" controls><source src="${esc(p.video)}" type="video/mp4"></video>`;
+  } else if (p.image) {
+    mediaHtml = `<img class="card-img" src="${esc(p.image)}" loading="lazy" onerror="this.style.display='none'">`;
+  }
+
+  const totalReactions = (p.reactions||[]).reduce((s,r)=>s+(r.count||0),0);
+  const userR = p.userReaction;
+  const activeReact = userR ? REACTIONS.find(r=>r.emoji===userR) : null;
+  const reactionHtml = `<div class="react-wrap">
+    <button class="react-main-btn ${userR?'reacted':''}" onclick="toggleReactMenu(${p.id})">
+      ${activeReact ? activeReact.icon : SVG.like}
+      <span>${totalReactions||'تفاعل'}</span>
+    </button>
+    <div class="react-menu" id="rmenu-${p.id}">
+      ${REACTIONS.map(r=>`<button class="react-emoji-btn ${p.userReaction===r.emoji?'active':''}" onclick="toggleReact(${p.id},'${r.emoji}')" title="${r.label}">${r.icon}</button>`).join('')}
+    </div>
+  </div>`;
+
+  const allComments = p.comments || [];
+  const topComments = allComments.filter(c => !c.parent_id);
+  function repliesOf(cid){ return allComments.filter(c => Number(c.parent_id) === Number(cid)); }
+  function oneCommentHtml(c, postId){
+    const ca = c.avatar ? `<img src="${esc(c.avatar)}" alt="">` : esc((c.display_name||c.username||'?').charAt(0).toUpperCase());
+    const canDelC = ME && (ME.role==='admin' || c.user_id==ME?.id);
+    const cleanContent = linkifyContent(stripEmojis(esc(c.content)));
+    const replies = repliesOf(c.id);
+    const repliesHtml = replies.length ? `<div class="replies-list">${replies.map(r=>oneCommentHtml(r, postId)).join('')}</div>` : '';
+    return `<div class="comment" id="cmt-${c.id}">
+      <div class="c-avatar">${ca}</div>
+      <div class="c-bubble">
+        <div class="c-name">${esc(c.display_name||c.username)}
+          ${ME ? `<button class="reply-btn" onclick="toggleReplyInput(${postId},${c.id})">رد</button>` : ''}
+          ${canDelC?`<button class="c-del" onclick="delComment(${c.id},${postId})">${SVG.delete}</button>`:''}
+        </div>
+        <div class="c-text">${cleanContent}</div>
       </div>
-    </div>`).join('');
+    </div>
+    <div class="reply-input-row" id="replyRow-${c.id}" style="display:none;">
+      <input class="comment-input" type="text" placeholder="رد @${esc(c.username||'')}" id="ri-${c.id}" onkeydown="if(event.key==='Enter')sendComment(${postId},${c.id})">
+      <button class="btn-send-comment" onclick="sendComment(${postId},${c.id})">${SVG.send}</button>
+    </div>
+    ${repliesHtml}`;
+  }
+  const commentsHtml = topComments.map(c => oneCommentHtml(c, p.id)).join('');
+  const commentInputHtml = ME ? `<div class="comment-input-row">
+    <input class="comment-input" type="text" placeholder="اكتب تعليقاً..." id="ci-${p.id}" onkeydown="if(event.key==='Enter')sendComment(${p.id})">
+    <button class="btn-send-comment" onclick="sendComment(${p.id})">${SVG.send}</button>
+  </div>` : '';
+
+  return `<div class="post-card" id="post-${p.id}">
+    ${mediaHtml}
+    <div class="card-body">
+      <div class="pub-row">
+        <div class="pub-info">
+          <div class="pub-name">
+            ${esc(p.publisher_name || p.publisher)}
+            ${(p.publisher_verified||p.user_verified) ? verifiedBadge() : ''}
+            ${postStatusBadge(p)}
+          </div>
+        </div>
+        <div class="pub-actions">
+          <button class="btn-icon" onclick="sharePost(${p.id})" title="مشاركة">${SVG.share}</button>
+          ${canDel ? `<button class="btn-icon" onclick="delPost(${p.id})" title="حذف">${SVG.delete}</button>` : ''}
+        </div>
+      </div>
+      <div class="pub-date">${fmtDate(p.created_at)}</div>
+      <div class="post-text post-html">${linkifyContent(p.content||'')}</div>
+      <div class="reactions-row">
+        ${reactionHtml}
+        <button class="react-btn" onclick="toggleComments(${p.id})" id="cmtToggle-${p.id}">
+          ${SVG.comment}<span>${allComments.length} تعليق</span>
+        </button>
+      </div>
+      <div class="comments-section" id="cmtSec-${p.id}" style="display:none;">
+        <div class="comments-list" id="cmtList-${p.id}">${commentsHtml}</div>
+        ${commentInputHtml}
+      </div>
+    </div>
+  </div>`;
+}
+
+function findProfilePost(id){ return profilePosts.find(p => p.id === id); }
+function rerenderPost(id){
+  const post = findProfilePost(id);
+  const card = document.getElementById('post-'+id);
+  if (post && card) {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = renderOnePost(post);
+    card.replaceWith(wrap.firstChild);
+  }
+}
+
+function toggleReactMenu(id){
+  const menu = document.getElementById('rmenu-'+id);
+  if (!menu) return;
+  document.querySelectorAll('.react-menu.show').forEach(m => { if (m !== menu) m.classList.remove('show'); });
+  menu.classList.toggle('show');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.react-wrap')) document.querySelectorAll('.react-menu.show').forEach(m => m.classList.remove('show'));
+});
+
+async function toggleReact(id, emoji){
+  if(!ME){ openAuth?.(); return; }
+  document.querySelectorAll('.react-menu.show').forEach(m => m.classList.remove('show'));
+  const d = await apiFetch('/api/records/'+id+'/react', 'POST', { emoji });
+  if(!d.success) return;
+  const post = findProfilePost(id);
+  if(post){ post.reactions = d.reactions; post.userReaction = d.userReaction; }
+  rerenderPost(id);
+}
+
+function toggleComments(id){
+  const sec=document.getElementById('cmtSec-'+id);
+  const toggle=document.getElementById('cmtToggle-'+id);
+  if(sec){
+    const showing = sec.style.display==='none';
+    sec.style.display = showing ? 'block' : 'none';
+    if(toggle) toggle.classList.toggle('expanded', showing);
+  }
+}
+
+function toggleReplyInput(postId, commentId){
+  const row = document.getElementById('replyRow-'+commentId);
+  if(!row) return;
+  const showing = row.style.display === 'none';
+  row.style.display = showing ? 'flex' : 'none';
+  if(showing) document.getElementById('ri-'+commentId)?.focus();
+}
+
+async function sendComment(postId, parentId){
+  if(!ME) return;
+  const input = parentId ? document.getElementById('ri-'+parentId) : document.getElementById('ci-'+postId);
+  if(!input||!input.value.trim()) return;
+  const content=input.value.trim(); input.value='';
+  const d=await apiFetch('/api/records/'+postId+'/comments','POST',{content, parent_id: parentId||null});
+  if(!d.success) return;
+  const comments=await apiFetch('/api/records/'+postId+'/comments');
+  const post=findProfilePost(postId);
+  if(post){ post.comments=comments; }
+  rerenderPost(postId);
+  document.getElementById('cmtSec-'+postId).style.display='block';
+  document.getElementById('cmtToggle-'+postId)?.classList.add('expanded');
+}
+
+async function delComment(commentId, postId){
+  if(!confirm('حذف هذا التعليق؟')) return;
+  await apiFetch('/api/comments/'+commentId,'DELETE');
+  document.getElementById('cmt-'+commentId)?.remove();
+}
+
+async function delPost(id){
+  if(!confirm('حذف هذا المنشور نهائياً؟')) return;
+  const d = await apiFetch('/api/records/'+id, 'DELETE');
+  if(d.success){
+    profilePosts = profilePosts.filter(p => p.id !== id);
+    document.getElementById('post-'+id)?.remove();
+  } else {
+    showToast(d.error || 'تعذر الحذف', 'error');
+  }
+}
+
+// ============================================================
+//  إنشاء منشور جديد (الوسائط + التنسيق + الخصوصية + الجدولة)
+// ============================================================
+let postMediaBase64 = '';
+let postMediaType = '';
+let postMediaFileObj = null;
+let postVideoMeta = { width:0, height:0, isReel:false };
+let selectedPostPrivacy = 'public';
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
+
+function readVideoDimensions(file){
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const v = document.createElement('video');
+    v.preload = 'metadata'; v.muted = true;
+    v.onloadedmetadata = () => {
+      const width = v.videoWidth || 0, height = v.videoHeight || 0;
+      URL.revokeObjectURL(url);
+      resolve({ width, height, isReel: width > 0 && height > 0 && height > width });
+    };
+    v.onerror = () => { URL.revokeObjectURL(url); resolve({ width:0, height:0, isReel:false }); };
+    v.src = url;
+  });
+}
+
+function openPostModal(){
+  if(!ME){ return; }
+  const ed=document.getElementById('postEditor');
+  if(ed) ed.innerHTML='';
+  document.getElementById('postErr').style.display='none';
+  document.getElementById('postMediaPreviewWrap').style.display='none';
+  postMediaBase64=''; postMediaType=''; postMediaFileObj=null;
+  selectedPostPrivacy = 'public';
+  document.querySelectorAll('#privacyChoices .privacy-opt').forEach(b=>b.classList.toggle('active', b.dataset.privacy==='public'));
+  const sched = document.getElementById('postScheduleInput');
+  if (sched) sched.value = '';
+  document.getElementById('postModal').classList.add('show');
+  setTimeout(()=>document.getElementById('postEditor')?.focus(),100);
+}
+
+function selectPostPrivacy(p){
+  selectedPostPrivacy = p;
+  document.querySelectorAll('#privacyChoices .privacy-opt').forEach(b=>b.classList.toggle('active', b.dataset.privacy===p));
+}
+
+function onPostMedia(e){
+  const f = e.target.files[0];
+  if (!f) return;
+  if (f.size > MAX_FILE_SIZE) { showToast('حجم الملف كبير جداً', 'error'); e.target.value=''; return; }
+  const isImage = f.type === 'image/jpeg' || f.type === 'image/jpg';
+  const isVideo = f.type.startsWith('video/') && (f.type === 'video/mp4' || f.type === 'video/webm');
+  if (!isImage && !isVideo) { showToast('نوع الملف غير مدعوم', 'error'); e.target.value=''; return; }
+  postMediaType = isImage ? 'image' : 'video';
+  postMediaFileObj = isVideo ? f : null;
+  postVideoMeta = { width:0, height:0, isReel:false };
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    postMediaBase64 = ev.target.result;
+    const preview = document.getElementById('postMediaPreview');
+    if (isImage) {
+      preview.innerHTML = `<img src="${postMediaBase64}" alt="معاينة الصورة">`;
+    } else {
+      postVideoMeta = await readVideoDimensions(f);
+      const reelTag = postVideoMeta.isReel ? `<div class="reel-detect-badge">${SVG.reel} <span>سيُنشر كريلز</span></div>` : '';
+      preview.innerHTML = `<video controls style="max-height:200px;width:100%;"><source src="${postMediaBase64}" type="${f.type}"></video>${reelTag}`;
+    }
+    document.getElementById('postMediaPreviewWrap').style.display = 'block';
+  };
+  reader.readAsDataURL(f);
+  e.target.value = '';
+}
+
+function removePostMedia(){
+  postMediaBase64=''; postMediaType=''; postMediaFileObj=null;
+  postVideoMeta = { width:0, height:0, isReel:false };
+  document.getElementById('postMediaPreviewWrap').style.display = 'none';
+}
+
+function fmt(cmd){ document.execCommand(cmd, false, null); document.getElementById('postEditor')?.focus(); }
+function fmtBlock(tag){
+  const sel = window.getSelection();
+  if(!sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  const el = document.createElement(tag);
+  el.appendChild(range.extractContents());
+  range.insertNode(el);
+  document.getElementById('postEditor')?.focus();
+}
+function fmtList(type){
+  document.execCommand(type==='ul'?'insertUnorderedList':'insertOrderedList', false, null);
+  document.getElementById('postEditor')?.focus();
+}
+function fmtLine(){ document.execCommand('insertHorizontalRule', false, null); document.getElementById('postEditor')?.focus(); }
+function fmtQuote(){
+  const sel = window.getSelection();
+  if(!sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  const bq = document.createElement('blockquote');
+  bq.appendChild(range.extractContents());
+  range.insertNode(bq);
+  document.getElementById('postEditor')?.focus();
+}
+
+async function submitPost(){
+  const editor = document.getElementById('postEditor');
+  const content = editor?.innerHTML?.trim();
+  const errEl = document.getElementById('postErr'); errEl.style.display='none';
+  if((!content || content==='<br>') && !postMediaBase64){ errEl.textContent='المحتوى أو الملف مطلوب'; errEl.style.display='block'; return; }
+  const btn=document.getElementById('postBtn'); btn.disabled=true;
+  const scheduleVal = document.getElementById('postScheduleInput')?.value || '';
+  try {
+    let imageUrl='', videoUrl='';
+    if(postMediaType === 'image' && postMediaBase64){
+      const up = await apiFetch('/api/upload', 'POST', { image: postMediaBase64 });
+      if (up.url) { imageUrl = up.url; }
+      else {
+        errEl.textContent = up.error || 'فشل رفع الملف'; errEl.style.display='block';
+        btn.disabled=false; return;
+      }
+    } else if (postMediaType === 'video' && postMediaFileObj) {
+      try {
+        const sig = await apiFetch('/api/upload/video/signature', 'POST', {});
+        if (!sig.signature) throw new Error(sig.error || 'تعذر تجهيز رفع الفيديو');
+        const fd = new FormData();
+        fd.append('file', postMediaFileObj);
+        fd.append('api_key', sig.apiKey);
+        fd.append('timestamp', sig.timestamp);
+        fd.append('folder', sig.folder);
+        fd.append('signature', sig.signature);
+        const vRes = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/video/upload`, { method:'POST', body:fd });
+        const vData = await vRes.json();
+        if (!vRes.ok || !vData.secure_url) throw new Error(vData.error?.message || 'فشل رفع الفيديو');
+        videoUrl = vData.secure_url;
+      } catch (upErr) {
+        errEl.textContent = upErr.message || 'فشل رفع الفيديو'; errEl.style.display='block';
+        btn.disabled=false; return;
+      }
+    }
+    const d = await apiFetch('/api/records','POST',{
+      content: content || '',
+      image: imageUrl,
+      video: videoUrl,
+      media_type: postMediaType,
+      video_width: postVideoMeta.width || 0,
+      video_height: postVideoMeta.height || 0,
+      privacy: selectedPostPrivacy,
+      scheduled_at: scheduleVal ? new Date(scheduleVal).toISOString() : null
+    });
+    if(d.success){
+      closeModal('postModal');
+      showToast('تم نشر المنشور بنجاح');
+      await loadMyProfile();
+    } else { errEl.textContent=d.error||'فشل النشر'; errEl.style.display='block'; }
+  } catch(e){ errEl.textContent='تعذر الاتصال بالخادم'; errEl.style.display='block'; }
+  finally { btn.disabled=false; }
 }
 
 function switchTab(tab) {
@@ -5884,7 +6402,6 @@ function onCover(e) {
 async function save() {
   const display_name = document.getElementById('fName')?.value.trim() || '';
   const bio = document.getElementById('fBio')?.value.trim() || '';
-  const game_id = document.getElementById('fGame')?.value.trim() || '';
   const errEl = document.getElementById('pErr'), okEl = document.getElementById('pOk');
   errEl.style.display = 'none'; okEl.style.display = 'none';
   const btn = document.getElementById('saveBtn');
@@ -5904,7 +6421,7 @@ async function save() {
       const ud = await up.json();
       if (ud.url) coverUrl = ud.url;
     }
-    const r = await fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ display_name, bio, game_id, avatar: avatarUrl, cover: coverUrl }) });
+    const r = await fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ display_name, bio, avatar: avatarUrl, cover: coverUrl }) });
     const d = await r.json();
     if (d.success) {
       try { const u = JSON.parse(localStorage.getItem('hostaka_user') || '{}'); u.avatar = avatarUrl; u.display_name = display_name; localStorage.setItem('hostaka_user', JSON.stringify(u)); } catch (e) {}
@@ -5982,6 +6499,24 @@ try { window.renderUserList = renderUserList; } catch(e) {}
 try { window.onAvatar = onAvatar; } catch(e) {}
 try { window.onCover = onCover; } catch(e) {}
 try { window.save = save; } catch(e) {}
+try { window.toggleReactMenu = toggleReactMenu; } catch(e) {}
+try { window.toggleReact = toggleReact; } catch(e) {}
+try { window.toggleComments = toggleComments; } catch(e) {}
+try { window.toggleReplyInput = toggleReplyInput; } catch(e) {}
+try { window.sendComment = sendComment; } catch(e) {}
+try { window.delComment = delComment; } catch(e) {}
+try { window.delPost = delPost; } catch(e) {}
+try { window.goPublisher = goPublisher; } catch(e) {}
+try { window.openPostModal = openPostModal; } catch(e) {}
+try { window.selectPostPrivacy = selectPostPrivacy; } catch(e) {}
+try { window.onPostMedia = onPostMedia; } catch(e) {}
+try { window.removePostMedia = removePostMedia; } catch(e) {}
+try { window.fmt = fmt; } catch(e) {}
+try { window.fmtBlock = fmtBlock; } catch(e) {}
+try { window.fmtList = fmtList; } catch(e) {}
+try { window.fmtLine = fmtLine; } catch(e) {}
+try { window.fmtQuote = fmtQuote; } catch(e) {}
+try { window.submitPost = submitPost; } catch(e) {}
 }
 
 /* ================= shiziai.html ================= */
@@ -6031,7 +6566,7 @@ const LANG = {
   }
 };
 
-let currentLang = localStorage.getItem('hostaka_lang') || 'ar';
+let currentLang = localStorage.getItem('hostaka_lang') || 'en';
 let currentTheme = localStorage.getItem('hostaka_theme') || 'light';
 let ME = null;
 let messages = [];
@@ -6503,8 +7038,35 @@ const MUTE_ICON = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" s
 const UNMUTE_ICON = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
 
 let reels = [];
+let reelsOrder = [];
+let reelsVisibleCount = 10;
+const REELS_PAGE_SIZE = 10;
 let soundOn = false;
 let activeCommentReelId = null;
+
+// نفس منطق الترجيح 60% لصالح المتابَعين المستخدم في الصفحة الرئيسية
+function weightedRandomSortReels(list) {
+  const followed = [], others = [];
+  list.forEach(p => (p.is_followed_author ? followed : others).push(p));
+  function shuffle(arr){
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+  shuffle(followed); shuffle(others);
+  const result = [];
+  let fi = 0, oi = 0;
+  while (fi < followed.length || oi < others.length) {
+    const pickFollowed = Math.random() < 0.6;
+    if (pickFollowed && fi < followed.length) result.push(followed[fi++]);
+    else if (!pickFollowed && oi < others.length) result.push(others[oi++]);
+    else if (fi < followed.length) result.push(followed[fi++]);
+    else result.push(others[oi++]);
+  }
+  return result;
+}
 
 function reactCount(reel){ return (reel.reactions||[]).reduce((s,r)=>s+(r.count||0),0); }
 
@@ -6551,23 +7113,41 @@ async function loadReels(){
     reels = await apiFetch('/api/reels');
     if (!Array.isArray(reels)) reels = [];
   } catch(e) { reels = []; }
+  reelsOrder = weightedRandomSortReels(reels);
+  reelsVisibleCount = REELS_PAGE_SIZE;
   document.getElementById('loader').style.display = 'none';
-  const feed = document.getElementById('reelsFeed');
-  if (!reels.length) {
-    feed.innerHTML = `<div class="empty-state">
-      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="6" y="2" width="12" height="20" rx="2.5"/><polygon points="10.5 9.5 15 12 10.5 14.5"/></svg>
-      <div>لا توجد فيديوهات ريلز بعد</div>
-    </div>`;
-    return;
-  }
-  feed.innerHTML = reels.map(reelSlideHtml).join('');
-  setupObserver();
+  renderReelsFeed();
 
   const wantedId = new URLSearchParams(location.search).get('id');
   if (wantedId) {
     const el = document.getElementById('reel-' + wantedId);
     if (el) requestAnimationFrame(() => el.scrollIntoView({ behavior:'instant', block:'start' }));
   }
+}
+
+function renderReelsFeed(){
+  const feed = document.getElementById('reelsFeed');
+  if (!reelsOrder.length) {
+    feed.innerHTML = `<div class="empty-state">
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="6" y="2" width="12" height="20" rx="2.5"/><polygon points="10.5 9.5 15 12 10.5 14.5"/></svg>
+      <div>لا توجد فيديوهات ريلز بعد</div>
+    </div>`;
+    return;
+  }
+  const visible = reelsOrder.slice(0, reelsVisibleCount);
+  let html = visible.map(reelSlideHtml).join('');
+  if (reelsOrder.length > visible.length) {
+    html += `<div class="reel-slide reel-load-more-slide">
+      <button class="load-more-btn" onclick="loadMoreReels()">المزيد من الريلز</button>
+    </div>`;
+  }
+  feed.innerHTML = html;
+  setupObserver();
+}
+
+function loadMoreReels(){
+  reelsVisibleCount += REELS_PAGE_SIZE;
+  renderReelsFeed();
 }
 
 let observer = null;
@@ -6626,6 +7206,8 @@ function closeComments(){
   activeCommentReelId = null;
 }
 
+let replyingToCommentId = null;
+
 async function renderComments(){
   const list = document.getElementById('commentsList');
   list.innerHTML = '<div class="comment-empty">جارٍ التحميل...</div>';
@@ -6634,15 +7216,30 @@ async function renderComments(){
   if (reel) { reel.comments = comments; const cEl = document.getElementById('cmtCount-' + activeCommentReelId); if (cEl) cEl.textContent = comments.length || ''; }
   document.getElementById('commentsCount').textContent = comments.length ? (comments.length + ' تعليق') : 'التعليقات';
   if (!comments.length) { list.innerHTML = '<div class="comment-empty">لا توجد تعليقات بعد، كن أول من يعلّق</div>'; return; }
-  list.innerHTML = comments.map(c => `
-    <div class="comment-row">
+  const top = comments.filter(c => !c.parent_id);
+  const repliesOf = (cid) => comments.filter(c => Number(c.parent_id) === Number(cid));
+  function row(c){
+    const replies = repliesOf(c.id);
+    return `<div class="comment-row">
       <div class="comment-avatar">${c.avatar ? `<img src="${esc(c.avatar)}" alt="">` : esc((c.display_name||c.username||'?').charAt(0).toUpperCase())}</div>
-      <div>
-        <div class="comment-name">${esc(c.display_name || c.username)}</div>
+      <div style="flex:1;">
+        <div class="comment-name">${esc(c.display_name || c.username)}
+          ${ME ? `<button class="reply-btn" onclick="startReplyTo(${c.id}, '${esc(c.username||'')}')">رد</button>` : ''}
+        </div>
         <div class="comment-text">${esc(c.content)}</div>
+        ${replies.length ? `<div class="replies-list">${replies.map(row).join('')}</div>` : ''}
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }
+  list.innerHTML = top.map(row).join('');
+}
+
+function startReplyTo(commentId, username){
+  replyingToCommentId = commentId;
+  const input = document.getElementById('commentInput');
+  input.value = '';
+  input.placeholder = 'الرد على @' + username;
+  input.focus();
 }
 
 async function sendReelComment(){
@@ -6651,7 +7248,10 @@ async function sendReelComment(){
   const content = input.value.trim();
   if (!content || !activeCommentReelId) return;
   input.value = '';
-  const d = await apiFetch('/api/records/' + activeCommentReelId + '/comments', 'POST', { content });
+  input.placeholder = 'أضف تعليقاً...';
+  const parentId = replyingToCommentId;
+  replyingToCommentId = null;
+  const d = await apiFetch('/api/records/' + activeCommentReelId + '/comments', 'POST', { content, parent_id: parentId||null });
   if (d.success) renderComments();
 }
 
@@ -6677,6 +7277,8 @@ try { window.reactCount = reactCount; } catch(e) {}
 try { window.reelSlideHtml = reelSlideHtml; } catch(e) {}
 try { window.stripHtml = stripHtml; } catch(e) {}
 try { window.loadReels = loadReels; } catch(e) {}
+try { window.renderReelsFeed = renderReelsFeed; } catch(e) {}
+try { window.loadMoreReels = loadMoreReels; } catch(e) {}
 try { window.setupObserver = setupObserver; } catch(e) {}
 try { window.onSlideTap = onSlideTap; } catch(e) {}
 try { window.goLogin = goLogin; } catch(e) {}
@@ -6684,6 +7286,7 @@ try { window.toggleReelLike = toggleReelLike; } catch(e) {}
 try { window.openComments = openComments; } catch(e) {}
 try { window.closeComments = closeComments; } catch(e) {}
 try { window.renderComments = renderComments; } catch(e) {}
+try { window.startReplyTo = startReplyTo; } catch(e) {}
 try { window.sendReelComment = sendReelComment; } catch(e) {}
 try { window.shareReel = shareReel; } catch(e) {}
 try { window.showShareToast = showShareToast; } catch(e) {}
