@@ -336,16 +336,17 @@ async function initDB() {
   try { await db.execute("UPDATE users SET last_seen = datetime('now') WHERE last_seen IS NULL OR last_seen = ''"); } catch(e) {}
 
   // Admin — Hostaka
+  // ⚠️ يُنشأ حساب الأدمن من متغيرات البيئة مرة واحدة فقط عند عدم وجود
+  // أي حساب أدمن بعد. بعد إنشائه، لا تتم إعادة تعيين بريده/كلمة مروره
+  // تلقائياً بعد ذلك — يصبح حساباً عادياً بصلاحيات أدمن يمكنك تعديل
+  // بريده أو كلمة مروره بحرية (مثلاً من صفحة /manager) دون أن يرجعه
+  // السيرفر لقيم متغيرات البيئة عند كل إعادة تشغيل/نشر جديد.
   const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@hostaka.io';
   const ADMIN_PASS  = process.env.ADMIN_PASS  || 'hostaka-admin-2026';
-  const hash = bcrypt.hashSync(ADMIN_PASS, 10);
 
-  let adminRes = await db.execute({ sql:"SELECT id, email FROM users WHERE username='admin' LIMIT 1", args:[] });
-  if (adminRes.rows.length === 0) {
-    adminRes = await db.execute({ sql:"SELECT id, email FROM users WHERE role='admin' LIMIT 1", args:[] });
-  }
-
-  if (adminRes.rows.length === 0) {
+  const adminExists = await db.execute({ sql:"SELECT id FROM users WHERE role='admin' LIMIT 1", args:[] });
+  if (adminExists.rows.length === 0) {
+    const hash = bcrypt.hashSync(ADMIN_PASS, 10);
     try {
       await db.execute({
         sql:"INSERT INTO users (username,email,password,role,display_name) VALUES (?,?,?,?,?)",
@@ -355,21 +356,6 @@ async function initDB() {
     } catch (e) {
       if (e.message?.includes('UNIQUE constraint failed')) {
         console.log('⚠️ Admin email already exists in users table, skipping insert');
-      } else {
-        throw e;
-      }
-    }
-  } else {
-    const adminId = adminRes.rows[0].id;
-    try {
-      await db.execute({
-        sql:"UPDATE users SET email=?, password=? WHERE id=?",
-        args:[ADMIN_EMAIL, hash, adminId]
-      });
-    } catch (e) {
-      if (e.message?.includes('UNIQUE constraint failed')) {
-        console.log('⚠️ Admin email conflicts with existing user, keeping current email');
-        await db.execute({ sql:"UPDATE users SET password=? WHERE id=?", args:[hash, adminId] });
       } else {
         throw e;
       }
