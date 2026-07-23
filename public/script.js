@@ -6870,3 +6870,399 @@ try { window.loadMine = loadMine; } catch(e) {}
 try { window.switchTab = switchTab; } catch(e) {}
 try { window.loadMe = loadMe; } catch(e) {}
 }
+
+// ============================================================
+//  صفحة إدارة الحساب — /manager
+// ============================================================
+if (document.body.classList.contains('page-manager')) {
+
+// ----- Theme -----
+let currentTheme = localStorage.getItem('hostaka_theme') || 'light';
+function setTheme(theme){
+  const html = document.documentElement;
+  if(theme==='dark') html.setAttribute('data-theme','dark'); else html.removeAttribute('data-theme');
+  currentTheme = theme;
+  localStorage.setItem('hostaka_theme', theme);
+}
+function toggleTheme(){ setTheme(currentTheme==='light'?'dark':'light'); }
+setTheme(currentTheme);
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function getToken(){ return localStorage.getItem('hostaka_token') || ''; }
+
+function showToast(msg, type='success'){
+  const host = document.getElementById('toastHost');
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + type;
+  el.textContent = msg;
+  host.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=>el.remove(),300); }, 3200);
+}
+
+async function apiFetch(url, method='GET', body=null){
+  const token = getToken();
+  const opts = { method, headers:{'Content-Type':'application/json','Authorization':'Bearer '+token} };
+  if(body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  const data = await r.json().catch(()=>({}));
+  if(r.status===403 && data?.suspended){
+    localStorage.removeItem('hostaka_token'); localStorage.removeItem('hostaka_user'); localStorage.removeItem('hostaka_role');
+    alert('تم تعليق حسابك من قبل الإدارة' + (data.reason?':\n'+data.reason:''));
+    window.location = '/';
+  }
+  return data;
+}
+
+function openModal(id){ document.getElementById(id).classList.add('show'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+let ME = null;
+let VERIFY_STATUS = null;
+let otpState = { purpose:null, cooldownTimer:null };
+
+function fmtDate(s){
+  if(!s) return '';
+  let d;
+  if(typeof s === 'string' && !/[zZ]|[+-]\d\d:?\d\d$/.test(s)) d = new Date(s.replace(' ','T')+'Z');
+  else d = new Date(s);
+  return d.toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'});
+}
+
+function initials(name){
+  const s = String(name||'').trim();
+  return s ? s[0].toUpperCase() : 'H';
+}
+
+const OTP_LABELS = {
+  username: { title:'تأكيد تغيير اسم المستخدم', desc:(email)=>`أرسلنا كود تأكيد إلى بريدك الحالي (${esc(email)}). أدخله لإتمام تغيير اسم المستخدم.` },
+  email:    { title:'تأكيد البريد الإلكتروني الجديد', desc:(email)=>`أرسلنا كود تأكيد إلى بريدك الجديد (${esc(email)}) للتحقق من ملكيته.` },
+  password: { title:'تأكيد تغيير كلمة المرور', desc:(email)=>`أرسلنا كود تأكيد إلى بريدك (${esc(email)}) لإتمام تغيير كلمة المرور.` },
+  delete:   { title:'تأكيد حذف الحساب', desc:(email)=>`أرسلنا كود تأكيد إلى بريدك (${esc(email)}). إدخاله سيحذف حسابك نهائياً ولا يمكن التراجع عن ذلك.` },
+};
+
+function openOtpModal(purpose, maskedEmail){
+  otpState.purpose = purpose;
+  const label = OTP_LABELS[purpose];
+  document.getElementById('otpTitle').textContent = label.title;
+  document.getElementById('otpDesc').textContent = label.desc(maskedEmail||'');
+  document.getElementById('otpErr').classList.remove('show');
+  document.getElementById('otpCode').value = '';
+  document.getElementById('otpConfirmBtn').textContent = purpose === 'delete' ? 'تأكيد الحذف' : 'تأكيد';
+  startOtpCooldown();
+  openModal('otpModal');
+  setTimeout(()=>document.getElementById('otpCode').focus(), 150);
+}
+function closeOtpModal(){
+  closeModal('otpModal');
+  if(otpState.cooldownTimer) clearInterval(otpState.cooldownTimer);
+  otpState.purpose = null;
+}
+
+function startOtpCooldown(){
+  let secs = 45;
+  const btn = document.getElementById('otpResendBtn');
+  const cd = document.getElementById('otpCooldown');
+  btn.disabled = true;
+  if(otpState.cooldownTimer) clearInterval(otpState.cooldownTimer);
+  otpState.cooldownTimer = setInterval(()=>{
+    secs--;
+    if(secs<=0){
+      clearInterval(otpState.cooldownTimer);
+      btn.disabled = false;
+      cd.textContent = '';
+    } else {
+      cd.textContent = `يمكنك إعادة الإرسال خلال ${secs} ثانية`;
+    }
+  }, 1000);
+}
+
+async function resendOtp(){
+  if(!otpState.purpose) return;
+  try{
+    const d = await apiFetch('/api/account/change/resend', 'POST', { purpose: otpState.purpose });
+    if(d.success){ showToast('تم إرسال كود جديد'); startOtpCooldown(); }
+    else { const e = document.getElementById('otpErr'); e.textContent = d.error||'تعذر إعادة الإرسال'; e.classList.add('show'); }
+  }catch(e){ showToast('تعذر الاتصال بالخادم', 'error'); }
+}
+
+async function confirmOtp(){
+  const purpose = otpState.purpose;
+  if(!purpose) return;
+  const code = document.getElementById('otpCode').value.trim();
+  const errEl = document.getElementById('otpErr');
+  errEl.classList.remove('show');
+  if(!/^\d{6}$/.test(code)){ errEl.textContent='أدخل كود التأكيد المكوّن من 6 أرقام'; errEl.classList.add('show'); return; }
+  const btn = document.getElementById('otpConfirmBtn');
+  btn.disabled = true;
+  try{
+    const d = await apiFetch('/api/account/change/verify', 'POST', { purpose, code });
+    if(d.success){
+      if(purpose === 'delete'){
+        localStorage.removeItem('hostaka_token');
+        localStorage.removeItem('hostaka_user');
+        localStorage.removeItem('hostaka_role');
+        showToast('تم حذف حسابك نهائياً');
+        closeOtpModal();
+        setTimeout(()=>{ window.location = '/'; }, 1200);
+        return;
+      }
+      if(d.token) localStorage.setItem('hostaka_token', d.token);
+      const u = { username:d.username, role:d.role, avatar:d.avatar||'' };
+      localStorage.setItem('hostaka_user', JSON.stringify(u));
+      showToast('تم تنفيذ التعديل بنجاح');
+      closeOtpModal();
+      await loadMe();
+    } else {
+      errEl.textContent = d.error || 'كود غير صحيح';
+      errEl.classList.add('show');
+    }
+  }catch(e){ errEl.textContent='تعذر الاتصال بالخادم'; errEl.classList.add('show'); }
+  btn.disabled = false;
+}
+
+// ----- تغيير اسم المستخدم -----
+async function requestUsernameChange(){
+  const val = document.getElementById('newUsernameInput').value.trim();
+  const errEl = document.getElementById('usernameErr');
+  errEl.classList.remove('show');
+  if(!val){ errEl.textContent='أدخل اسم المستخدم الجديد'; errEl.classList.add('show'); return; }
+  const btn = document.getElementById('usernameBtn');
+  btn.disabled = true;
+  try{
+    const d = await apiFetch('/api/account/change/request', 'POST', { purpose:'username', newUsername: val });
+    if(d.success){ showToast(d.message||'تم إرسال كود التأكيد'); openOtpModal('username', d.maskedEmail); }
+    else { errEl.textContent = d.error||'تعذر تنفيذ الطلب'; errEl.classList.add('show'); }
+  }catch(e){ errEl.textContent='تعذر الاتصال بالخادم'; errEl.classList.add('show'); }
+  btn.disabled = false;
+}
+
+// ----- تغيير البريد الإلكتروني -----
+async function requestEmailChange(){
+  const val = document.getElementById('newEmailInput').value.trim();
+  const errEl = document.getElementById('emailErr');
+  errEl.classList.remove('show');
+  if(!val){ errEl.textContent='أدخل البريد الإلكتروني الجديد'; errEl.classList.add('show'); return; }
+  const btn = document.getElementById('emailBtn');
+  btn.disabled = true;
+  try{
+    const d = await apiFetch('/api/account/change/request', 'POST', { purpose:'email', newEmail: val });
+    if(d.success){ showToast(d.message||'تم إرسال كود التأكيد'); openOtpModal('email', d.maskedEmail); }
+    else { errEl.textContent = d.error||'تعذر تنفيذ الطلب'; errEl.classList.add('show'); }
+  }catch(e){ errEl.textContent='تعذر الاتصال بالخادم'; errEl.classList.add('show'); }
+  btn.disabled = false;
+}
+
+// ----- تغيير كلمة المرور -----
+async function requestPasswordChange(){
+  const cur = document.getElementById('curPasswordInput').value;
+  const nw = document.getElementById('newPasswordInput').value;
+  const cf = document.getElementById('confirmPasswordInput').value;
+  const errEl = document.getElementById('passwordErr');
+  errEl.classList.remove('show');
+  if(!cur || !nw || !cf){ errEl.textContent='جميع الحقول مطلوبة'; errEl.classList.add('show'); return; }
+  if(nw.length < 6){ errEl.textContent='كلمة المرور الجديدة 6 أحرف على الأقل'; errEl.classList.add('show'); return; }
+  if(nw !== cf){ errEl.textContent='كلمة المرور الجديدة وتأكيدها غير متطابقين'; errEl.classList.add('show'); return; }
+  const btn = document.getElementById('passwordBtn');
+  btn.disabled = true;
+  try{
+    const d = await apiFetch('/api/account/change/request', 'POST', { purpose:'password', currentPassword: cur, newPassword: nw });
+    if(d.success){
+      showToast(d.message||'تم إرسال كود التأكيد');
+      document.getElementById('curPasswordInput').value = '';
+      document.getElementById('newPasswordInput').value = '';
+      document.getElementById('confirmPasswordInput').value = '';
+      openOtpModal('password', d.maskedEmail);
+    } else { errEl.textContent = d.error||'تعذر تنفيذ الطلب'; errEl.classList.add('show'); }
+  }catch(e){ errEl.textContent='تعذر الاتصال بالخادم'; errEl.classList.add('show'); }
+  btn.disabled = false;
+}
+
+// ----- تاريخ الميلاد -----
+async function saveBirthdate(){
+  const val = document.getElementById('birthdateInput').value;
+  const btn = document.getElementById('birthdateBtn');
+  btn.disabled = true;
+  try{
+    const d = await apiFetch('/api/account/birthdate', 'PUT', { birth_date: val });
+    if(d.success){ showToast('تم حفظ تاريخ الميلاد'); ME.birth_date = val; }
+    else { showToast(d.error||'تعذر الحفظ', 'error'); }
+  }catch(e){ showToast('تعذر الاتصال بالخادم', 'error'); }
+  btn.disabled = false;
+}
+
+// ----- طلب التوثيق -----
+async function requestVerifyBadge(){
+  try{
+    const d = await apiFetch('/api/verify/request', 'POST');
+    if(d.success){ showToast('تم إرسال طلب التوثيق، سيتم مراجعته من الإدارة'); await refreshVerifyStatus(); render(); }
+    else { showToast(d.error||'تعذر إرسال الطلب', 'error'); }
+  }catch(e){ showToast('تعذر الاتصال بالخادم', 'error'); }
+}
+async function refreshVerifyStatus(){
+  try{ VERIFY_STATUS = await apiFetch('/api/verify/status'); }catch(e){ VERIFY_STATUS = null; }
+}
+
+// ----- حذف الحساب -----
+function openDeleteModal(){
+  document.getElementById('deleteErr').classList.remove('show');
+  document.getElementById('deletePassword').value = '';
+  openModal('deleteModal');
+}
+async function requestDeleteAccount(){
+  const pass = document.getElementById('deletePassword').value;
+  const errEl = document.getElementById('deleteErr');
+  errEl.classList.remove('show');
+  if(!pass){ errEl.textContent='أدخل كلمة المرور الحالية'; errEl.classList.add('show'); return; }
+  const btn = document.getElementById('deleteConfirmBtn');
+  btn.disabled = true;
+  try{
+    const d = await apiFetch('/api/account/change/request', 'POST', { purpose:'delete', currentPassword: pass });
+    if(d.success){
+      closeModal('deleteModal');
+      showToast(d.message||'تم إرسال كود التأكيد');
+      openOtpModal('delete', d.maskedEmail);
+    } else { errEl.textContent = d.error||'تعذر تنفيذ الطلب'; errEl.classList.add('show'); }
+  }catch(e){ errEl.textContent='تعذر الاتصال بالخادم'; errEl.classList.add('show'); }
+  btn.disabled = false;
+}
+
+// ----- عرض الصفحة -----
+function verifyStatusPill(){
+  if(ME?.verified) return `<span class="status-pill st-verified">حساب موثّق ✓</span>`;
+  if(VERIFY_STATUS?.status === 'pending') return `<span class="status-pill st-pending">طلبك قيد المراجعة</span>`;
+  return `<span class="status-pill st-none">غير موثّق</span>`;
+}
+
+function render(){
+  const wrap = document.getElementById('wrap');
+  const avatarHtml = ME.avatar ? `<img src="${esc(ME.avatar)}" alt="">` : initials(ME.display_name||ME.username);
+  wrap.innerHTML = `
+    <div class="page-title">إدارة الحساب</div>
+    <div class="page-sub">تحكّم في بيانات حسابك، أمانه، وخصوصيتك في هوستاكا</div>
+
+    <div class="acc-summary">
+      <div class="acc-avatar">${avatarHtml}</div>
+      <div>
+        <div class="acc-name">${esc(ME.display_name||ME.username)} ${ME.verified ? `<span class="badge-verified"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg></span>` : ''}</div>
+        <div class="acc-meta">عضو منذ ${fmtDate(ME.created_at)}</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        اسم المستخدم
+      </div>
+      <div class="section-hint">يتطلب تغيير اسم المستخدم تأكيد كود يُرسل إلى بريدك الإلكتروني الحالي.</div>
+      <div class="f-current">اسم المستخدم الحالي: <b>@${esc(ME.username)}</b></div>
+      <div class="err" id="usernameErr"></div>
+      <div class="fg"><input type="text" id="newUsernameInput" class="f-input" placeholder="اسم المستخدم الجديد" dir="ltr"></div>
+      <button class="btn-submit" id="usernameBtn" onclick="requestUsernameChange()">إرسال كود التأكيد</button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M22 6l-10 7L2 6"/></svg>
+        البريد الإلكتروني
+      </div>
+      <div class="section-hint">سيتم إرسال كود تأكيد إلى بريدك الجديد للتحقق من ملكيته قبل ربطه بحسابك.</div>
+      <div class="f-current">البريد الحالي: <b>${esc(ME.email||'')}</b></div>
+      <div class="err" id="emailErr"></div>
+      <div class="fg"><input type="email" id="newEmailInput" class="f-input" placeholder="example@mail.com" dir="ltr"></div>
+      <button class="btn-submit" id="emailBtn" onclick="requestEmailChange()">إرسال كود التأكيد</button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        كلمة المرور
+      </div>
+      <div class="section-hint">يتطلب تغيير كلمة المرور إدخال كلمة المرور الحالية وتأكيد كود يُرسل إلى بريدك.</div>
+      <div class="err" id="passwordErr"></div>
+      <div class="fg"><label class="f-label">كلمة المرور الحالية</label><input type="password" id="curPasswordInput" class="f-input" placeholder="••••••••" autocomplete="current-password"></div>
+      <div class="fg"><label class="f-label">كلمة المرور الجديدة</label><input type="password" id="newPasswordInput" class="f-input" placeholder="6 أحرف على الأقل" autocomplete="new-password"></div>
+      <div class="fg"><label class="f-label">تأكيد كلمة المرور الجديدة</label><input type="password" id="confirmPasswordInput" class="f-input" placeholder="••••••••" autocomplete="new-password"></div>
+      <button class="btn-submit" id="passwordBtn" onclick="requestPasswordChange()">إرسال كود التأكيد</button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        تاريخ الميلاد
+      </div>
+      <div class="section-hint">يساعدنا في تخصيص تجربتك على المنصة. يمكن تعديله متى شئت دون الحاجة لتأكيد بريد.</div>
+      <div class="fg"><input type="date" id="birthdateInput" class="f-input" value="${esc(ME.birth_date||'')}"></div>
+      <button class="btn-submit" id="birthdateBtn" onclick="saveBirthdate()">حفظ</button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        توثيق الحساب
+      </div>
+      <div class="section-hint">احصل على علامة التوثيق الزرقاء بعد مراجعة طلبك من فريق الإدارة.</div>
+      <div class="verify-status">
+        ${verifyStatusPill()}
+        ${(!ME.verified && VERIFY_STATUS?.status !== 'pending') ? `<button class="btn-submit" onclick="requestVerifyBadge()">طلب التوثيق</button>` : ''}
+      </div>
+    </div>
+
+    <div class="section danger-zone">
+      <div class="section-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        منطقة الخطر
+      </div>
+      <div class="section-hint">حذف حسابك سيؤدي لإزالة جميع بياناتك ومنشوراتك ورسائلك نهائياً من هوستاكا، ولا يمكن التراجع عن هذا الإجراء.</div>
+      <button class="btn-outline-danger" onclick="openDeleteModal()">حذف الحساب نهائياً</button>
+    </div>
+  `;
+}
+
+async function loadMe(){
+  const token = getToken();
+  if(!token){
+    document.getElementById('wrap').innerHTML = `
+      <div class="login-gate">
+        <div style="font-size:1.05rem;font-weight:800;margin-bottom:6px;">إدارة الحساب متاحة للأعضاء المسجلين فقط</div>
+        <div style="color:var(--muted);font-size:0.85rem;">سجّل الدخول للتحكم في اسم المستخدم، البريد، كلمة المرور، وباقي إعدادات حسابك</div>
+        <a href="/">تسجيل الدخول</a>
+      </div>`;
+    return;
+  }
+  try{
+    ME = await apiFetch('/api/me');
+    if(!ME || ME.error) throw new Error('unauth');
+  }catch(e){
+    document.getElementById('wrap').innerHTML = `<div class="login-gate"><div style="font-weight:800;">تعذر التحقق من الحساب</div><a href="/">العودة للرئيسية</a></div>`;
+    return;
+  }
+  await refreshVerifyStatus();
+  render();
+}
+
+loadMe();
+
+/* expose top-level functions for inline onclick handlers */
+try { window.setTheme = setTheme; } catch(e) {}
+try { window.toggleTheme = toggleTheme; } catch(e) {}
+try { window.esc = esc; } catch(e) {}
+try { window.getToken = getToken; } catch(e) {}
+try { window.showToast = showToast; } catch(e) {}
+try { window.apiFetch = apiFetch; } catch(e) {}
+try { window.openModal = openModal; } catch(e) {}
+try { window.closeModal = closeModal; } catch(e) {}
+try { window.openOtpModal = openOtpModal; } catch(e) {}
+try { window.closeOtpModal = closeOtpModal; } catch(e) {}
+try { window.resendOtp = resendOtp; } catch(e) {}
+try { window.confirmOtp = confirmOtp; } catch(e) {}
+try { window.requestUsernameChange = requestUsernameChange; } catch(e) {}
+try { window.requestEmailChange = requestEmailChange; } catch(e) {}
+try { window.requestPasswordChange = requestPasswordChange; } catch(e) {}
+try { window.saveBirthdate = saveBirthdate; } catch(e) {}
+try { window.requestVerifyBadge = requestVerifyBadge; } catch(e) {}
+try { window.openDeleteModal = openDeleteModal; } catch(e) {}
+try { window.requestDeleteAccount = requestDeleteAccount; } catch(e) {}
+try { window.render = render; } catch(e) {}
+try { window.loadMe = loadMe; } catch(e) {}
+}
