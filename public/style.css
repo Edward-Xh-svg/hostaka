@@ -3519,6 +3519,13 @@ body.page-manager .toast.toast-error {background:var(--danger);color:#fff;}
     body.page-profile .badge-verified svg {width:16px;height:16px;}
     body.page-profile .pub-actions {display:flex;align-items:center;gap:6px;flex-shrink:0;}
     body.page-profile .btn-icon {
+      background:none;border:none;color:var(--muted);
+      cursor:pointer;padding:9px;border-radius:var(--radius-sm);
+      transition:all var(--transition-fast);display:flex;align-items:center;justify-content:center;
+    }
+    body.page-profile .btn-icon:hover {background:var(--primary-light);color:var(--primary);}
+    body.page-profile .btn-icon:active {transform:scale(0.88);}
+    body.page-profile .btn-icon svg {width:17px;height:17px;}
     body.page-profile .react-wrap {position:relative;display:inline-flex;align-items:center;}
     body.page-profile .react-main-btn {
       display:inline-flex;align-items:center;gap:7px;
@@ -3632,6 +3639,13 @@ body.page-manager .toast.toast-error {background:var(--danger);color:#fff;}
       width:40px;height:40px;
       background:var(--primary);
       border:none;border-radius:var(--radius-full);
+      cursor:pointer;display:flex;align-items:center;justify-content:center;
+      transition:all var(--transition-fast);flex-shrink:0;
+      box-shadow:0 2px 8px rgba(0,113,227,0.25);
+    }
+    body.page-profile .btn-send-comment:hover {background:var(--primary-h);transform:scale(1.1);box-shadow:0 4px 16px rgba(0,113,227,0.35);}
+    body.page-profile .btn-send-comment:active {transform:scale(0.92);}
+    body.page-profile .btn-send-comment svg {width:16px;height:16px;stroke:#fff;}
     body.page-profile .load-more-btn {display:block;width:100%;padding:13px;border:1.5px solid var(--border);border-radius:var(--radius-md, 14px);background:var(--card, transparent);color:var(--text);font-family:'Cairo',sans-serif;font-weight:800;font-size:0.88rem;cursor:pointer;transition:all 0.2s;}
     body.page-profile .load-more-btn:hover {background:var(--primary, #0071e3);color:#fff;border-color:transparent;}
     body.page-profile .modal-box.wide {max-width:640px;}
