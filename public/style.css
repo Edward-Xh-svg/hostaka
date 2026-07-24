@@ -3841,3 +3841,12 @@ body.page-profile .mention-tag {color:var(--primary);font-weight:700;text-decora
 body.page-profile .mention-tag:hover {text-decoration:underline;opacity:0.8;}
 body.page-profile .hashtag-tag {color:var(--primary);font-weight:700;text-decoration:none;cursor:pointer;transition:opacity 0.15s;}
 body.page-profile .hashtag-tag:hover {text-decoration:underline;opacity:0.8;}
+
+/* إصلاح توافق القوائم المنسدلة مع الوضع الإنجليزي LTR (كانت مثبتة left:0 بافتراض RTL فقط) */
+html[dir="ltr"].page-index .user-dropdown,
+html[dir="ltr"].page-index .notif-dropdown,
+html[dir="ltr"].page-index .post-opts-menu,
+html[dir="ltr"].page-index .lang-menu {
+  left: auto;
+  right: 0;
+}
