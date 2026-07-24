@@ -327,6 +327,9 @@ async function initDB() {
     "CREATE INDEX IF NOT EXISTS idx_pages_owner ON pages(owner_id)",
     "CREATE TABLE IF NOT EXISTS page_follows (id INTEGER PRIMARY KEY AUTOINCREMENT, page_id INTEGER NOT NULL, user_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(page_id, user_id))",
     "ALTER TABLE users ADD COLUMN birth_date TEXT DEFAULT ''",  // ✅ تاريخ الميلاد — صفحة إدارة الحساب
+    "ALTER TABLE users ADD COLUMN totp_secret TEXT DEFAULT ''",         // ✅ سر المصادقة الثنائية (TOTP)
+    "ALTER TABLE users ADD COLUMN totp_enabled INTEGER DEFAULT 0",      // ✅ هل المصادقة الثنائية مفعّلة
+    "ALTER TABLE users ADD COLUMN totp_backup_codes TEXT DEFAULT ''",   // ✅ أكواد الاسترجاع الاحتياطية (JSON، مشفّرة bcrypt)
     "CREATE TABLE IF NOT EXISTS account_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '', target_email TEXT NOT NULL DEFAULT '', code TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, expires_at TEXT NOT NULL, last_sent_at TEXT NOT NULL DEFAULT (datetime('now')), created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(user_id, purpose))",
     "ALTER TABLE records ADD COLUMN privacy TEXT DEFAULT 'public'",       // public | private | draft
     "ALTER TABLE records ADD COLUMN scheduled_at TEXT DEFAULT NULL",      // نشر مجدوَل بوقت لاحق
@@ -375,7 +378,8 @@ async function initDB() {
 const q = {
   // ── Users ──
   getUserByEmail:   (email)    => db.execute({ sql:'SELECT * FROM users WHERE email=?', args:[email] }).then(first),
-  getUserById:      (id)       => db.execute({ sql:'SELECT id,username,email,role,avatar,bio,game_id,display_name,cover,verified,suspended,suspend_reason,birth_date,last_seen,created_at FROM users WHERE id=?', args:[id] }).then(first),
+  getUserById:      (id)       => db.execute({ sql:'SELECT id,username,email,role,avatar,bio,game_id,display_name,cover,verified,suspended,suspend_reason,birth_date,totp_enabled,last_seen,created_at FROM users WHERE id=?', args:[id] }).then(first),
+  getUserByIdFull:  (id)       => db.execute({ sql:'SELECT * FROM users WHERE id=?', args:[id] }).then(first),
   touchLastSeen: (id) => db.execute({ sql:"UPDATE users SET last_seen=datetime('now') WHERE id=?", args:[id] }).catch(()=>{}),
   getUserStatus: async (username) => {
     const u = await db.execute({ sql:'SELECT id, last_seen FROM users WHERE username=?', args:[username] }).then(first);
@@ -405,6 +409,12 @@ const q = {
   updateEmail:          (id, email)    => db.execute({ sql:'UPDATE users SET email=? WHERE id=?', args:[email, id] }),
   updateUserPassword:   (id, passwordHash) => db.execute({ sql:'UPDATE users SET password=? WHERE id=?', args:[passwordHash, id] }),
   updateBirthDate:      (id, birth_date) => db.execute({ sql:'UPDATE users SET birth_date=? WHERE id=?', args:[birth_date||'', id] }),
+
+  // ── مصادقة ثنائية (2FA/TOTP) ──
+  setTotpSecretPending: (id, secret) => db.execute({ sql:'UPDATE users SET totp_secret=?, totp_enabled=0 WHERE id=?', args:[secret, id] }),
+  enableTotp:           (id, backupCodesJson) => db.execute({ sql:'UPDATE users SET totp_enabled=1, totp_backup_codes=? WHERE id=?', args:[backupCodesJson, id] }),
+  disableTotp:          (id) => db.execute({ sql:"UPDATE users SET totp_enabled=0, totp_secret='', totp_backup_codes='' WHERE id=?", args:[id] }),
+  updateTotpBackupCodes: (id, json) => db.execute({ sql:'UPDATE users SET totp_backup_codes=? WHERE id=?', args:[json, id] }),
 
   // ── Account Changes (تعديل يوزر نيم/بريد/كلمة مرور/حذف حساب بتأكيد كود بريد) ──
   getAccountChange: (userId, purpose) => db.execute({ sql:'SELECT * FROM account_changes WHERE user_id=? AND purpose=?', args:[userId, purpose] }).then(first),

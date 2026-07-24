@@ -8,6 +8,8 @@ const { q, initDB } = require('./database');
 // ===== استيراد node-fetch و crypto =====
 const fetch  = require('node-fetch');
 const crypto = require('crypto');
+const { authenticator } = require('otplib');
+const QRCode = require('qrcode');
 
 const app = express();
 app.use(express.json({ limit: '25mb' }));
@@ -263,6 +265,26 @@ function maskEmail(email) {
 function signToken(user) {
   return jwt.sign({ id:user.id, username:user.username, role:user.role, avatar:user.avatar||'' }, JWT_SECRET, { expiresIn:JWT_EXPIRES });
 }
+
+// ── مصادقة ثنائية (2FA/TOTP) ──
+function sign2FAPendingToken(userId) {
+  return jwt.sign({ id: userId, purpose: '2fa_pending' }, JWT_SECRET, { expiresIn: '5m' });
+}
+function verify2FAPendingToken(token) {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.purpose !== '2fa_pending') return null;
+    return decoded;
+  } catch(e) { return null; }
+}
+function generateBackupCodes(count = 5) {
+  const codes = [];
+  for (let i = 0; i < count; i++) {
+    codes.push(crypto.randomBytes(5).toString('hex').toUpperCase().match(/.{1,5}/g).join('-'));
+  }
+  return codes;
+}
+
 function verifyToken(req) {
   const token = (req.headers['authorization']||'').replace('Bearer ','').trim();
   if (!token) return null;
@@ -332,8 +354,44 @@ app.post('/api/login', async(req,res)=>{
     const user=await q.getUserByEmail(email.trim().toLowerCase());
     if(!user||!bcrypt.compareSync(password,user.password)) return res.status(401).json({error:'البريد أو كلمة المرور غير صريحة'});
     if(user.suspended) return res.status(403).json({ error:'تم تعليق حسابك' + (user.suspend_reason ? ': ' + user.suspend_reason : ''), suspended:true, reason:user.suspend_reason||'' });
+    if (Number(user.totp_enabled) === 1) {
+      return res.json({ success:true, requires2FA:true, pendingToken: sign2FAPendingToken(user.id) });
+    }
     res.json({success:true,token:signToken(user),username:user.username,role:user.role,avatar:user.avatar||'',id:user.id});
   }catch(e){res.status(500).json({error:'خطأ في الخادم'});}
+});
+
+// الخطوة الثانية لتسجيل الدخول عند تفعيل المصادقة الثنائية: تأكيد كود التطبيق أو كود احتياطي
+app.post('/api/login/2fa-verify', async (req, res) => {
+  try {
+    const { pendingToken, code } = req.body || {};
+    const decoded = verify2FAPendingToken(pendingToken);
+    if (!decoded) return res.status(401).json({ error:'انتهت صلاحية الجلسة، الرجاء تسجيل الدخول من جديد' });
+    const user = await q.getUserByIdFull(decoded.id);
+    if (!user) return res.status(404).json({ error:'المستخدم غير موجود' });
+    if (user.suspended) return res.status(403).json({ error:'تم تعليق حسابك', suspended:true, reason:user.suspend_reason||'' });
+
+    const inputCode = String(code||'').trim().toUpperCase();
+    let ok = false;
+    if (/^[0-9]{6}$/.test(inputCode)) {
+      ok = authenticator.verify({ token: inputCode, secret: user.totp_secret });
+    } else {
+      let backupCodes = [];
+      try { backupCodes = JSON.parse(user.totp_backup_codes || '[]'); } catch(e) {}
+      const idx = backupCodes.findIndex(h => bcrypt.compareSync(inputCode, h));
+      if (idx !== -1) {
+        ok = true;
+        backupCodes.splice(idx, 1);
+        await q.updateTotpBackupCodes(user.id, JSON.stringify(backupCodes));
+      }
+    }
+    if (!ok) return res.status(400).json({ error:'كود المصادقة غير صحيح' });
+
+    res.json({ success:true, token:signToken(user), username:user.username, role:user.role, avatar:user.avatar||'', id:user.id });
+  } catch(e) {
+    console.error('❌ 2fa-verify error:', e);
+    res.status(500).json({ error:'خطأ في الخادم' });
+  }
 });
 
 // هذا المسار القديم أصبح معطلاً، التسجيل الآن يتم عبر تأكيد البريد (انظر /api/auth/register/*)
@@ -1507,6 +1565,79 @@ app.post('/api/account/change/verify', requireAuth, async (req, res) => {
   } catch(e) {
     console.error('❌ account/change/verify error:', e);
     res.status(500).json({ error: e.message || 'تعذر تأكيد التعديل' });
+  }
+});
+
+// ============================================================
+// المصادقة الثنائية (2FA/TOTP) — إعدادات الحساب /manager
+// ============================================================
+
+// الخطوة 1: توليد سر جديد + رمز QR لمسحه بتطبيق المصادقة (لم يُفعّل بعد)
+app.post('/api/account/2fa/setup', requireAuth, async (req, res) => {
+  try {
+    const fullUser = await q.getUserByIdFull(req.user.id);
+    if (!fullUser) return res.status(404).json({ error:'المستخدم غير موجود' });
+    if (Number(fullUser.totp_enabled) === 1) return res.status(400).json({ error:'المصادقة الثنائية مفعّلة بالفعل' });
+
+    const secret = authenticator.generateSecret();
+    const otpauth = authenticator.keyuri(fullUser.email, 'Hostaka', secret);
+    const qrDataUrl = await QRCode.toDataURL(otpauth);
+    await q.setTotpSecretPending(req.user.id, secret);
+
+    res.json({ success:true, secret, qrCode: qrDataUrl });
+  } catch(e) {
+    console.error('❌ 2fa/setup error:', e);
+    res.status(500).json({ error:'تعذر إعداد المصادقة الثنائية' });
+  }
+});
+
+// الخطوة 2: تأكيد الكود من التطبيق لتفعيل المصادقة الثنائية فعلياً — يعيد أكواد الاسترجاع مرة واحدة فقط
+app.post('/api/account/2fa/enable', requireAuth, async (req, res) => {
+  try {
+    const { code } = req.body || {};
+    const fullUser = await q.getUserByIdFull(req.user.id);
+    if (!fullUser || !fullUser.totp_secret) return res.status(400).json({ error:'الرجاء بدء إعداد المصادقة الثنائية أولاً' });
+    if (Number(fullUser.totp_enabled) === 1) return res.status(400).json({ error:'المصادقة الثنائية مفعّلة بالفعل' });
+
+    const ok = authenticator.verify({ token: String(code||'').trim(), secret: fullUser.totp_secret });
+    if (!ok) return res.status(400).json({ error:'الكود غير صحيح، تأكد من التطبيق وحاول مجدداً' });
+
+    const backupCodes = generateBackupCodes(5);
+    const hashedCodes = backupCodes.map(c => bcrypt.hashSync(c, 10));
+    await q.enableTotp(req.user.id, JSON.stringify(hashedCodes));
+
+    res.json({ success:true, backupCodes });
+  } catch(e) {
+    console.error('❌ 2fa/enable error:', e);
+    res.status(500).json({ error:'تعذر تفعيل المصادقة الثنائية' });
+  }
+});
+
+// إلغاء تفعيل المصادقة الثنائية — يتطلب كلمة المرور + كود صالح (تطبيق أو احتياطي)
+app.post('/api/account/2fa/disable', requireAuth, async (req, res) => {
+  try {
+    const { password, code } = req.body || {};
+    const fullUser = await q.getUserByIdFull(req.user.id);
+    if (!fullUser) return res.status(404).json({ error:'المستخدم غير موجود' });
+    if (Number(fullUser.totp_enabled) !== 1) return res.status(400).json({ error:'المصادقة الثنائية غير مفعّلة أصلاً' });
+    if (!password || !bcrypt.compareSync(password, fullUser.password)) return res.status(401).json({ error:'كلمة المرور غير صحيحة' });
+
+    const inputCode = String(code||'').trim().toUpperCase();
+    let ok = false;
+    if (/^[0-9]{6}$/.test(inputCode)) {
+      ok = authenticator.verify({ token: inputCode, secret: fullUser.totp_secret });
+    } else {
+      let backupCodes = [];
+      try { backupCodes = JSON.parse(fullUser.totp_backup_codes || '[]'); } catch(e) {}
+      ok = backupCodes.some(h => bcrypt.compareSync(inputCode, h));
+    }
+    if (!ok) return res.status(400).json({ error:'كود المصادقة غير صحيح' });
+
+    await q.disableTotp(req.user.id);
+    res.json({ success:true });
+  } catch(e) {
+    console.error('❌ 2fa/disable error:', e);
+    res.status(500).json({ error:'تعذر إلغاء تفعيل المصادقة الثنائية' });
   }
 });
 
