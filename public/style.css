@@ -3659,7 +3659,7 @@ body.page-manager .toast.toast-error {background:var(--danger);color:#fff;}
       background:none;color:var(--muted);
       transition:all var(--transition-fast);
     }
-    body.page-profile .tab.active {background:var(--primary);color:#fff;box-shadow:0 2px 8px rgba(0,113,227,0.2);}
+    body.page-profile .tab.active {background:var(--primary);color:var(--black);box-shadow:0 2px 8px rgba(0,0,0,0.15);}
     body.page-profile .tab:hover:not(.active) {color:var(--text);}
     body.page-profile .tab-pane {display:none;}
     body.page-profile .tab-pane.active {display:block;animation:index-fadeIn 0.35s ease;}
@@ -3689,11 +3689,11 @@ body.page-manager .toast.toast-error {background:var(--danger);color:#fff;}
     body.page-profile .btn-submit {
       width:100%;padding:14px;
       background:var(--primary);
-      color:#fff;
+      color:var(--black);
       font-weight:800;border:none;border-radius:var(--radius-md);
       cursor:pointer;font-family:'Cairo',sans-serif;
       font-size:0.95rem;transition:all var(--transition-fast);margin-top:6px;
-      box-shadow:0 2px 8px rgba(0,113,227,0.25);
+      box-shadow:0 2px 8px rgba(0,0,0,0.15);
     }
     body.page-profile .btn-submit:hover {background:var(--primary-h);transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,113,227,0.35);}
     body.page-profile .btn-submit:active {transform:translateY(0) scale(0.97);}
@@ -3770,14 +3770,14 @@ body.page-profile .post-settings-box {background:var(--input-bg, rgba(0,0,0,0.03
 body.page-profile .privacy-choices {display:flex;gap:8px;flex-wrap:wrap;}
 body.page-profile .privacy-opt {display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:999px;border:1.5px solid var(--border);background:var(--card);color:var(--text);font-family:'Cairo',sans-serif;font-weight:700;font-size:0.82rem;cursor:pointer;transition:all 0.2s;}
 body.page-profile .privacy-opt:hover {border-color:var(--primary-border);}
-body.page-profile .privacy-opt.active {background:var(--primary);color:#fff;border-color:transparent;}
+body.page-profile .privacy-opt.active {background:var(--primary);color:var(--black);border-color:transparent;}
 body.page-profile .privacy-opt svg {flex-shrink:0;}
 body.page-profile .schedule-input {width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm,10px);background:var(--card);color:var(--text);font-family:'Cairo',sans-serif;font-size:0.85rem;}
 body.page-profile .schedule-input:focus {outline:none;border-color:var(--primary);box-shadow:0 0 0 4px var(--primary-light);}
 body.page-profile #scheduleWrap {margin-top:12px;}
 
 /* زر إنشاء منشور في تبويب المنشورات بالبروفايل */
-body.page-profile .create-post-cta {display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;margin-bottom:16px;border:none;border-radius:var(--radius-md,14px);background:var(--primary);color:#fff;font-family:'Cairo',sans-serif;font-weight:800;font-size:0.9rem;cursor:pointer;box-shadow:0 4px 16px rgba(0,113,227,0.25);transition:all 0.2s;}
+body.page-profile .create-post-cta {display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;margin-bottom:16px;border:none;border-radius:var(--radius-md,14px);background:var(--primary);color:var(--black);font-family:'Cairo',sans-serif;font-weight:800;font-size:0.9rem;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.15);transition:all 0.2s;}
 body.page-profile .create-post-cta:hover {background:var(--primary-h);transform:translateY(-1px);}
 
 /* شارة حالة المنشور (خاص/مسودة/مجدول) */
