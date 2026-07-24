@@ -85,8 +85,13 @@ async function doLogin(){
   const errEl=document.getElementById('loginErr'); errEl.style.display='none';
   const btn=document.getElementById('loginBtn'); btn.disabled=true; btn.textContent='...';
   try{
-    const d=await api('/api/login','POST',{email,password:pass});
-    if(d.role!=='admin'){errEl.textContent='ليس لديك صلاحية admin';errEl.style.display='block';btn.disabled=false;btn.textContent='دخول';return;}
+    let d=await api('/api/login','POST',{email,password:pass});
+    if(d.requires2FA){
+      const code = window.prompt('أدخل كود المصادقة الثنائية من تطبيق المصادقة:');
+      if(!code){ btn.disabled=false; btn.textContent='دخول'; return; }
+      d = await api('/api/login/2fa-verify','POST',{ pendingToken:d.pendingToken, code:code.trim() });
+    }
+    if(!d.success || d.role!=='admin'){errEl.textContent=d.error||'ليس لديك صلاحية admin';errEl.style.display='block';btn.disabled=false;btn.textContent='دخول';return;}
     TOKEN=d.token; localStorage.setItem('hostaka_token',TOKEN);
     initAdmin(d.username);
   }catch(e){errEl.textContent='فشل الاتصال';errEl.style.display='block';btn.disabled=false;btn.textContent='دخول';}
@@ -3522,6 +3527,20 @@ function switchTab(t){
   document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active',(i===0&&t==='login')||(i===1&&t==='register')));
   document.getElementById('tabLogin').classList.toggle('active',t==='login');
   document.getElementById('tabReg').classList.toggle('active',t==='register');
+  document.getElementById('tab2FA').classList.remove('active');
+  document.querySelector('#authModal .tabs').style.display = 'flex';
+}
+
+let pending2FAToken = null;
+function show2FAStep(pendingToken){
+  pending2FAToken = pendingToken;
+  document.querySelector('#authModal .tabs').style.display = 'none';
+  document.getElementById('tabLogin').classList.remove('active');
+  document.getElementById('tabReg').classList.remove('active');
+  document.getElementById('tab2FA').classList.add('active');
+  document.getElementById('login2faErr').style.display = 'none';
+  document.getElementById('login2faCode').value = '';
+  setTimeout(()=>document.getElementById('login2faCode')?.focus(), 150);
 }
 
 function showToast(msg, type='success'){
@@ -3544,7 +3563,9 @@ async function doLogin(){
   const btn=document.getElementById('loginBtn'); btn.disabled=true; btn.textContent='...';
   try {
     const d = await apiFetch('/api/login','POST',{email,password:pass});
-    if(d.success){
+    if(d.requires2FA){
+      show2FAStep(d.pendingToken);
+    } else if(d.success){
       localStorage.setItem('hostaka_token',d.token);
       localStorage.setItem('hostaka_role',d.role);
       const u={username:d.username,role:d.role,avatar:d.avatar||''};
@@ -3556,6 +3577,28 @@ async function doLogin(){
     } else { errEl.textContent=d.error||'فشل'; errEl.style.display='block'; }
   } catch(e){ errEl.textContent='تعذر الاتصال'; errEl.style.display='block'; }
   finally { btn.disabled=false; btn.innerHTML=`<span id="loginSubmitText">${t('loginSubmit')}</span>`; }
+}
+
+async function submit2FALogin(){
+  const code = document.getElementById('login2faCode').value.trim();
+  const errEl = document.getElementById('login2faErr'); errEl.style.display='none';
+  if(!code){ errEl.textContent='أدخل كود المصادقة'; errEl.style.display='block'; return; }
+  const btn = document.getElementById('login2faBtn'); btn.disabled=true;
+  try {
+    const d = await apiFetch('/api/login/2fa-verify','POST',{ pendingToken: pending2FAToken, code });
+    if(d.success){
+      localStorage.setItem('hostaka_token',d.token);
+      localStorage.setItem('hostaka_role',d.role);
+      const u={username:d.username,role:d.role,avatar:d.avatar||''};
+      localStorage.setItem('hostaka_user',JSON.stringify(u));
+      setLoggedInUI(u);
+      closeModal('authModal');
+      pending2FAToken = null;
+      await loadPosts();
+      loadUnread();
+    } else { errEl.textContent=d.error||'كود غير صحيح'; errEl.style.display='block'; }
+  } catch(e){ errEl.textContent='تعذر الاتصال'; errEl.style.display='block'; }
+  btn.disabled=false;
 }
 
 async function doRegister(){
@@ -4719,6 +4762,8 @@ try { window.switchTab = switchTab; } catch(e) {}
 try { window.showToast = showToast; } catch(e) {}
 try { window.getToken = getToken; } catch(e) {}
 try { window.doLogin = doLogin; } catch(e) {}
+try { window.submit2FALogin = submit2FALogin; } catch(e) {}
+try { window.show2FAStep = show2FAStep; } catch(e) {}
 try { window.doRegister = doRegister; } catch(e) {}
 try { window.doLogout = doLogout; } catch(e) {}
 try { window.loadUnread = loadUnread; } catch(e) {}
@@ -4875,7 +4920,12 @@ async function doLogin(){
   const btn = document.getElementById('loginBtn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
   try {
-    const d = await apiFetch('/api/login','POST',{ email, password: pass });
+    let d = await apiFetch('/api/login','POST',{ email, password: pass });
+    if (d.requires2FA) {
+      const code = window.prompt('أدخل كود المصادقة الثنائية من تطبيق المصادقة:');
+      if (!code) { btn.disabled = false; btn.textContent = 'دخول'; return; }
+      d = await apiFetch('/api/login/2fa-verify','POST',{ pendingToken: d.pendingToken, code: code.trim() });
+    }
     if (d.success) { setLoggedIn(d); location.href = '/'; }
     else showErr('loginErr', d.error || 'فشل تسجيل الدخول');
   } catch(e) { showErr('loginErr','تعذر الاتصال بالخادم'); }
@@ -7701,6 +7751,73 @@ async function refreshVerifyStatus(){
   try{ VERIFY_STATUS = await apiFetch('/api/verify/status'); }catch(e){ VERIFY_STATUS = null; }
 }
 
+// ----- المصادقة الثنائية (2FA) -----
+async function start2FASetup(){
+  try{
+    const d = await apiFetch('/api/account/2fa/setup', 'POST');
+    if(!d.success){ showToast(d.error||'تعذر بدء الإعداد', 'error'); return; }
+    document.getElementById('tfaErr').classList.remove('show');
+    document.getElementById('tfaQrImg').src = d.qrCode;
+    document.getElementById('tfaSecretText').textContent = d.secret;
+    document.getElementById('tfaEnableCode').value = '';
+    document.getElementById('tfaStepQr').style.display = 'block';
+    document.getElementById('tfaStepBackup').style.display = 'none';
+    document.getElementById('tfaStepTitle').textContent = 'تفعيل المصادقة الثنائية';
+    openModal('tfaSetupModal');
+  }catch(e){ showToast('تعذر الاتصال بالخادم', 'error'); }
+}
+
+async function confirm2FAEnable(){
+  const code = document.getElementById('tfaEnableCode').value.trim();
+  const errEl = document.getElementById('tfaErr');
+  errEl.classList.remove('show');
+  if(!/^\d{6}$/.test(code)){ errEl.textContent='أدخل كود التطبيق المكوّن من 6 أرقام'; errEl.classList.add('show'); return; }
+  const btn = document.getElementById('tfaEnableBtn'); btn.disabled = true;
+  try{
+    const d = await apiFetch('/api/account/2fa/enable', 'POST', { code });
+    if(d.success){
+      ME.totp_enabled = true;
+      document.getElementById('tfaStepTitle').textContent = 'احفظ أكواد الاسترجاع';
+      document.getElementById('tfaStepQr').style.display = 'none';
+      document.getElementById('tfaBackupCodesList').innerHTML = d.backupCodes.map(c=>`<div>${esc(c)}</div>`).join('');
+      document.getElementById('tfaStepBackup').style.display = 'block';
+    } else { errEl.textContent = d.error||'كود غير صحيح'; errEl.classList.add('show'); }
+  }catch(e){ errEl.textContent='تعذر الاتصال بالخادم'; errEl.classList.add('show'); }
+  btn.disabled = false;
+}
+
+function finish2FASetup(){
+  closeModal('tfaSetupModal');
+  showToast('تم تفعيل المصادقة الثنائية بنجاح');
+  render();
+}
+
+function open2FADisableModal(){
+  document.getElementById('tfaDisableErr').classList.remove('show');
+  document.getElementById('tfaDisablePassword').value = '';
+  document.getElementById('tfaDisableCode').value = '';
+  openModal('tfaDisableModal');
+}
+
+async function submit2FADisable(){
+  const password = document.getElementById('tfaDisablePassword').value;
+  const code = document.getElementById('tfaDisableCode').value.trim();
+  const errEl = document.getElementById('tfaDisableErr');
+  errEl.classList.remove('show');
+  if(!password || !code){ errEl.textContent='جميع الحقول مطلوبة'; errEl.classList.add('show'); return; }
+  const btn = document.getElementById('tfaDisableBtn'); btn.disabled = true;
+  try{
+    const d = await apiFetch('/api/account/2fa/disable', 'POST', { password, code });
+    if(d.success){
+      ME.totp_enabled = false;
+      closeModal('tfaDisableModal');
+      showToast('تم إلغاء تفعيل المصادقة الثنائية');
+      render();
+    } else { errEl.textContent = d.error||'تعذر إلغاء التفعيل'; errEl.classList.add('show'); }
+  }catch(e){ errEl.textContent='تعذر الاتصال بالخادم'; errEl.classList.add('show'); }
+  btn.disabled = false;
+}
+
 // ----- حذف الحساب -----
 function openDeleteModal(){
   document.getElementById('deleteErr').classList.remove('show');
@@ -7806,6 +7923,20 @@ function render(){
       </div>
     </div>
 
+    <div class="section">
+      <div class="section-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        المصادقة الثنائية (2FA)
+      </div>
+      <div class="section-hint">طبقة حماية إضافية: بعد التفعيل، سيُطلب منك عند تسجيل الدخول إدخال كود يتولّد في تطبيق مصادقة (مثل Google Authenticator) بجانب كلمة المرور.</div>
+      <div class="verify-status">
+        ${ME.totp_enabled ? `<span class="status-pill st-verified">مفعّلة ✓</span>` : `<span class="status-pill st-none">غير مفعّلة</span>`}
+        ${ME.totp_enabled
+          ? `<button class="btn-outline-danger" onclick="open2FADisableModal()">إلغاء التفعيل</button>`
+          : `<button class="btn-submit" onclick="start2FASetup()">تفعيل المصادقة الثنائية</button>`}
+      </div>
+    </div>
+
     <div class="section danger-zone">
       <div class="section-title">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
@@ -7859,6 +7990,11 @@ try { window.requestEmailChange = requestEmailChange; } catch(e) {}
 try { window.requestPasswordChange = requestPasswordChange; } catch(e) {}
 try { window.saveBirthdate = saveBirthdate; } catch(e) {}
 try { window.requestVerifyBadge = requestVerifyBadge; } catch(e) {}
+try { window.start2FASetup = start2FASetup; } catch(e) {}
+try { window.confirm2FAEnable = confirm2FAEnable; } catch(e) {}
+try { window.finish2FASetup = finish2FASetup; } catch(e) {}
+try { window.open2FADisableModal = open2FADisableModal; } catch(e) {}
+try { window.submit2FADisable = submit2FADisable; } catch(e) {}
 try { window.openDeleteModal = openDeleteModal; } catch(e) {}
 try { window.requestDeleteAccount = requestDeleteAccount; } catch(e) {}
 try { window.render = render; } catch(e) {}

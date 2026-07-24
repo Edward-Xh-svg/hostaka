@@ -67,6 +67,55 @@
   </div>
 </div>
 
+<!-- نافذة إعداد المصادقة الثنائية -->
+<div class="modal-bd" id="tfaSetupModal">
+  <div class="modal-box">
+    <div class="modal-t">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <span id="tfaStepTitle">تفعيل المصادقة الثنائية</span>
+    </div>
+    <div class="err" id="tfaErr"></div>
+
+    <div id="tfaStepQr">
+      <p style="color:var(--muted);font-size:0.85rem;line-height:1.7;margin-bottom:14px;">امسح رمز QR التالي بتطبيق مصادقة مثل Google Authenticator أو Authy، ثم أدخل الكود المكوّن من 6 أرقام الذي يظهر لتأكيد التفعيل.</p>
+      <div style="text-align:center;margin-bottom:14px;">
+        <img id="tfaQrImg" src="" alt="QR" style="width:200px;height:200px;border-radius:12px;background:#fff;padding:8px;">
+      </div>
+      <div class="f-current" style="text-align:center;word-break:break-all;">أو أدخل هذا السر يدوياً: <b id="tfaSecretText" dir="ltr"></b></div>
+      <div class="fg" style="margin-top:14px;"><input type="text" id="tfaEnableCode" class="f-input" placeholder="000000" maxlength="6" inputmode="numeric" style="text-align:center;letter-spacing:6px;font-size:1.2rem;"></div>
+      <div class="modal-footer">
+        <button class="btn-ghost" onclick="closeModal('tfaSetupModal')">إلغاء</button>
+        <button class="btn-submit" style="width:auto;padding:10px 26px;" id="tfaEnableBtn" onclick="confirm2FAEnable()">تفعيل</button>
+      </div>
+    </div>
+
+    <div id="tfaStepBackup" style="display:none;">
+      <p style="color:var(--muted);font-size:0.85rem;line-height:1.7;margin-bottom:14px;">تم التفعيل بنجاح ✓ احفظ أكواد الاسترجاع التالية في مكان آمن — كل كود يُستخدم مرة واحدة فقط لو فقدت الوصول لتطبيق المصادقة. لن تظهر هذه الأكواد مرة أخرى.</p>
+      <div id="tfaBackupCodesList" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--input-bg);border-radius:10px;padding:14px;font-family:monospace;direction:ltr;text-align:center;font-size:0.9rem;font-weight:700;"></div>
+      <div class="modal-footer">
+        <button class="btn-submit" style="width:auto;padding:10px 26px;" onclick="finish2FASetup()">تم، لقد حفظتها</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- نافذة إلغاء تفعيل المصادقة الثنائية -->
+<div class="modal-bd" id="tfaDisableModal">
+  <div class="modal-box">
+    <div class="modal-t danger-t">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <span>إلغاء تفعيل المصادقة الثنائية</span>
+    </div>
+    <div class="err" id="tfaDisableErr"></div>
+    <div class="fg"><label class="f-label">كلمة المرور الحالية</label><input type="password" id="tfaDisablePassword" class="f-input" placeholder="••••••••" autocomplete="current-password"></div>
+    <div class="fg"><label class="f-label">كود المصادقة الحالي أو كود احتياطي</label><input type="text" id="tfaDisableCode" class="f-input" placeholder="000000" autocomplete="one-time-code"></div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('tfaDisableModal')">إلغاء</button>
+      <button class="btn-danger" id="tfaDisableBtn" onclick="submit2FADisable()">إلغاء التفعيل</button>
+    </div>
+  </div>
+</div>
+
 <div id="toastHost"></div>
 
 <script src="/script.js" defer></script>
