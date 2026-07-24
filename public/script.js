@@ -2985,25 +2985,29 @@ function t(key) {
 function applyLang() {
   document.documentElement.lang = currentLang;
   document.documentElement.dir = (currentLang === 'ar') ? 'rtl' : 'ltr';
-  document.getElementById('topbarTitle').textContent = t('title');
-  document.getElementById('pageTitle').textContent = t('title');
-  document.getElementById('pageSubtitle').textContent = t('subtitle');
-  document.getElementById('searchInput').placeholder = t('search');
-  document.getElementById('loginBtnText').textContent = t('login');
-  document.getElementById('tabLoginBtn').textContent = t('loginTab');
-  document.getElementById('tabRegisterBtn').textContent = t('registerTab');
-  document.getElementById('lEmailLabel').textContent = t('email');
-  document.getElementById('lPassLabel').textContent = t('password');
-  document.getElementById('loginSubmitText').textContent = t('loginSubmit');
-  document.getElementById('rUserLabel').textContent = t('username');
-  document.getElementById('rEmailLabel').textContent = t('email');
-  document.getElementById('rPassLabel').textContent = t('password');
-  document.getElementById('registerSubmitText').textContent = t('registerSubmit');
-  document.querySelector('.drop-admin').textContent = t('admin');
-  document.querySelector('.drop-profile').textContent = t('profile');
-  document.querySelector('.drop-download').textContent = t('downloadAndroid');
-  document.querySelector('.drop-logout').textContent = t('logout');
-  document.getElementById('loadingText').textContent = t('loading');
+  const setText = (sel, val, byId=true) => {
+    const el = byId ? document.getElementById(sel) : document.querySelector(sel);
+    if (el) el.textContent = val;
+  };
+  setText('topbarTitle', t('title'));
+  setText('pageTitle', t('title'));
+  setText('pageSubtitle', t('subtitle'));
+  const si = document.getElementById('searchInput'); if (si) si.placeholder = t('search');
+  setText('loginBtnText', t('login'));
+  setText('tabLoginBtn', t('loginTab'));
+  setText('tabRegisterBtn', t('registerTab'));
+  setText('lEmailLabel', t('email'));
+  setText('lPassLabel', t('password'));
+  setText('loginSubmitText', t('loginSubmit'));
+  setText('rUserLabel', t('username'));
+  setText('rEmailLabel', t('email'));
+  setText('rPassLabel', t('password'));
+  setText('registerSubmitText', t('registerSubmit'));
+  setText('.drop-admin', t('admin'), false);
+  setText('.drop-profile', t('profile'), false);
+  setText('.drop-download', t('downloadAndroid'), false);
+  setText('.drop-logout', t('logout'), false);
+  setText('loadingText', t('loading'));
   if (allPosts.length) renderFeed(allPosts);
   else {
     const feed = document.getElementById('feed');
