@@ -335,6 +335,11 @@ async function initDB() {
     "CREATE INDEX IF NOT EXISTS idx_saved_posts_user ON saved_posts(user_id, created_at DESC)",
     "ALTER TABLE records ADD COLUMN pinned INTEGER DEFAULT 0",       // ✅ تثبيت المنشور في الملف الشخصي
     "ALTER TABLE records ADD COLUMN pinned_at TEXT DEFAULT ''",
+    "CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, jti TEXT NOT NULL UNIQUE, device TEXT DEFAULT '', browser TEXT DEFAULT '', os TEXT DEFAULT '', ip TEXT DEFAULT '', location TEXT DEFAULT '', user_agent TEXT DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')), last_active TEXT NOT NULL DEFAULT (datetime('now')), revoked INTEGER DEFAULT 0)",  // ✅ إدارة الجلسات/الأجهزة
+    "CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id, revoked)",
+    "CREATE INDEX IF NOT EXISTS idx_sessions_jti ON sessions(jti)",
+    "CREATE TABLE IF NOT EXISTS security_events (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, type TEXT NOT NULL, description TEXT DEFAULT '', ip TEXT DEFAULT '', device TEXT DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')))",  // ✅ تنبيهات الأمان
+    "CREATE INDEX IF NOT EXISTS idx_security_events_user ON security_events(user_id, created_at DESC)",
     "ALTER TABLE records ADD COLUMN privacy TEXT DEFAULT 'public'",       // public | private | draft
     "ALTER TABLE records ADD COLUMN scheduled_at TEXT DEFAULT NULL",      // نشر مجدوَل بوقت لاحق
     "ALTER TABLE record_comments ADD COLUMN parent_id INTEGER DEFAULT NULL", // الرد على تعليق
@@ -419,6 +424,24 @@ const q = {
   enableTotp:           (id, backupCodesJson) => db.execute({ sql:'UPDATE users SET totp_enabled=1, totp_backup_codes=? WHERE id=?', args:[backupCodesJson, id] }),
   disableTotp:          (id) => db.execute({ sql:"UPDATE users SET totp_enabled=0, totp_secret='', totp_backup_codes='' WHERE id=?", args:[id] }),
   updateTotpBackupCodes: (id, json) => db.execute({ sql:'UPDATE users SET totp_backup_codes=? WHERE id=?', args:[json, id] }),
+
+  // ── الجلسات/الأجهزة ──
+  createSession: (userId, jti, device, browser, os, ip, location, userAgent) => db.execute({
+    sql:`INSERT INTO sessions (user_id, jti, device, browser, os, ip, location, user_agent) VALUES (?,?,?,?,?,?,?,?)`,
+    args:[userId, jti, device||'', browser||'', os||'', ip||'', location||'', userAgent||'']
+  }),
+  getSessionByJti: (jti) => db.execute({ sql:'SELECT * FROM sessions WHERE jti=?', args:[jti] }).then(first),
+  touchSession: (jti) => db.execute({ sql:"UPDATE sessions SET last_active=datetime('now') WHERE jti=?", args:[jti] }),
+  getUserSessions: (userId) => db.execute({ sql:'SELECT * FROM sessions WHERE user_id=? AND revoked=0 ORDER BY last_active DESC', args:[userId] }).then(rows),
+  revokeSession: (userId, sessionId) => db.execute({ sql:'UPDATE sessions SET revoked=1 WHERE id=? AND user_id=?', args:[sessionId, userId] }),
+  revokeAllSessions: (userId, exceptJti) => db.execute({ sql:'UPDATE sessions SET revoked=1 WHERE user_id=? AND jti!=?', args:[userId, exceptJti||''] }),
+
+  // ── تنبيهات الأمان ──
+  logSecurityEvent: (userId, type, description, ip, device) => db.execute({
+    sql:`INSERT INTO security_events (user_id, type, description, ip, device) VALUES (?,?,?,?,?)`,
+    args:[userId, type, description||'', ip||'', device||'']
+  }),
+  getSecurityEvents: (userId, limit=30) => db.execute({ sql:'SELECT * FROM security_events WHERE user_id=? ORDER BY created_at DESC LIMIT ?', args:[userId, limit] }).then(rows),
 
   // ── Account Changes (تعديل يوزر نيم/بريد/كلمة مرور/حذف حساب بتأكيد كود بريد) ──
   getAccountChange: (userId, purpose) => db.execute({ sql:'SELECT * FROM account_changes WHERE user_id=? AND purpose=?', args:[userId, purpose] }).then(first),
