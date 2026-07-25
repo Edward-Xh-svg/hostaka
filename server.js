@@ -262,8 +262,50 @@ function maskEmail(email) {
   return visible + '*'.repeat(Math.max(name.length - 2, 1)) + s.slice(at);
 }
 
-function signToken(user) {
-  return jwt.sign({ id:user.id, username:user.username, role:user.role, avatar:user.avatar||'' }, JWT_SECRET, { expiresIn:JWT_EXPIRES });
+function signToken(user, jti) {
+  const payload = { id:user.id, username:user.username, role:user.role, avatar:user.avatar||'' };
+  if (jti) payload.jti = jti;
+  return jwt.sign(payload, JWT_SECRET, { expiresIn:JWT_EXPIRES });
+}
+
+function getClientIp(req) {
+  const fwd = req.headers['x-forwarded-for'];
+  if (fwd) return fwd.split(',')[0].trim();
+  return req.socket?.remoteAddress || '';
+}
+
+function parseUserAgent(ua) {
+  ua = ua || '';
+  let browser = 'متصفح غير معروف';
+  if (/Edg\//.test(ua)) browser = 'Edge';
+  else if (/OPR\/|Opera/.test(ua)) browser = 'Opera';
+  else if (/Chrome\//.test(ua) && !/Chromium/.test(ua)) browser = 'Chrome';
+  else if (/Firefox\//.test(ua)) browser = 'Firefox';
+  else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
+
+  let os = 'نظام غير معروف';
+  if (/Windows/.test(ua)) os = 'Windows';
+  else if (/Mac OS X/.test(ua)) os = 'macOS';
+  else if (/Android/.test(ua)) os = 'Android';
+  else if (/iPhone|iPad|iPod/.test(ua)) os = 'iOS';
+  else if (/Linux/.test(ua)) os = 'Linux';
+
+  let device = 'حاسوب';
+  if (/Mobi|Android(?!.*Tablet)|iPhone/.test(ua)) device = 'جوال';
+  else if (/iPad|Tablet/.test(ua)) device = 'تابلت';
+
+  return { browser, os, device };
+}
+
+// إنشاء جلسة جديدة + تنبيه أمان "تسجيل دخول جديد" — يُستخدم عند كل تسجيل دخول فعلي (وليس عند مجرد تعديل بيانات الحساب)
+async function createLoginSession(user, req) {
+  const jti = crypto.randomUUID();
+  const ip = getClientIp(req);
+  const ua = req.headers['user-agent'] || '';
+  const { browser, os, device } = parseUserAgent(ua);
+  await q.createSession(user.id, jti, device, browser, os, ip, '', ua);
+  await q.logSecurityEvent(user.id, 'login', `تسجيل دخول جديد عبر ${browser} على ${os}`, ip, device);
+  return signToken(user, jti);
 }
 
 // ── مصادقة ثنائية (2FA/TOTP) ──
@@ -293,6 +335,11 @@ function verifyToken(req) {
 async function requireAuth(req,res,next) {
   const u=verifyToken(req); if(!u) return res.status(401).json({error:'غير مصرح'});
   try {
+    if (u.jti) {
+      const session = await q.getSessionByJti(u.jti);
+      if (!session || Number(session.revoked) === 1) return res.status(401).json({ error:'انتهت هذه الجلسة، الرجاء تسجيل الدخول من جديد', sessionRevoked:true });
+      q.touchSession(u.jti); // fire-and-forget
+    }
     const dbUser = await q.getUserById(u.id);
     if (!dbUser) return res.status(401).json({error:'غير مصرح'});
     if (dbUser.suspended) return res.status(403).json({ error:'تم تعليق حسابك' + (dbUser.suspend_reason ? ': ' + dbUser.suspend_reason : ''), suspended:true, reason: dbUser.suspend_reason||'' });
@@ -357,7 +404,7 @@ app.post('/api/login', async(req,res)=>{
     if (Number(user.totp_enabled) === 1) {
       return res.json({ success:true, requires2FA:true, pendingToken: sign2FAPendingToken(user.id) });
     }
-    res.json({success:true,token:signToken(user),username:user.username,role:user.role,avatar:user.avatar||'',id:user.id});
+    res.json({success:true,token:await createLoginSession(user, req),username:user.username,role:user.role,avatar:user.avatar||'',id:user.id});
   }catch(e){res.status(500).json({error:'خطأ في الخادم'});}
 });
 
@@ -387,7 +434,7 @@ app.post('/api/login/2fa-verify', async (req, res) => {
     }
     if (!ok) return res.status(400).json({ error:'كود المصادقة غير صحيح' });
 
-    res.json({ success:true, token:signToken(user), username:user.username, role:user.role, avatar:user.avatar||'', id:user.id });
+    res.json({ success:true, token:await createLoginSession(user, req), username:user.username, role:user.role, avatar:user.avatar||'', id:user.id });
   } catch(e) {
     console.error('❌ 2fa-verify error:', e);
     res.status(500).json({ error:'خطأ في الخادم' });
@@ -503,7 +550,7 @@ app.post('/api/auth/register/verify', async (req, res) => {
     await q.deletePendingRegistration(mail);
 
     const user = { id: Number(result.lastInsertRowid), username: pending.username, role:'user', avatar:'' };
-    res.json({ success:true, token: signToken(user), username:user.username, role:user.role, avatar:'', id:user.id });
+    res.json({ success:true, token: await createLoginSession(user, req), username:user.username, role:user.role, avatar:'', id:user.id });
   } catch(e) {
     console.error('❌ register/verify error:', e);
     res.status(500).json({ error: e.message || 'تعذر تأكيد الحساب' });
@@ -607,7 +654,7 @@ app.post('/api/auth/password/reset', async (req, res) => {
     await q.updateUserPasswordByEmail(mail, hash);
     await q.deletePasswordReset(mail);
 
-    res.json({ success:true, token: signToken(user), username:user.username, role:user.role, avatar:user.avatar||'', id:user.id, message:'تم تحديث كلمة المرور بنجاح' });
+    res.json({ success:true, token: await createLoginSession(user, req), username:user.username, role:user.role, avatar:user.avatar||'', id:user.id, message:'تم تحديث كلمة المرور بنجاح' });
   } catch(e) {
     console.error('❌ password/reset error:', e);
     res.status(500).json({ error: e.message || 'تعذر إعادة تعيين كلمة المرور' });
@@ -1604,14 +1651,17 @@ app.post('/api/account/change/verify', requireAuth, async (req, res) => {
         if (e.message?.includes('UNIQUE')) return res.status(400).json({ error:'اسم المستخدم أصبح مستخدماً، حاول باسم آخر' });
         throw e;
       }
+      await q.logSecurityEvent(req.user.id, 'username_changed', `تم تغيير اسم المستخدم إلى @${payload.newUsername}`, getClientIp(req), parseUserAgent(req.headers['user-agent']).device);
     } else if (purpose === 'email') {
       try { await q.updateEmail(req.user.id, payload.newEmail); }
       catch(e) {
         if (e.message?.includes('UNIQUE')) return res.status(400).json({ error:'البريد الإلكتروني أصبح مستخدماً' });
         throw e;
       }
+      await q.logSecurityEvent(req.user.id, 'email_changed', `تم تغيير البريد الإلكتروني إلى ${maskEmail(payload.newEmail)}`, getClientIp(req), parseUserAgent(req.headers['user-agent']).device);
     } else if (purpose === 'password') {
       await q.updateUserPassword(req.user.id, payload.newPasswordHash);
+      await q.logSecurityEvent(req.user.id, 'password_changed', 'تم تغيير كلمة المرور', getClientIp(req), parseUserAgent(req.headers['user-agent']).device);
     } else if (purpose === 'delete') {
       await q.deleteAccountChange(req.user.id, purpose);
       await q.deleteUser(req.user.id);
@@ -1623,7 +1673,7 @@ app.post('/api/account/change/verify', requireAuth, async (req, res) => {
     const updatedUser = await q.getUserById(req.user.id);
     res.json({
       success:true,
-      token: signToken(updatedUser),
+      token: signToken(updatedUser, req.user.jti),
       id: updatedUser.id,
       username: updatedUser.username,
       email: updatedUser.email,
@@ -1673,6 +1723,7 @@ app.post('/api/account/2fa/enable', requireAuth, async (req, res) => {
     const backupCodes = generateBackupCodes(5);
     const hashedCodes = backupCodes.map(c => bcrypt.hashSync(c, 10));
     await q.enableTotp(req.user.id, JSON.stringify(hashedCodes));
+    await q.logSecurityEvent(req.user.id, '2fa_enabled', 'تم تفعيل المصادقة الثنائية', getClientIp(req), parseUserAgent(req.headers['user-agent']).device);
 
     res.json({ success:true, backupCodes });
   } catch(e) {
@@ -1702,6 +1753,7 @@ app.post('/api/account/2fa/disable', requireAuth, async (req, res) => {
     if (!ok) return res.status(400).json({ error:'كود المصادقة غير صحيح' });
 
     await q.disableTotp(req.user.id);
+    await q.logSecurityEvent(req.user.id, '2fa_disabled', 'تم إلغاء تفعيل المصادقة الثنائية', getClientIp(req), parseUserAgent(req.headers['user-agent']).device);
     res.json({ success:true });
   } catch(e) {
     console.error('❌ 2fa/disable error:', e);
@@ -1726,6 +1778,208 @@ app.put('/api/account/birthdate', requireAuth, async (req, res) => {
     res.json({ success:true });
   } catch(e) {
     res.status(500).json({ error:'خطأ في الخادم' });
+  }
+});
+
+// ============================================================
+// الجلسات والأجهزة — /manager
+// ============================================================
+
+function timeAgoAr(dateStr) {
+  const ms = Date.now() - parseSqliteUTC(dateStr).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return 'الآن';
+  if (mins < 60) return `منذ ${mins} دقيقة`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `منذ ${hrs} ساعة`;
+  const days = Math.floor(hrs / 24);
+  return `منذ ${days} يوم`;
+}
+
+// عرض كل الجلسات النشطة للمستخدم مع تمييز الجلسة الحالية
+app.get('/api/account/sessions', requireAuth, async (req, res) => {
+  try {
+    const sessions = await q.getUserSessions(req.user.id);
+    res.json(sessions.map(s => ({
+      id: s.id,
+      device: s.device,
+      browser: s.browser,
+      os: s.os,
+      ip: s.ip,
+      location: s.location || 'غير معروف',
+      created_at: s.created_at,
+      last_active: s.last_active,
+      last_active_text: timeAgoAr(s.last_active),
+      is_current: s.jti === req.user.jti
+    })));
+  } catch(e) {
+    res.status(500).json({ error:'خطأ في الخادم' });
+  }
+});
+
+// إنهاء جلسة واحدة محددة
+app.post('/api/account/sessions/:id/revoke', requireAuth, async (req, res) => {
+  try {
+    await q.revokeSession(req.user.id, Number(req.params.id));
+    await q.logSecurityEvent(req.user.id, 'session_revoked', 'تم إنهاء جلسة تسجيل دخول من جهاز آخر', getClientIp(req), parseUserAgent(req.headers['user-agent']).device);
+    res.json({ success:true });
+  } catch(e) {
+    res.status(500).json({ error:'خطأ في الخادم' });
+  }
+});
+
+// إنهاء كل الجلسات الأخرى (عدا الجلسة الحالية)
+app.post('/api/account/sessions/revoke-all', requireAuth, async (req, res) => {
+  try {
+    await q.revokeAllSessions(req.user.id, req.user.jti || '');
+    await q.logSecurityEvent(req.user.id, 'sessions_revoked_all', 'تم تسجيل الخروج من جميع الأجهزة الأخرى', getClientIp(req), parseUserAgent(req.headers['user-agent']).device);
+    res.json({ success:true });
+  } catch(e) {
+    res.status(500).json({ error:'خطأ في الخادم' });
+  }
+});
+
+// ============================================================
+// تنبيهات الأمان — /manager
+// ============================================================
+const SECURITY_EVENT_LABELS = {
+  login: { title:'تسجيل دخول جديد', icon:'login' },
+  username_changed: { title:'تغيير اسم المستخدم', icon:'edit' },
+  email_changed: { title:'تغيير البريد الإلكتروني', icon:'mail' },
+  password_changed: { title:'تغيير كلمة المرور', icon:'lock' },
+  '2fa_enabled': { title:'تفعيل المصادقة الثنائية', icon:'shield' },
+  '2fa_disabled': { title:'إلغاء تفعيل المصادقة الثنائية', icon:'shield' },
+  session_revoked: { title:'إنهاء جلسة', icon:'logout' },
+  sessions_revoked_all: { title:'تسجيل خروج من كل الأجهزة', icon:'logout' },
+};
+
+app.get('/api/account/security-events', requireAuth, async (req, res) => {
+  try {
+    const events = await q.getSecurityEvents(req.user.id, 40);
+    res.json(events.map(e => ({
+      id: e.id,
+      type: e.type,
+      title: (SECURITY_EVENT_LABELS[e.type]?.title) || e.type,
+      icon: (SECURITY_EVENT_LABELS[e.type]?.icon) || 'bell',
+      description: e.description,
+      ip: e.ip,
+      device: e.device,
+      created_at: e.created_at,
+      time_text: timeAgoAr(e.created_at)
+    })));
+  } catch(e) {
+    res.status(500).json({ error:'خطأ في الخادم' });
+  }
+});
+
+// ============================================================
+// النسخ الاحتياطي وتنزيل البيانات — /manager
+// ============================================================
+
+// تنزيل نسخة كاملة من بيانات المستخدم بصيغة JSON
+app.get('/api/account/backup', requireAuth, async (req, res) => {
+  try {
+    const user = await q.getUserById(req.user.id);
+    if (!user) return res.status(404).json({ error:'المستخدم غير موجود' });
+    const [posts, savedPosts] = await Promise.all([
+      q.getUserPosts(req.user.id, req.user.id),
+      q.getSavedPosts(req.user.id)
+    ]);
+    const backup = {
+      exported_at: new Date().toISOString(),
+      profile: user,
+      posts,
+      saved_posts: savedPosts,
+    };
+    res.setHeader('Content-Disposition', `attachment; filename="hostaka-backup-${user.username}.json"`);
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.send(JSON.stringify(backup, null, 2));
+  } catch(e) {
+    console.error('❌ account/backup error:', e);
+    res.status(500).json({ error:'تعذر إنشاء النسخة الاحتياطية' });
+  }
+});
+
+// ── ربط Google Drive ورفع النسخة الاحتياطية إليه ──
+// يتطلب متغيرات البيئة: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || '';
+
+app.get('/api/account/backup/drive/status', requireAuth, (req, res) => {
+  res.json({ configured: !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REDIRECT_URI) });
+});
+
+// الخطوة 1: توجيه المستخدم لصفحة موافقة Google (يحمل معه توكن قصير الأجل لتحديد هويته عند العودة)
+app.get('/api/account/backup/drive/connect', requireAuth, (req, res) => {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_REDIRECT_URI) {
+    return res.status(400).json({ error:'ميزة ربط Google Drive غير مُفعّلة على الخادم بعد' });
+  }
+  const state = jwt.sign({ id: req.user.id, purpose:'drive_backup' }, JWT_SECRET, { expiresIn:'10m' });
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: GOOGLE_REDIRECT_URI,
+    response_type: 'code',
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    access_type: 'online',
+    prompt: 'consent',
+    state,
+  });
+  res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}` });
+});
+
+// الخطوة 2: استقبال كود Google، تبديله بتوكن وصول، ثم رفع النسخة الاحتياطية مباشرة إلى Drive
+app.get('/api/account/backup/drive/callback', async (req, res) => {
+  try {
+    const { code, state } = req.query;
+    let decoded;
+    try { decoded = jwt.verify(state, JWT_SECRET); } catch(e) { return res.status(400).send('انتهت صلاحية الطلب، حاول من جديد'); }
+    if (decoded.purpose !== 'drive_backup') return res.status(400).send('طلب غير صالح');
+
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code, client_id:GOOGLE_CLIENT_ID, client_secret:GOOGLE_CLIENT_SECRET,
+        redirect_uri:GOOGLE_REDIRECT_URI, grant_type:'authorization_code'
+      })
+    });
+    const tokenData = await tokenRes.json();
+    if (!tokenRes.ok || !tokenData.access_token) {
+      console.error('❌ Google token exchange failed:', tokenData);
+      return res.status(400).send('تعذر إتمام الربط مع Google');
+    }
+
+    const user = await q.getUserById(decoded.id);
+    const [posts, savedPosts] = await Promise.all([
+      q.getUserPosts(decoded.id, decoded.id),
+      q.getSavedPosts(decoded.id)
+    ]);
+    const backupJson = JSON.stringify({ exported_at:new Date().toISOString(), profile:user, posts, saved_posts:savedPosts }, null, 2);
+    const fileName = `hostaka-backup-${user.username}-${Date.now()}.json`;
+
+    const boundary = 'hostakaboundary' + Date.now();
+    const metadata = JSON.stringify({ name: fileName, mimeType:'application/json' });
+    const multipartBody =
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n` +
+      `--${boundary}\r\nContent-Type: application/json\r\n\r\n${backupJson}\r\n--${boundary}--`;
+
+    const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method:'POST',
+      headers:{ 'Authorization':`Bearer ${tokenData.access_token}`, 'Content-Type':`multipart/related; boundary=${boundary}` },
+      body: multipartBody
+    });
+    const uploadData = await uploadRes.json();
+    if (!uploadRes.ok) {
+      console.error('❌ Drive upload failed:', uploadData);
+      return res.status(400).send('تعذر رفع النسخة الاحتياطية إلى Drive');
+    }
+
+    await q.logSecurityEvent(decoded.id, 'drive_backup', 'تم رفع نسخة احتياطية إلى Google Drive', getClientIp(req), '');
+    res.send(`<html dir="rtl"><body style="font-family:sans-serif;text-align:center;padding:60px;"><h2>تم رفع النسخة الاحتياطية إلى Google Drive بنجاح ✅</h2><p>يمكنك إغلاق هذه الصفحة والعودة إلى المنصة.</p></body></html>`);
+  } catch(e) {
+    console.error('❌ drive/callback error:', e);
+    res.status(500).send('خطأ في الخادم');
   }
 });
 
