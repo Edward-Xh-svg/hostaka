@@ -331,6 +331,10 @@ async function initDB() {
     "ALTER TABLE users ADD COLUMN totp_enabled INTEGER DEFAULT 0",      // ✅ هل المصادقة الثنائية مفعّلة
     "ALTER TABLE users ADD COLUMN totp_backup_codes TEXT DEFAULT ''",   // ✅ أكواد الاسترجاع الاحتياطية (JSON، مشفّرة bcrypt)
     "CREATE TABLE IF NOT EXISTS account_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '', target_email TEXT NOT NULL DEFAULT '', code TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, expires_at TEXT NOT NULL, last_sent_at TEXT NOT NULL DEFAULT (datetime('now')), created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(user_id, purpose))",
+    "CREATE TABLE IF NOT EXISTS saved_posts (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, record_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(user_id, record_id))",  // ✅ حفظ المنشورات/الريلز
+    "CREATE INDEX IF NOT EXISTS idx_saved_posts_user ON saved_posts(user_id, created_at DESC)",
+    "ALTER TABLE records ADD COLUMN pinned INTEGER DEFAULT 0",       // ✅ تثبيت المنشور في الملف الشخصي
+    "ALTER TABLE records ADD COLUMN pinned_at TEXT DEFAULT ''",
     "ALTER TABLE records ADD COLUMN privacy TEXT DEFAULT 'public'",       // public | private | draft
     "ALTER TABLE records ADD COLUMN scheduled_at TEXT DEFAULT NULL",      // نشر مجدوَل بوقت لاحق
     "ALTER TABLE record_comments ADD COLUMN parent_id INTEGER DEFAULT NULL", // الرد على تعليق
@@ -451,15 +455,17 @@ const q = {
            COALESCE(u.display_name, u.username, r.publisher, '') as publisher_name,
            COALESCE(u.verified, 0) as publisher_verified,
            p.username as page_username,
-           CASE WHEN f.follower_id IS NOT NULL THEN 1 ELSE 0 END as is_followed_author
+           CASE WHEN f.follower_id IS NOT NULL THEN 1 ELSE 0 END as is_followed_author,
+           CASE WHEN sp.id IS NOT NULL THEN 1 ELSE 0 END as is_saved
     FROM records r
     LEFT JOIN users u ON (u.id = r.user_id) OR (r.user_id IS NULL AND u.username = r.publisher)
     LEFT JOIN pages p ON p.id = r.page_id
     LEFT JOIN follows f ON f.follower_id = ? AND f.followed_id = r.user_id
+    LEFT JOIN saved_posts sp ON sp.record_id = r.id AND sp.user_id = ?
     WHERE COALESCE(r.privacy,'public') = 'public'
       AND (r.scheduled_at IS NULL OR r.scheduled_at = '' OR r.scheduled_at <= datetime('now'))
     ORDER BY r.created_at DESC
-  `, args: [viewerId || 0] }).then(rows),
+  `, args: [viewerId || 0, viewerId || 0] }).then(rows),
   getRecordById: (id) => db.execute({ sql: `
     SELECT r.*,
            COALESCE(u.avatar, r.user_avatar, '') as user_avatar,
@@ -505,11 +511,40 @@ const q = {
   deleteRecord: (id) => db.execute({ sql:'DELETE FROM records WHERE id=?', args:[id] }),
   getRecord:    (id) => db.execute({ sql:'SELECT * FROM records WHERE id=?', args:[id] }).then(first),
   getUserPosts: (uid, viewerId) => (Number(viewerId) === Number(uid)
-    ? db.execute({ sql:'SELECT * FROM records WHERE user_id=? ORDER BY created_at DESC', args:[uid] }).then(rows)
-    : db.execute({ sql:`SELECT * FROM records WHERE user_id=?
-        AND COALESCE(privacy,'public') = 'public'
-        AND (scheduled_at IS NULL OR scheduled_at = '' OR scheduled_at <= datetime('now'))
-        ORDER BY created_at DESC`, args:[uid] }).then(rows)),
+    ? db.execute({ sql:`SELECT r.*, CASE WHEN sp.id IS NOT NULL THEN 1 ELSE 0 END as is_saved
+        FROM records r LEFT JOIN saved_posts sp ON sp.record_id = r.id AND sp.user_id = ?
+        WHERE r.user_id=? ORDER BY COALESCE(r.pinned,0) DESC, r.created_at DESC`, args:[viewerId||0, uid] }).then(rows)
+    : db.execute({ sql:`SELECT r.*, CASE WHEN sp.id IS NOT NULL THEN 1 ELSE 0 END as is_saved
+        FROM records r LEFT JOIN saved_posts sp ON sp.record_id = r.id AND sp.user_id = ?
+        WHERE r.user_id=?
+        AND COALESCE(r.privacy,'public') = 'public'
+        AND (r.scheduled_at IS NULL OR r.scheduled_at = '' OR r.scheduled_at <= datetime('now'))
+        ORDER BY COALESCE(r.pinned,0) DESC, r.created_at DESC`, args:[viewerId||0, uid] }).then(rows)),
+
+  // ── تثبيت المنشور في الملف الشخصي (منشور واحد فقط في كل مرة) ──
+  pinPost: async (userId, recordId) => {
+    await db.execute({ sql:"UPDATE records SET pinned=0, pinned_at='' WHERE user_id=? AND pinned=1", args:[userId] });
+    await db.execute({ sql:"UPDATE records SET pinned=1, pinned_at=datetime('now') WHERE id=? AND user_id=?", args:[recordId, userId] });
+  },
+  unpinPost: (userId, recordId) => db.execute({ sql:"UPDATE records SET pinned=0, pinned_at='' WHERE id=? AND user_id=?", args:[recordId, userId] }),
+
+  // ── حفظ المنشورات/الريلز ──
+  isPostSaved: (userId, recordId) => db.execute({ sql:'SELECT id FROM saved_posts WHERE user_id=? AND record_id=?', args:[userId, recordId] }).then(r => !!first(r)),
+  savePost:    (userId, recordId) => db.execute({ sql:'INSERT OR IGNORE INTO saved_posts (user_id, record_id) VALUES (?,?)', args:[userId, recordId] }),
+  unsavePost:  (userId, recordId) => db.execute({ sql:'DELETE FROM saved_posts WHERE user_id=? AND record_id=?', args:[userId, recordId] }),
+  getSavedPosts: (userId) => db.execute({ sql:`
+    SELECT r.*,
+           COALESCE(u.avatar, r.user_avatar, '') as user_avatar,
+           COALESCE(u.display_name, u.username, r.publisher, '') as publisher_name,
+           COALESCE(u.verified, 0) as publisher_verified,
+           1 as is_saved,
+           sp.created_at as saved_at
+    FROM saved_posts sp
+    JOIN records r ON r.id = sp.record_id
+    LEFT JOIN users u ON (u.id = r.user_id) OR (r.user_id IS NULL AND u.username = r.publisher)
+    WHERE sp.user_id = ?
+    ORDER BY sp.created_at DESC
+  `, args:[userId] }).then(rows),
 
   // ── Reels (فيديوهات عمودية) ──
   listReels: (viewerId) => db.execute({ sql: `
@@ -517,15 +552,17 @@ const q = {
            COALESCE(u.avatar, r.user_avatar, '') as user_avatar,
            COALESCE(u.display_name, u.username, r.publisher, '') as publisher_name,
            COALESCE(u.verified, 0) as publisher_verified,
-           CASE WHEN f.follower_id IS NOT NULL THEN 1 ELSE 0 END as is_followed_author
+           CASE WHEN f.follower_id IS NOT NULL THEN 1 ELSE 0 END as is_followed_author,
+           CASE WHEN sp.id IS NOT NULL THEN 1 ELSE 0 END as is_saved
     FROM records r
     LEFT JOIN users u ON (u.id = r.user_id) OR (r.user_id IS NULL AND u.username = r.publisher)
     LEFT JOIN follows f ON f.follower_id = ? AND f.followed_id = r.user_id
+    LEFT JOIN saved_posts sp ON sp.record_id = r.id AND sp.user_id = ?
     WHERE r.video IS NOT NULL AND r.video != '' AND r.is_reel = 1
       AND COALESCE(r.privacy,'public') = 'public'
       AND (r.scheduled_at IS NULL OR r.scheduled_at = '' OR r.scheduled_at <= datetime('now'))
     ORDER BY RANDOM()
-  `, args: [viewerId || 0] }).then(rows),
+  `, args: [viewerId || 0, viewerId || 0] }).then(rows),
 
   // ── Reactions ──
   getAllReactions:      () => db.execute('SELECT record_id,emoji,COUNT(*) as count FROM record_reactions GROUP BY record_id,emoji').then(rows),

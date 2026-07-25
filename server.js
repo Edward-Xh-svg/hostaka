@@ -1236,6 +1236,74 @@ app.delete('/api/records/:id', requireAuth, async (req, res) => {
   }
 });
 
+// ============================================================
+// حفظ المنشورات/الريلز (/save) وتثبيت منشور في الملف الشخصي
+// ============================================================
+
+// تبديل حالة الحفظ لمنشور أو ريلز
+app.post('/api/records/:id/save', requireAuth, async (req, res) => {
+  try {
+    const recordId = Number(req.params.id);
+    const rec = await q.getRecord(recordId);
+    if (!rec) return res.status(404).json({ error:'المنشور غير موجود' });
+    const already = await q.isPostSaved(req.user.id, recordId);
+    if (already) {
+      await q.unsavePost(req.user.id, recordId);
+      return res.json({ success:true, saved:false });
+    } else {
+      await q.savePost(req.user.id, recordId);
+      return res.json({ success:true, saved:true });
+    }
+  } catch(e) {
+    res.status(500).json({ error:'خطأ في الخادم' });
+  }
+});
+
+// قائمة كل المنشورات/الريلز المحفوظة للمستخدم الحالي
+app.get('/api/saved', requireAuth, async (req, res) => {
+  try {
+    const records = await q.getSavedPosts(req.user.id);
+    if (!records.length) return res.json([]);
+    const [allR, allC, urList] = await Promise.all([
+      q.getAllReactions(),
+      q.getAllComments(),
+      q.getUserAllReactions(req.user.id)
+    ]);
+    const rMap = {}, cMap = {}, urMap = {};
+    allR.forEach(r => { if (!rMap[r.record_id]) rMap[r.record_id] = []; rMap[r.record_id].push({ emoji:r.emoji, count:r.count }); });
+    allC.forEach(c => { if (!cMap[c.record_id]) cMap[c.record_id] = []; cMap[c.record_id].push(c); });
+    urList.forEach(r => { urMap[r.record_id] = r.emoji; });
+    res.json(records.map(r => ({
+      ...r,
+      reactions: rMap[r.id] || [],
+      comments: cMap[r.id] || [],
+      userReaction: urMap[r.id] || null
+    })));
+  } catch(e) {
+    console.error('❌ /api/saved error:', e);
+    res.status(500).json({ error:'خطأ في الخادم' });
+  }
+});
+
+// تثبيت/إلغاء تثبيت منشور في الملف الشخصي (منشور واحد فقط في كل مرة)
+app.post('/api/records/:id/pin', requireAuth, async (req, res) => {
+  try {
+    const recordId = Number(req.params.id);
+    const rec = await q.getRecord(recordId);
+    if (!rec) return res.status(404).json({ error:'المنشور غير موجود' });
+    if (rec.user_id != req.user.id) return res.status(403).json({ error:'غير مسموح' });
+    if (Number(rec.pinned) === 1) {
+      await q.unpinPost(req.user.id, recordId);
+      return res.json({ success:true, pinned:false });
+    } else {
+      await q.pinPost(req.user.id, recordId);
+      return res.json({ success:true, pinned:true });
+    }
+  } catch(e) {
+    res.status(500).json({ error:'خطأ في الخادم' });
+  }
+});
+
 app.post('/api/records/:id/react', requireAuth, async (req, res) => {
   try {
     const { emoji } = req.body || {};
@@ -2357,6 +2425,7 @@ app.get('/group',   (req, res) => sendOG(req, res, 'group.html', baseMeta(req, '
 app.get('/shiziai', (req, res) => sendOG(req, res, 'shiziai.html', baseMeta(req, 'شيزي الذكاء الاصطناعي')));
 app.get('/support', (req, res) => sendOG(req, res, 'support.html', baseMeta(req, 'الدعم الفني')));
 app.get('/manager', (req, res) => sendOG(req, res, 'manager.html', baseMeta(req, 'إدارة الحساب')));
+app.get('/save', (req, res) => sendOG(req, res, 'save.html', baseMeta(req, 'المحفوظات')));
 
 app.get('/profile', async (req, res) => {
   const meta = baseMeta(req, 'الملف الشخصي');
