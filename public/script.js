@@ -7827,6 +7827,109 @@ async function refreshVerifyStatus(){
   try{ VERIFY_STATUS = await apiFetch('/api/verify/status'); }catch(e){ VERIFY_STATUS = null; }
 }
 
+// ----- الأجهزة وجلسات الدخول -----
+const DEVICE_ICONS = {
+  'جوال': `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="11" y1="18" x2="13" y2="18"/></svg>`,
+  'تابلت': `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="11" y1="18" x2="13" y2="18"/></svg>`,
+  'حاسوب': `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
+};
+
+async function loadSessions(){
+  const box = document.getElementById('sessionsList');
+  if(!box) return;
+  try{
+    const sessions = await apiFetch('/api/account/sessions');
+    if(!Array.isArray(sessions) || !sessions.length){ box.innerHTML = '<div class="section-hint">لا توجد جلسات نشطة</div>'; return; }
+    box.innerHTML = sessions.map(s => `
+      <div class="session-row">
+        <div class="session-icon">${DEVICE_ICONS[s.device] || DEVICE_ICONS['حاسوب']}</div>
+        <div class="session-info">
+          <div class="session-name">${esc(s.browser)} · ${esc(s.os)} ${s.is_current ? '<span class="status-pill st-verified" style="margin-inline-start:6px;">هذا الجهاز</span>' : ''}</div>
+          <div class="session-meta">${esc(s.ip || 'IP غير معروف')} · ${esc(s.last_active_text)}</div>
+        </div>
+        ${!s.is_current ? `<button class="btn-outline-danger" style="padding:6px 12px;font-size:0.76rem;" onclick="revokeSession(${s.id})">إنهاء</button>` : ''}
+      </div>
+    `).join('');
+  }catch(e){ box.innerHTML = '<div class="section-hint">تعذر تحميل الجلسات</div>'; }
+}
+
+async function revokeSession(id){
+  if(!confirm('إنهاء هذه الجلسة؟ سيتم تسجيل الخروج منها فوراً.')) return;
+  const d = await apiFetch('/api/account/sessions/'+id+'/revoke', 'POST');
+  if(d.success){ showToast('تم إنهاء الجلسة'); loadSessions(); }
+  else showToast(d.error||'تعذر إنهاء الجلسة', 'error');
+}
+
+async function revokeAllSessions(){
+  if(!confirm('تسجيل الخروج من كل الأجهزة الأخرى؟ ستبقى فقط هذه الجلسة الحالية مفعّلة.')) return;
+  const d = await apiFetch('/api/account/sessions/revoke-all', 'POST');
+  if(d.success){ showToast('تم تسجيل الخروج من كل الأجهزة الأخرى'); loadSessions(); }
+  else showToast(d.error||'تعذر تنفيذ الطلب', 'error');
+}
+
+// ----- تنبيهات الأمان -----
+const SECURITY_ICONS = {
+  login:  `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>`,
+  edit:   `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
+  mail:   `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M22 6l-10 7L2 6"/></svg>`,
+  lock:   `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+  shield: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+  logout: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
+  bell:   `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+};
+
+async function loadSecurityEvents(){
+  const box = document.getElementById('securityEventsList');
+  if(!box) return;
+  try{
+    const events = await apiFetch('/api/account/security-events');
+    if(!Array.isArray(events) || !events.length){ box.innerHTML = '<div class="section-hint">لا توجد أحداث أمنية مسجّلة بعد</div>'; return; }
+    box.innerHTML = events.map(ev => `
+      <div class="session-row">
+        <div class="session-icon">${SECURITY_ICONS[ev.icon] || SECURITY_ICONS.bell}</div>
+        <div class="session-info">
+          <div class="session-name">${esc(ev.title)}</div>
+          <div class="session-meta">${esc(ev.description||'')} · ${esc(ev.time_text)}</div>
+        </div>
+      </div>
+    `).join('');
+  }catch(e){ box.innerHTML = '<div class="section-hint">تعذر تحميل السجل</div>'; }
+}
+
+// ----- النسخ الاحتياطي وGoogle Drive -----
+async function downloadBackup(e){
+  e.preventDefault();
+  try{
+    const r = await fetch('/api/account/backup', { headers:{ 'Authorization':'Bearer '+getToken() } });
+    if(!r.ok){ showToast('تعذر إنشاء النسخة الاحتياطية', 'error'); return false; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'hostaka-backup.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    showToast('جارٍ تنزيل نسخة بياناتك');
+  }catch(err){ showToast('تعذر الاتصال بالخادم', 'error'); }
+  return false;
+}
+
+async function checkDriveConfigured(){
+  const btn = document.getElementById('driveBackupBtn');
+  if(!btn) return;
+  try{
+    const d = await apiFetch('/api/account/backup/drive/status');
+    if(!d.configured){ btn.disabled = true; btn.title = 'هذه الميزة غير مفعّلة على الخادم حالياً'; }
+  }catch(e){}
+}
+
+async function connectGoogleDrive(){
+  try{
+    const d = await apiFetch('/api/account/backup/drive/connect');
+    if(d.url) window.location.href = d.url;
+    else showToast(d.error||'ميزة Google Drive غير مفعّلة حالياً', 'error');
+  }catch(e){ showToast('تعذر الاتصال بالخادم', 'error'); }
+}
+
 // ----- المصادقة الثنائية (2FA) -----
 async function start2FASetup(){
   try{
@@ -8013,6 +8116,37 @@ function render(){
       </div>
     </div>
 
+    <div class="section">
+      <div class="section-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        الأجهزة وجلسات الدخول
+      </div>
+      <div class="section-hint">كل الأجهزة والأماكن اللي سجّلت منها دخولك. لو فيه جلسة ما تعرفها، أنهِها فوراً.</div>
+      <div id="sessionsList"><div class="section-hint">جارٍ التحميل...</div></div>
+      <button class="btn-outline-danger" style="margin-top:10px;" onclick="revokeAllSessions()">تسجيل الخروج من كل الأجهزة الأخرى</button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        تنبيهات الأمان
+      </div>
+      <div class="section-hint">سجل بكل الأحداث الأمنية المهمة بحسابك: تسجيل دخول جديد، تغيير كلمة المرور أو البريد، وغيرها.</div>
+      <div id="securityEventsList"><div class="section-hint">جارٍ التحميل...</div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        النسخ الاحتياطي وتنزيل البيانات
+      </div>
+      <div class="section-hint">نزّل نسخة من بياناتك (منشوراتك، ملفك الشخصي، محفوظاتك) بصيغة JSON، أو ارفعها مباشرة إلى Google Drive.</div>
+      <div class="verify-status">
+        <a class="btn-submit" style="text-decoration:none;display:inline-flex;align-items:center;" href="/api/account/backup" onclick="return downloadBackup(event)">تنزيل نسخة من بياناتي</a>
+        <button class="btn-ghost" id="driveBackupBtn" onclick="connectGoogleDrive()">رفع نسخة إلى Google Drive</button>
+      </div>
+    </div>
+
     <div class="section danger-zone">
       <div class="section-title">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
@@ -8022,6 +8156,9 @@ function render(){
       <button class="btn-outline-danger" onclick="openDeleteModal()">حذف الحساب نهائياً</button>
     </div>
   `;
+  loadSessions();
+  loadSecurityEvents();
+  checkDriveConfigured();
 }
 
 async function loadMe(){
@@ -8073,6 +8210,10 @@ try { window.open2FADisableModal = open2FADisableModal; } catch(e) {}
 try { window.submit2FADisable = submit2FADisable; } catch(e) {}
 try { window.openDeleteModal = openDeleteModal; } catch(e) {}
 try { window.requestDeleteAccount = requestDeleteAccount; } catch(e) {}
+try { window.revokeSession = revokeSession; } catch(e) {}
+try { window.revokeAllSessions = revokeAllSessions; } catch(e) {}
+try { window.downloadBackup = downloadBackup; } catch(e) {}
+try { window.connectGoogleDrive = connectGoogleDrive; } catch(e) {}
 try { window.render = render; } catch(e) {}
 try { window.loadMe = loadMe; } catch(e) {}
 }
