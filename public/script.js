@@ -7931,7 +7931,12 @@ async function connectGoogleDrive(){
 }
 
 // ----- المصادقة الثنائية (2FA) -----
+let tfaSetupInFlight = false;
 async function start2FASetup(){
+  if(tfaSetupInFlight) return; // يمنع الضغط المتكرر السريع من إنشاء أكثر من سر بنفس الوقت (كان يسبب عدم تطابق الكود مع QR المعروض)
+  tfaSetupInFlight = true;
+  const triggerBtns = document.querySelectorAll('[onclick="start2FASetup()"]');
+  triggerBtns.forEach(b => b.disabled = true);
   try{
     const d = await apiFetch('/api/account/2fa/setup', 'POST');
     if(!d.success){ showToast(d.error||'تعذر بدء الإعداد', 'error'); return; }
@@ -7944,6 +7949,10 @@ async function start2FASetup(){
     document.getElementById('tfaStepTitle').textContent = 'تفعيل المصادقة الثنائية';
     openModal('tfaSetupModal');
   }catch(e){ showToast('تعذر الاتصال بالخادم', 'error'); }
+  finally{
+    tfaSetupInFlight = false;
+    triggerBtns.forEach(b => b.disabled = false);
+  }
 }
 
 async function confirm2FAEnable(){
