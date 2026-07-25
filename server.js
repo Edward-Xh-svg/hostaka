@@ -9,6 +9,9 @@ const { q, initDB } = require('./database');
 const fetch  = require('node-fetch');
 const crypto = require('crypto');
 const { authenticator } = require('otplib');
+// otplib افتراضياً window:0 (بدون أي تسامح بفارق التوقيت)، وهذا يرفض الكود الصحيح
+// لأتفه فرق بتوقيت جهاز المستخدم أو تأخر بسيط بالشبكة. نسمح بنافذة ±60 ثانية (خطوة قبل وبعد).
+authenticator.options = { window: 2 };
 const QRCode = require('qrcode');
 
 const app = express();
