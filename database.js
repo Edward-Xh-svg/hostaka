@@ -335,7 +335,7 @@ async function initDB() {
     "CREATE INDEX IF NOT EXISTS idx_saved_posts_user ON saved_posts(user_id, created_at DESC)",
     "ALTER TABLE records ADD COLUMN pinned INTEGER DEFAULT 0",       // ✅ تثبيت المنشور في الملف الشخصي
     "ALTER TABLE records ADD COLUMN pinned_at TEXT DEFAULT ''",
-    "CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, jti TEXT NOT NULL UNIQUE, device TEXT DEFAULT '', browser TEXT DEFAULT '', os TEXT DEFAULT '', ip TEXT DEFAULT '', location TEXT DEFAULT '', user_agent TEXT DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')), last_active TEXT NOT NULL DEFAULT (datetime('now')), revoked INTEGER DEFAULT 0)",  // ✅ إدارة الجلسات/الأجهزة
+    "CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, jti TEXT NOT NULL UNIQUE, username TEXT DEFAULT '', device TEXT DEFAULT '', browser TEXT DEFAULT '', os TEXT DEFAULT '', ip TEXT DEFAULT '', location TEXT DEFAULT '', user_agent TEXT DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')), last_active TEXT NOT NULL DEFAULT (datetime('now')), revoked INTEGER DEFAULT 0)",  // ✅ إدارة الجلسات/الأجهزة
     // 🩹 إصلاح احتياطي: لو جدول sessions كان موجوداً مسبقاً بشكل مختلف (بدون بعض الأعمدة)، نضيف الأعمدة الناقصة يدوياً
     "ALTER TABLE sessions ADD COLUMN jti TEXT DEFAULT ''",
     "ALTER TABLE sessions ADD COLUMN device TEXT DEFAULT ''",
@@ -348,6 +348,7 @@ async function initDB() {
     "ALTER TABLE sessions ADD COLUMN last_active TEXT DEFAULT ''",
     "ALTER TABLE sessions ADD COLUMN revoked INTEGER DEFAULT 0",
     "ALTER TABLE sessions ADD COLUMN user_id INTEGER DEFAULT 0",
+    "ALTER TABLE sessions ADD COLUMN username TEXT DEFAULT ''",
     "CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id, revoked)",
     "CREATE INDEX IF NOT EXISTS idx_sessions_jti ON sessions(jti)",
     "CREATE TABLE IF NOT EXISTS security_events (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, type TEXT NOT NULL, description TEXT DEFAULT '', ip TEXT DEFAULT '', device TEXT DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')))",  // ✅ تنبيهات الأمان
@@ -443,9 +444,9 @@ const q = {
   updateTotpBackupCodes: (id, json) => db.execute({ sql:'UPDATE users SET totp_backup_codes=? WHERE id=?', args:[json, id] }),
 
   // ── الجلسات/الأجهزة ──
-  createSession: (userId, jti, device, browser, os, ip, location, userAgent) => db.execute({
-    sql:`INSERT INTO sessions (user_id, jti, device, browser, os, ip, location, user_agent) VALUES (?,?,?,?,?,?,?,?)`,
-    args:[userId, jti, device||'', browser||'', os||'', ip||'', location||'', userAgent||'']
+  createSession: (userId, jti, device, browser, os, ip, location, userAgent, username) => db.execute({
+    sql:`INSERT INTO sessions (user_id, jti, device, browser, os, ip, location, user_agent, username) VALUES (?,?,?,?,?,?,?,?,?)`,
+    args:[userId, jti, device||'', browser||'', os||'', ip||'', location||'', userAgent||'', username||'']
   }),
   getSessionByJti: (jti) => db.execute({ sql:'SELECT * FROM sessions WHERE jti=?', args:[jti] }).then(first),
   touchSession: (jti) => db.execute({ sql:"UPDATE sessions SET last_active=datetime('now') WHERE jti=?", args:[jti] }),

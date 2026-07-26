@@ -319,7 +319,7 @@ async function createLoginSession(user, req) {
     const ip = getClientIp(req);
     const ua = req.headers['user-agent'] || '';
     const { browser, os, device } = parseUserAgent(ua);
-    await q.createSession(user.id, jti, device, browser, os, ip, '', ua);
+    await q.createSession(user.id, jti, device, browser, os, ip, '', ua, user.username);
     await q.logSecurityEvent(user.id, 'login', `تسجيل دخول جديد عبر ${browser} على ${os}`, ip, device);
   } catch(e) {
     // تسجيل الجلسة/تنبيه الأمان ميزة إضافية ولا يجب أبداً أن تمنع تسجيل الدخول نفسه
