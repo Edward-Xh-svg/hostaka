@@ -724,11 +724,64 @@ app.get('/api/profile/:username', async (req, res) => {
 });
 app.put('/api/profile', requireAuth, async (req, res) => {
   try {
-    const { display_name, bio, game_id, avatar, cover } = req.body || {};
-    await q.updateProfile(display_name || '', bio || '', game_id || '', avatar || '', cover || '', req.user.id);
+    const { display_name, bio, game_id, avatar, cover, country, favorite_song, school, certificates } = req.body || {};
+    await q.updateProfile(display_name || '', bio || '', game_id || '', avatar || '', cover || '', req.user.id, country || '', favorite_song || '', school || '', certificates || '');
     res.json({ success: true });
   } catch(e) {
     res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+// خصوصية الحساب: عام/خاص
+app.put('/api/account/privacy', requireAuth, async (req, res) => {
+  try {
+    const { is_private } = req.body || {};
+    await q.updatePrivacy(req.user.id, !!is_private);
+    res.json({ success:true });
+  } catch(e) {
+    res.status(500).json({ error:'خطأ في الخادم' });
+  }
+});
+
+// من يقدر يراسلني: الجميع / المتابعون / لا أحد
+app.put('/api/account/message-privacy', requireAuth, async (req, res) => {
+  try {
+    const { pref } = req.body || {};
+    if (!['everyone','followers','none'].includes(pref)) return res.status(400).json({ error:'قيمة غير صحيحة' });
+    await q.updateMessagePrivacy(req.user.id, pref);
+    res.json({ success:true });
+  } catch(e) {
+    res.status(500).json({ error:'خطأ في الخادم' });
+  }
+});
+
+// ── الأصدقاء المقربون ──
+app.get('/api/account/close-friends', requireAuth, async (req, res) => {
+  try {
+    res.json(await q.getCloseFriends(req.user.id));
+  } catch(e) {
+    res.status(500).json({ error:'خطأ في الخادم' });
+  }
+});
+app.post('/api/account/close-friends/:username', requireAuth, async (req, res) => {
+  try {
+    const friend = await q.getUserByUsername(req.params.username);
+    if (!friend) return res.status(404).json({ error:'المستخدم غير موجود' });
+    if (friend.id === req.user.id) return res.status(400).json({ error:'ما تقدر تضيف نفسك' });
+    await q.addCloseFriend(req.user.id, friend.id);
+    res.json({ success:true });
+  } catch(e) {
+    res.status(500).json({ error:'خطأ في الخادم' });
+  }
+});
+app.delete('/api/account/close-friends/:username', requireAuth, async (req, res) => {
+  try {
+    const friend = await q.getUserByUsername(req.params.username);
+    if (!friend) return res.status(404).json({ error:'المستخدم غير موجود' });
+    await q.removeCloseFriend(req.user.id, friend.id);
+    res.json({ success:true });
+  } catch(e) {
+    res.status(500).json({ error:'خطأ في الخادم' });
   }
 });
 
@@ -782,6 +835,10 @@ app.get('/api/user/:username/posts', async (req, res) => {
     const u = await q.getPublicProfile(req.params.username);
     if (!u) return res.status(404).json({ error: 'غير موجود' });
     const viewer = verifyToken(req);
+    const isOwner = viewer && Number(viewer.id) === Number(u.id);
+    if (Number(u.is_private) === 1 && !isOwner && !u.is_following) {
+      return res.json({ private: true, posts: [] });
+    }
     const posts = await q.getUserPosts(u.id, viewer ? viewer.id : null);
     if (!posts.length) return res.json([]);
     const [allR, allC, urList] = await Promise.all([
@@ -958,6 +1015,41 @@ app.get('/api/link-preview', async (req, res) => {
     res.json(data);
   } catch (e) {
     res.status(500).json({ error: 'تعذر جلب معاينة الرابط' });
+  }
+});
+
+// عرض منشور واحد بشكل انفرادي (صفحة /post)
+app.get('/api/records/:id/single', async (req, res) => {
+  try {
+    const u = verifyToken(req);
+    const rec = await q.getRecordById(req.params.id);
+    if (!rec) return res.status(404).json({ error: 'المنشور غير موجود' });
+
+    const isOwner = u && Number(u.id) === Number(rec.user_id);
+    const privacy = rec.privacy || 'public';
+    if (!isOwner) {
+      if (privacy === 'draft' || privacy === 'private') {
+        return res.status(403).json({ error: 'هذا المنشور غير متاح' });
+      }
+      if (privacy === 'close_friends') {
+        const isCF = u ? await q.isCloseFriend(rec.user_id, u.id) : false;
+        if (!isCF) return res.status(403).json({ error: 'هذا المنشور خاص بالأصدقاء المقربين فقط' });
+      }
+      if (rec.scheduled_at && new Date(rec.scheduled_at.replace(' ','T')+'Z').getTime() > Date.now()) {
+        return res.status(403).json({ error: 'هذا المنشور لم يُنشر بعد' });
+      }
+    }
+
+    const [reactions, comments, userReaction, isSaved] = await Promise.all([
+      q.getReactions(rec.id),
+      q.getComments(rec.id),
+      u ? q.getUserReaction(rec.id, u.id) : Promise.resolve(null),
+      u ? q.isPostSaved(u.id, rec.id) : Promise.resolve(false)
+    ]);
+    res.json({ ...rec, reactions, comments, userReaction: userReaction?.emoji || null, is_saved: !!isSaved });
+  } catch(e) {
+    console.error('❌ records/:id/single error:', e);
+    res.status(500).json({ error: 'خطأ في الخادم' });
   }
 });
 
@@ -2229,6 +2321,15 @@ app.post('/api/messages/:username', requireAuth, async (req, res) => {
     if (await q.isBlockedEitherWay(req.user.id, other.id)) {
       return res.status(403).json({ error: 'لا يمكن إرسال رسالة، يوجد حظر بينكما' });
     }
+    if (Number(other.id) !== Number(req.user.id)) {
+      if (other.message_privacy === 'none') {
+        return res.status(403).json({ error: 'هذا المستخدم لا يسمح لأحد بمراسلته' });
+      }
+      if (other.message_privacy === 'followers') {
+        const iFollowThem = await q.isFollowing(req.user.id, other.id); // هل أنا (المرسل) أتابع الطرف الآخر
+        if (!iFollowThem) return res.status(403).json({ error: 'هذا المستخدم يسمح فقط لمتابعيه بمراسلته' });
+      }
+    }
     const me = await q.getUserById(req.user.id);
     await q.sendMessage(
       me.id,
@@ -2728,6 +2829,7 @@ app.get('/shiziai', (req, res) => sendOG(req, res, 'shiziai.html', baseMeta(req,
 app.get('/support', (req, res) => sendOG(req, res, 'support.html', baseMeta(req, 'الدعم الفني')));
 app.get('/manager', (req, res) => sendOG(req, res, 'manager.html', baseMeta(req, 'إدارة الحساب')));
 app.get('/save', (req, res) => sendOG(req, res, 'save.html', baseMeta(req, 'المحفوظات')));
+app.get('/post', (req, res) => sendOG(req, res, 'post.html', baseMeta(req, 'منشور')));
 
 app.get('/profile', async (req, res) => {
   const meta = baseMeta(req, 'الملف الشخصي');

@@ -338,6 +338,15 @@ async function initDB() {
     "CREATE TABLE IF NOT EXISTS user_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, jti TEXT NOT NULL UNIQUE, username TEXT DEFAULT '', device TEXT DEFAULT '', browser TEXT DEFAULT '', os TEXT DEFAULT '', ip TEXT DEFAULT '', location TEXT DEFAULT '', user_agent TEXT DEFAULT '', created_at TEXT DEFAULT '', last_active TEXT DEFAULT '', revoked INTEGER DEFAULT 0)",  // ✅ إدارة الجلسات/الأجهزة (جدول جديد كلياً لتفادي تعارض جدول sessions القديم غير المعروف البنية)
     "CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id, revoked)",
     "CREATE INDEX IF NOT EXISTS idx_user_sessions_jti ON user_sessions(jti)",
+    // ✅ خصوصية الحساب: عام/خاص + من يقدر يراسلني + حقول تعريفية إضافية
+    "ALTER TABLE users ADD COLUMN is_private INTEGER DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN message_privacy TEXT DEFAULT 'everyone'",
+    "ALTER TABLE users ADD COLUMN country TEXT DEFAULT ''",
+    "ALTER TABLE users ADD COLUMN favorite_song TEXT DEFAULT ''",
+    "ALTER TABLE users ADD COLUMN school TEXT DEFAULT ''",
+    "ALTER TABLE users ADD COLUMN certificates TEXT DEFAULT ''",
+    "CREATE TABLE IF NOT EXISTS close_friends (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, friend_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(user_id, friend_id))",
+    "CREATE INDEX IF NOT EXISTS idx_close_friends_user ON close_friends(user_id)",
     "CREATE TABLE IF NOT EXISTS security_events (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, type TEXT NOT NULL, description TEXT DEFAULT '', ip TEXT DEFAULT '', device TEXT DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')))",  // ✅ تنبيهات الأمان
     "ALTER TABLE security_events ADD COLUMN type TEXT DEFAULT ''",
     "ALTER TABLE security_events ADD COLUMN description TEXT DEFAULT ''",
@@ -392,7 +401,7 @@ async function initDB() {
 const q = {
   // ── Users ──
   getUserByEmail:   (email)    => db.execute({ sql:'SELECT * FROM users WHERE email=?', args:[email] }).then(first),
-  getUserById:      (id)       => db.execute({ sql:'SELECT id,username,email,role,avatar,bio,game_id,display_name,cover,verified,suspended,suspend_reason,birth_date,totp_enabled,last_seen,created_at FROM users WHERE id=?', args:[id] }).then(first),
+  getUserById:      (id)       => db.execute({ sql:'SELECT id,username,email,role,avatar,bio,game_id,display_name,cover,verified,suspended,suspend_reason,birth_date,totp_enabled,is_private,message_privacy,country,favorite_song,school,certificates,last_seen,created_at FROM users WHERE id=?', args:[id] }).then(first),
   getUserByIdFull:  (id)       => db.execute({ sql:'SELECT * FROM users WHERE id=?', args:[id] }).then(first),
   touchLastSeen: (id) => db.execute({ sql:"UPDATE users SET last_seen=datetime('now') WHERE id=?", args:[id] }).catch(()=>{}),
   getUserStatus: async (username) => {
@@ -405,6 +414,7 @@ const q = {
       sql: `
         SELECT 
           u.id, u.username, u.display_name, u.avatar, u.bio, u.game_id, u.role, u.verified, u.cover, u.created_at,
+          u.is_private, u.message_privacy, u.country, u.favorite_song, u.school, u.certificates,
           (SELECT COUNT(*) FROM follows WHERE followed_id = u.id) AS followers_count,
           (SELECT COUNT(*) FROM follows WHERE follower_id = u.id) AS following_count,
           EXISTS (SELECT 1 FROM follows WHERE follower_id = ? AND followed_id = u.id) AS is_following
@@ -418,7 +428,15 @@ const q = {
   createVerifiedUser: (username,email,password) => db.execute({ sql:'INSERT INTO users (username,email,password,email_verified) VALUES (?,?,?,1)', args:[username,email,password] }),
   getUserByUsername: (username) => db.execute({ sql:'SELECT * FROM users WHERE username=?', args:[username] }).then(first),
   updateUserPasswordByEmail: (email, passwordHash) => db.execute({ sql:'UPDATE users SET password=? WHERE email=?', args:[passwordHash, email] }),
-  updateProfile:    (display_name,bio,game_id,avatar,cover,id) => db.execute({ sql:'UPDATE users SET display_name=?,bio=?,game_id=?,avatar=?,cover=? WHERE id=?', args:[display_name,bio,game_id,avatar,cover,id] }),
+  updateProfile:    (display_name,bio,game_id,avatar,cover,id,country,favorite_song,school,certificates) => db.execute({ sql:'UPDATE users SET display_name=?,bio=?,game_id=?,avatar=?,cover=?,country=?,favorite_song=?,school=?,certificates=? WHERE id=?', args:[display_name,bio,game_id,avatar,cover,country||'',favorite_song||'',school||'',certificates||'',id] }),
+  updatePrivacy:        (id, isPrivate) => db.execute({ sql:'UPDATE users SET is_private=? WHERE id=?', args:[isPrivate?1:0, id] }),
+  updateMessagePrivacy: (id, pref) => db.execute({ sql:'UPDATE users SET message_privacy=? WHERE id=?', args:[pref, id] }),
+
+  // ── الأصدقاء المقربون ──
+  getCloseFriends:    (userId) => db.execute({ sql:`SELECT u.id,u.username,u.display_name,u.avatar,u.verified FROM close_friends cf JOIN users u ON u.id=cf.friend_id WHERE cf.user_id=? ORDER BY cf.created_at DESC`, args:[userId] }).then(rows),
+  isCloseFriend:      (userId, friendId) => db.execute({ sql:'SELECT 1 FROM close_friends WHERE user_id=? AND friend_id=?', args:[userId, friendId] }).then(first).then(r => !!r),
+  addCloseFriend:     (userId, friendId) => db.execute({ sql:'INSERT OR IGNORE INTO close_friends (user_id, friend_id) VALUES (?,?)', args:[userId, friendId] }),
+  removeCloseFriend:  (userId, friendId) => db.execute({ sql:'DELETE FROM close_friends WHERE user_id=? AND friend_id=?', args:[userId, friendId] }),
   updateUsername:      (id, username) => db.execute({ sql:'UPDATE users SET username=? WHERE id=?', args:[username, id] }),
   updateEmail:          (id, email)    => db.execute({ sql:'UPDATE users SET email=? WHERE id=?', args:[email, id] }),
   updateUserPassword:   (id, passwordHash) => db.execute({ sql:'UPDATE users SET password=? WHERE id=?', args:[passwordHash, id] }),
@@ -490,10 +508,18 @@ const q = {
     LEFT JOIN pages p ON p.id = r.page_id
     LEFT JOIN follows f ON f.follower_id = ? AND f.followed_id = r.user_id
     LEFT JOIN saved_posts sp ON sp.record_id = r.id AND sp.user_id = ?
-    WHERE COALESCE(r.privacy,'public') = 'public'
-      AND (r.scheduled_at IS NULL OR r.scheduled_at = '' OR r.scheduled_at <= datetime('now'))
+    WHERE (r.scheduled_at IS NULL OR r.scheduled_at = '' OR r.scheduled_at <= datetime('now'))
+      AND (
+        COALESCE(r.privacy,'public') = 'public'
+        OR (r.privacy = 'close_friends' AND EXISTS (SELECT 1 FROM close_friends cf WHERE cf.user_id = r.user_id AND cf.friend_id = ?))
+      )
+      AND (
+        r.user_id = ?
+        OR COALESCE(u.is_private,0) = 0
+        OR f.follower_id IS NOT NULL
+      )
     ORDER BY r.created_at DESC
-  `, args: [viewerId || 0, viewerId || 0] }).then(rows),
+  `, args: [viewerId || 0, viewerId || 0, viewerId || 0, viewerId || 0] }).then(rows),
   getRecordById: (id) => db.execute({ sql: `
     SELECT r.*,
            COALESCE(u.avatar, r.user_avatar, '') as user_avatar,
@@ -545,9 +571,12 @@ const q = {
     : db.execute({ sql:`SELECT r.*, CASE WHEN sp.id IS NOT NULL THEN 1 ELSE 0 END as is_saved
         FROM records r LEFT JOIN saved_posts sp ON sp.record_id = r.id AND sp.user_id = ?
         WHERE r.user_id=?
-        AND COALESCE(r.privacy,'public') = 'public'
         AND (r.scheduled_at IS NULL OR r.scheduled_at = '' OR r.scheduled_at <= datetime('now'))
-        ORDER BY COALESCE(r.pinned,0) DESC, r.created_at DESC`, args:[viewerId||0, uid] }).then(rows)),
+        AND (
+          COALESCE(r.privacy,'public') = 'public'
+          OR (r.privacy = 'close_friends' AND EXISTS (SELECT 1 FROM close_friends cf WHERE cf.user_id = r.user_id AND cf.friend_id = ?))
+        )
+        ORDER BY COALESCE(r.pinned,0) DESC, r.created_at DESC`, args:[viewerId||0, uid, viewerId||0] }).then(rows)),
 
   // ── تثبيت المنشور في الملف الشخصي (منشور واحد فقط في كل مرة) ──
   pinPost: async (userId, recordId) => {
