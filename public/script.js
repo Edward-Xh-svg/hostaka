@@ -4115,7 +4115,7 @@ function goPublisher(username, isPage){
 }
 
 function sharePost(id){
-  const url = window.location.origin + '/?p=' + id;
+  const url = window.location.origin + '/post?id=' + id;
   if(navigator.clipboard){ navigator.clipboard.writeText(url).then(()=>showToast(t('copyLink'))); }
   else { prompt('انسخ الرابط:',url); }
 }
@@ -5260,12 +5260,14 @@ async function toggleFollow(){
 }
 
 let editAvatarBase64 = '';
+let editCoverBase64 = '';
 function openEditPage(){
   document.getElementById('epName').value = pageData.name || '';
   document.getElementById('epCategory').value = pageData.category || '';
   document.getElementById('epBio').value = pageData.bio || '';
   document.getElementById('editPageErr').style.display = 'none';
   editAvatarBase64 = '';
+  editCoverBase64 = '';
   document.getElementById('editPageModal').classList.add('show');
 }
 function closeEditPage(){ document.getElementById('editPageModal').classList.remove('show'); }
@@ -5274,6 +5276,13 @@ function onEditAvatar(e){
   if (!f) return;
   const reader = new FileReader();
   reader.onload = ev => { editAvatarBase64 = ev.target.result; };
+  reader.readAsDataURL(f);
+}
+function onEditCover(e){
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => { editCoverBase64 = ev.target.result; showToast('تم اختيار الغلاف، اضغط حفظ لتطبيقه'); };
   reader.readAsDataURL(f);
 }
 async function savePageEdit(){
@@ -5287,8 +5296,13 @@ async function savePageEdit(){
       const up = await apiFetch('/api/upload', 'POST', { image: editAvatarBase64 });
       if (up.url) avatarUrl = up.url;
     }
+    let coverUrl = pageData.cover;
+    if (editCoverBase64) {
+      const up = await apiFetch('/api/upload', 'POST', { image: editCoverBase64 });
+      if (up.url) coverUrl = up.url;
+    }
     const d = await apiFetch('/api/pages/' + pageData.id, 'PUT', {
-      name, avatar: avatarUrl, bio: document.getElementById('epBio').value.trim(),
+      name, avatar: avatarUrl, cover: coverUrl, bio: document.getElementById('epBio').value.trim(),
       category: document.getElementById('epCategory').value.trim()
     });
     if (d.success) { closeEditPage(); await loadPage(); }
@@ -5765,13 +5779,18 @@ function renderPublic(user, posts, followStatus) {
   const isFollowing = followStatus.following || false;
   const followersCount = followStatus.followers_count || 0;
   const followingCount = followStatus.following_count || 0;
+  const isLocked = Number(user.is_private) === 1 && !isOwn && !isFollowing;
+
+  const canMessage = user.message_privacy === 'none' ? false
+    : user.message_privacy === 'followers' ? isFollowing
+    : true; // 'everyone' أو غير محدد
 
   let actionsHtml = '';
   if (isOwn) {
     actionsHtml = `<button class="btn-edit" onclick="switchTab('edit')">${SVG.edit}${t('editProfile')}</button>`;
   } else if (token) {
     actionsHtml = `
-      <a href="/chat?with=${esc(user.username)}" class="btn-msg">${SVG.msg}${t('message') || 'مراسلة'}</a>
+      ${canMessage ? `<a href="/chat?with=${esc(user.username)}" class="btn-msg">${SVG.msg}${t('message') || 'مراسلة'}</a>` : ''}
       <button class="btn-follow ${isFollowing ? 'following' : ''}" onclick="toggleFollow('${esc(user.username)}', this)">
         ${isFollowing ? SVG.check : SVG.follow}
         <span>${isFollowing ? t('unfollow') : t('follow')}</span>
@@ -5794,16 +5813,24 @@ function renderPublic(user, posts, followStatus) {
     `;
   }
 
+  const aboutItems = [
+    user.country ? `<div class="about-chip">${SVG.clock}${esc(user.country)}</div>` : '',
+    user.school ? `<div class="about-chip">${esc(user.school)}</div>` : '',
+    user.favorite_song ? `<div class="about-chip">🎵 ${esc(user.favorite_song)}</div>` : '',
+    user.certificates ? `<div class="about-chip">🎓 ${esc(user.certificates)}</div>` : '',
+  ].filter(Boolean).join('');
+
   document.getElementById('profileSection').innerHTML = `
     <div class="avatar-pull">
       <div class="avatar-big" style="cursor:default;">${avatarInner(user)}</div>
       <div class="profile-actions">${actionsHtml}</div>
     </div>
     <div class="profile-meta">
-      <div class="meta-name">${esc(user.display_name || user.username)} ${user.verified ? verifiedBadge() : ''}</div>
+      <div class="meta-name">${esc(user.display_name || user.username)} ${user.verified ? verifiedBadge() : ''} ${Number(user.is_private)===1 ? '<span class="private-badge">🔒 خاص</span>' : ''}</div>
       <div class="meta-un">@${esc(user.username)}</div>
       ${roleBadge(user.role)}
       ${user.bio ? `<div class="meta-bio">${esc(user.bio)}</div>` : ''}
+      ${aboutItems ? `<div class="about-chips">${aboutItems}</div>` : ''}
       <div class="meta-info">
         <div class="info-item">${SVG.clock}${t('since')} ${fmtDate(user.created_at)}</div>
       </div>
@@ -5816,7 +5843,11 @@ function renderPublic(user, posts, followStatus) {
     <div class="tabs-bar">
       <button class="tab-btn active" onclick="switchTab('posts')">${t('posts')}</button>
     </div>
-    <div class="posts-tab" id="postsTab">${renderPosts(posts)}</div>`;
+    <div class="posts-tab" id="postsTab">${isLocked ? `
+      <div class="post-empty">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <div>هذا الحساب خاص. تابعه عشان تقدر تشوف منشوراته</div>
+      </div>` : renderPosts(posts)}</div>`;
 
   if (!isOwn && token) checkBlockStatus(user.username);
 }
@@ -5911,6 +5942,7 @@ function renderMyProfile(user, posts) {
     <div class="tabs-bar">
       <button class="tab-btn active" id="tabPosts" onclick="switchTab('posts')">${t('posts')}</button>
       <button class="tab-btn" id="tabEdit" onclick="switchTab('edit')">${t('editProfile')}</button>
+      <button class="tab-btn" id="tabPrivacy" onclick="switchTab('privacy')">الخصوصية</button>
       <button class="tab-btn" id="tabPages" onclick="switchTab('pages')">الصفحات</button>
     </div>
     <div class="posts-tab" id="postsTab">
@@ -5926,7 +5958,39 @@ function renderMyProfile(user, posts) {
         <div class="fg"><label>${t('editProfile')}</label><input type="text" id="fName" value="${esc(user.display_name || '')}" placeholder="${t('editProfile')}"></div>
       </div>
       <div class="fg"><label>${t('bio')}</label><textarea id="fBio" placeholder="${t('bio')}">${esc(user.bio || '')}</textarea></div>
+      <div class="fg-row">
+        <div class="fg"><label>الدولة</label><input type="text" id="fCountry" value="${esc(user.country || '')}" placeholder="مثال: السعودية"></div>
+        <div class="fg"><label>المدرسة/الجامعة</label><input type="text" id="fSchool" value="${esc(user.school || '')}" placeholder="اختياري"></div>
+      </div>
+      <div class="fg-row">
+        <div class="fg"><label>الأغنية المفضلة</label><input type="text" id="fSong" value="${esc(user.favorite_song || '')}" placeholder="اختياري"></div>
+        <div class="fg"><label>الشهادات</label><input type="text" id="fCert" value="${esc(user.certificates || '')}" placeholder="اختياري"></div>
+      </div>
       <button class="btn-save" id="saveBtn" onclick="save()">${SVG.save}${t('save')}</button>
+    </div>
+    <div class="edit-section" id="privacyTab" style="display:none;">
+      <div class="alert alert-err" id="privErr"></div>
+      <div class="alert alert-ok" id="privOk"></div>
+      <div class="privacy-row">
+        <div>
+          <div class="privacy-row-title">حساب خاص</div>
+          <div class="privacy-row-hint">لو فعّلته، ما يقدر يشوف منشوراتك إلا متابعينك فقط</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="fPrivate" ${Number(user.is_private)===1?'checked':''} onchange="saveAccountPrivacy()"><span class="slider"></span></label>
+      </div>
+      <div class="fg" style="margin-top:16px;">
+        <label>مين يقدر يراسلني؟</label>
+        <select id="fMsgPrivacy" onchange="saveMessagePrivacy()">
+          <option value="everyone" ${user.message_privacy==='everyone'?'selected':''}>الجميع</option>
+          <option value="followers" ${user.message_privacy==='followers'?'selected':''}>المتابعون فقط</option>
+          <option value="none" ${user.message_privacy==='none'?'selected':''}>لا أحد</option>
+        </select>
+      </div>
+      <div class="fg" style="margin-top:20px;">
+        <label>الأصدقاء المقربون</label>
+        <div class="privacy-row-hint" style="margin-bottom:10px;">قائمة خاصة تقدر تنشر لها منشورات "أصدقاء مقربون فقط"</div>
+        <button class="btn-save" style="width:auto;padding:9px 20px;" onclick="openCloseFriendsModal()">إدارة القائمة (${closeFriendsCount})</button>
+      </div>
     </div>
     <div class="edit-section" id="pagesTab" style="display:none;">
       <button class="btn-save" style="margin-bottom:16px;" onclick="openCreatePage()">
@@ -5938,12 +6002,94 @@ function renderMyProfile(user, posts) {
 }
 
 let profilePosts = [];
+let closeFriendsCount = 0;
+
+async function loadCloseFriendsCount(){
+  try{
+    const list = await apiFetch('/api/account/close-friends');
+    closeFriendsCount = Array.isArray(list) ? list.length : 0;
+    const btn = document.querySelector('#privacyTab .btn-save');
+    if(btn) btn.textContent = `إدارة القائمة (${closeFriendsCount})`;
+  }catch(e){}
+}
+
+async function saveAccountPrivacy(){
+  const checked = document.getElementById('fPrivate').checked;
+  const d = await apiFetch('/api/account/privacy', 'PUT', { is_private: checked });
+  if(d.success){ showToast(checked ? 'صار حسابك خاص' : 'صار حسابك عام'); if(ME) ME.is_private = checked?1:0; }
+  else showToast(d.error||'تعذر الحفظ', 'error');
+}
+
+async function saveMessagePrivacy(){
+  const pref = document.getElementById('fMsgPrivacy').value;
+  const d = await apiFetch('/api/account/message-privacy', 'PUT', { pref });
+  if(d.success) showToast('تم تحديث إعدادات المراسلة');
+  else showToast(d.error||'تعذر الحفظ', 'error');
+}
+
+async function openCloseFriendsModal(){
+  let modal = document.getElementById('closeFriendsModal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.className = 'modal-bd';
+    modal.id = 'closeFriendsModal';
+    modal.innerHTML = `<div class="modal-box">
+      <div class="modal-t">الأصدقاء المقربون</div>
+      <div class="fg-row" style="margin-bottom:12px;">
+        <input type="text" id="cfUsernameInput" class="fg" placeholder="اسم المستخدم" style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;background:var(--input-bg);color:var(--text);">
+        <button class="btn-save" style="width:auto;padding:9px 16px;" onclick="addCloseFriendByUsername()">إضافة</button>
+      </div>
+      <div class="err" id="cfErr" style="display:none;color:var(--danger);font-size:0.8rem;margin-bottom:8px;"></div>
+      <div id="closeFriendsList"><div class="post-empty">جارٍ التحميل...</div></div>
+      <div class="modal-footer" style="margin-top:16px;display:flex;justify-content:flex-end;">
+        <button class="btn-edit" onclick="document.getElementById('closeFriendsModal').classList.remove('show')">إغلاق</button>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+  }
+  modal.classList.add('show');
+  await renderCloseFriendsList();
+}
+
+async function renderCloseFriendsList(){
+  const box = document.getElementById('closeFriendsList');
+  try{
+    const list = await apiFetch('/api/account/close-friends');
+    closeFriendsCount = Array.isArray(list) ? list.length : 0;
+    if(!list.length){ box.innerHTML = '<div class="post-empty" style="padding:20px;">قائمتك فاضية حالياً</div>'; return; }
+    box.innerHTML = list.map(f => `
+      <div class="session-row">
+        <div class="session-icon">${f.avatar?`<img src="${esc(f.avatar)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`:esc((f.display_name||f.username||'?').charAt(0).toUpperCase())}</div>
+        <div class="session-info"><div class="session-name">${esc(f.display_name||f.username)}</div><div class="session-meta">@${esc(f.username)}</div></div>
+        <button class="btn-outline-danger" style="padding:6px 12px;font-size:0.76rem;" onclick="removeCloseFriend('${esc(f.username)}')">إزالة</button>
+      </div>
+    `).join('');
+  }catch(e){ box.innerHTML = '<div class="post-empty">تعذر التحميل</div>'; }
+}
+
+async function addCloseFriendByUsername(){
+  const input = document.getElementById('cfUsernameInput');
+  const username = input.value.trim().replace(/^@/, '');
+  const errEl = document.getElementById('cfErr');
+  errEl.style.display = 'none';
+  if(!username) return;
+  const d = await apiFetch('/api/account/close-friends/' + encodeURIComponent(username), 'POST');
+  if(d.success){ input.value = ''; renderCloseFriendsList(); showToast('تمت الإضافة'); }
+  else { errEl.textContent = d.error || 'تعذر الإضافة'; errEl.style.display = 'block'; }
+}
+
+async function removeCloseFriend(username){
+  const d = await apiFetch('/api/account/close-friends/' + encodeURIComponent(username), 'DELETE');
+  if(d.success){ renderCloseFriendsList(); showToast('تمت الإزالة'); }
+  else showToast(d.error||'تعذر الإزالة', 'error');
+}
 
 function postStatusBadge(p){
   let out = '';
   if (Number(p.pinned) === 1) out += `<span class="post-status-badge st-pinned">${SVG.pin} مثبّت</span>`;
   if (p.privacy === 'draft') out += `<span class="post-status-badge st-draft">مسودة</span>`;
   else if (p.privacy === 'private') out += `<span class="post-status-badge st-private">خاص</span>`;
+  else if (p.privacy === 'close_friends') out += `<span class="post-status-badge st-close-friends">أصدقاء مقربون</span>`;
   else if (p.scheduled_at && new Date(p.scheduled_at.replace(' ','T')+'Z').getTime() > Date.now()) out += `<span class="post-status-badge st-scheduled">مجدول</span>`;
   return out;
 }
@@ -6319,21 +6465,20 @@ function switchTab(tab) {
   const postsTab = document.getElementById('postsTab');
   const editTab = document.getElementById('editTab');
   const pagesTab = document.getElementById('pagesTab');
+  const privacyTab = document.getElementById('privacyTab');
+  [postsTab, editTab, pagesTab, privacyTab].forEach(el => { if (el) el.style.display = 'none'; });
   if (tab === 'posts') {
     document.getElementById('tabPosts')?.classList.add('active');
     if (postsTab) postsTab.style.display = 'block';
-    if (editTab) editTab.style.display = 'none';
-    if (pagesTab) pagesTab.style.display = 'none';
   } else if (tab === 'pages') {
     document.getElementById('tabPages')?.classList.add('active');
-    if (postsTab) postsTab.style.display = 'none';
-    if (editTab) editTab.style.display = 'none';
     if (pagesTab) { pagesTab.style.display = 'block'; loadMyPages(); }
+  } else if (tab === 'privacy') {
+    document.getElementById('tabPrivacy')?.classList.add('active');
+    if (privacyTab) { privacyTab.style.display = 'block'; loadCloseFriendsCount(); }
   } else {
     document.getElementById('tabEdit')?.classList.add('active');
-    if (postsTab) postsTab.style.display = 'none';
     if (editTab) editTab.style.display = 'block';
-    if (pagesTab) pagesTab.style.display = 'none';
   }
 }
 
@@ -6379,7 +6524,7 @@ async function createPage(name, username){
 }
 
 function sharePost(id) {
-  const url = window.location.origin + '/?p=' + id;
+  const url = window.location.origin + '/post?id=' + id;
   if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => showToast(t('linkCopied')));
   else prompt('الرابط:', url);
 }
@@ -6510,6 +6655,10 @@ function onCover(e) {
 async function save() {
   const display_name = document.getElementById('fName')?.value.trim() || '';
   const bio = document.getElementById('fBio')?.value.trim() || '';
+  const country = document.getElementById('fCountry')?.value.trim() || '';
+  const school = document.getElementById('fSchool')?.value.trim() || '';
+  const favorite_song = document.getElementById('fSong')?.value.trim() || '';
+  const certificates = document.getElementById('fCert')?.value.trim() || '';
   const errEl = document.getElementById('pErr'), okEl = document.getElementById('pOk');
   errEl.style.display = 'none'; okEl.style.display = 'none';
   const btn = document.getElementById('saveBtn');
@@ -6529,7 +6678,7 @@ async function save() {
       const ud = await up.json();
       if (ud.url) coverUrl = ud.url;
     }
-    const r = await fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ display_name, bio, avatar: avatarUrl, cover: coverUrl }) });
+    const r = await fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ display_name, bio, avatar: avatarUrl, cover: coverUrl, country, school, favorite_song, certificates }) });
     const d = await r.json();
     if (d.success) {
       try { const u = JSON.parse(localStorage.getItem('hostaka_user') || '{}'); u.avatar = avatarUrl; u.display_name = display_name; localStorage.setItem('hostaka_user', JSON.stringify(u)); } catch (e) {}
@@ -6616,6 +6765,12 @@ try { window.delComment = delComment; } catch(e) {}
 try { window.delPost = delPost; } catch(e) {}
 try { window.toggleSavePost = toggleSavePost; } catch(e) {}
 try { window.togglePinPost = togglePinPost; } catch(e) {}
+try { window.loadCloseFriendsCount = loadCloseFriendsCount; } catch(e) {}
+try { window.saveAccountPrivacy = saveAccountPrivacy; } catch(e) {}
+try { window.saveMessagePrivacy = saveMessagePrivacy; } catch(e) {}
+try { window.openCloseFriendsModal = openCloseFriendsModal; } catch(e) {}
+try { window.addCloseFriendByUsername = addCloseFriendByUsername; } catch(e) {}
+try { window.removeCloseFriend = removeCloseFriend; } catch(e) {}
 try { window.goPublisher = goPublisher; } catch(e) {}
 try { window.openPostModal = openPostModal; } catch(e) {}
 try { window.selectPostPrivacy = selectPostPrivacy; } catch(e) {}
@@ -8356,7 +8511,7 @@ function linkifyContent(html){
 }
 function goPublisher(username){ window.location = '/profile?u=' + encodeURIComponent(username); }
 function sharePost(id){
-  const url = location.origin + '/?post=' + id;
+  const url = location.origin + '/post?id=' + id;
   if (navigator.share) { navigator.share({ url }).catch(()=>{}); return; }
   navigator.clipboard?.writeText(url).then(()=>showToast('تم نسخ رابط المنشور')).catch(()=>showToast('تعذر النسخ','error'));
 }
@@ -8585,4 +8740,352 @@ try { window.toggleReplyInput = toggleReplyInput; } catch(e) {}
 try { window.sendComment = sendComment; } catch(e) {}
 try { window.delComment = delComment; } catch(e) {}
 try { window.unsaveItem = unsaveItem; } catch(e) {}
+}
+
+// ============================================================
+//  صفحة منشور واحد — /post
+// ============================================================
+if (document.body.classList.contains('page-post')) {
+
+let currentTheme = localStorage.getItem('hostaka_theme') || 'light';
+function setTheme(theme){
+  const html = document.documentElement;
+  if(theme==='dark') html.setAttribute('data-theme','dark'); else html.removeAttribute('data-theme');
+  currentTheme = theme;
+  localStorage.setItem('hostaka_theme', theme);
+}
+function toggleTheme(){ setTheme(currentTheme==='light'?'dark':'light'); }
+setTheme(currentTheme);
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function getToken(){ return localStorage.getItem('hostaka_token') || ''; }
+
+function showToast(msg, type='success'){
+  const host = document.getElementById('toastHost');
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + type;
+  el.textContent = msg;
+  host.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=>el.remove(),300); }, 3200);
+}
+
+async function apiFetch(url, method='GET', body=null){
+  const token = getToken();
+  const opts = { method, headers:{'Content-Type':'application/json','Authorization':'Bearer '+token} };
+  if(body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  const data = await r.json().catch(()=>({}));
+  return data;
+}
+
+function openModal(id){ document.getElementById(id).classList.add('show'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+function fmtDate(s){
+  if(!s) return '';
+  let d;
+  if(typeof s === 'string' && !/[zZ]|[+-]\d\d:?\d\d$/.test(s)) d = new Date(s.replace(' ','T')+'Z');
+  else d = new Date(s);
+  return d.toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'});
+}
+
+const SVG = {
+  like:     `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`,
+  heart:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`,
+  haha:     `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
+  sad:      `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 16c-1.5-1-2.5-1.5-4-1.5s-2.5.5-4 1.5"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
+  angry:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 16c-1.5-1-2.5-1.5-4-1.5s-2.5.5-4 1.5"/><path d="M8 8l2 2"/><path d="M16 8l-2 2"/></svg>`,
+  send:     `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`,
+  delete:   `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`,
+  comment:  `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+  share:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>`,
+  reel:     `<svg width="22" height="22" viewBox="0 0 24 24" fill="white" stroke="none"><polygon points="6 4 20 12 6 20"/></svg>`,
+  bookmarkFilled: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>`,
+  check:   `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`,
+};
+const REACTIONS = [
+  { emoji:'like',  label:'أعجبني',  icon:SVG.like },
+  { emoji:'heart', label:'أحببته',  icon:SVG.heart },
+  { emoji:'haha',  label:'أضحكني',  icon:SVG.haha },
+  { emoji:'sad',   label:'أحزنني',  icon:SVG.sad },
+  { emoji:'angry', label:'أغضبني',  icon:SVG.angry },
+];
+
+function verifiedBadge(){ return `<span class="badge-verified">${SVG.check}</span>`; }
+function stripEmojis(text) {
+  return text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FEFF}\u{1F1E0}-\u{1F1FF}]/gu, '');
+}
+function linkifyContent(html){
+  try {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    const walker = document.createTreeWalker(wrapper, NodeFilter.SHOW_TEXT);
+    const textNodes = [];
+    let node;
+    while((node = walker.nextNode())) textNodes.push(node);
+    const re = /(^|[\s(])(?:([@#])([A-Za-z0-9_\u0600-\u06FF]{2,32})|(https?:\/\/[^\s<]+))/gu;
+    textNodes.forEach(tn=>{
+      const text = tn.nodeValue;
+      if(!text || !/[@#]|https?:\/\//.test(text)) return;
+      let last = 0, m, changed = false;
+      const frag = document.createDocumentFragment();
+      re.lastIndex = 0;
+      while((m = re.exec(text))){
+        changed = true;
+        const [full, pre, sym, word, rawUrl] = m;
+        const start = m.index;
+        if(start > last) frag.appendChild(document.createTextNode(text.slice(last, start)));
+        if(pre) frag.appendChild(document.createTextNode(pre));
+        if(rawUrl){
+          const cleanUrl = rawUrl.replace(/[.,!?)\]]+$/, '');
+          const trail = rawUrl.slice(cleanUrl.length);
+          const a = document.createElement('a');
+          a.textContent = cleanUrl; a.className = 'post-link'; a.href = cleanUrl; a.target = '_blank'; a.rel = 'noopener noreferrer';
+          frag.appendChild(a);
+          if(trail) frag.appendChild(document.createTextNode(trail));
+          last = start + full.length;
+          continue;
+        }
+        const a = document.createElement('a');
+        a.textContent = sym + word;
+        if(sym === '@'){ a.className = 'mention-tag'; a.href = '/profile?u=' + encodeURIComponent(word); }
+        else { a.className = 'hashtag-tag'; a.href = '/?tag=' + encodeURIComponent(word); }
+        frag.appendChild(a);
+        last = start + full.length;
+      }
+      if(!changed) return;
+      if(last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      tn.parentNode.replaceChild(frag, tn);
+    });
+    return wrapper.innerHTML;
+  } catch(e){ return html; }
+}
+function goPublisher(username){ window.location = '/profile?u=' + encodeURIComponent(username); }
+function sharePost(id){
+  const url = location.origin + '/post?id=' + id;
+  if (navigator.share) { navigator.share({ url }).catch(()=>{}); return; }
+  navigator.clipboard?.writeText(url).then(()=>showToast('تم نسخ رابط المنشور')).catch(()=>showToast('تعذر النسخ','error'));
+}
+
+let ME = null;
+let postList = [];
+
+function postStatusBadge(p){
+  if (p.privacy === 'draft') return `<span class="post-status-badge st-draft">مسودة</span>`;
+  if (p.privacy === 'private') return `<span class="post-status-badge st-private">خاص</span>`;
+  return '';
+}
+
+function findPostItem(id){ return postList.find(p => p.id === id); }
+function rerenderPostItem(id){
+  const post = findPostItem(id);
+  const card = document.getElementById('post-'+id);
+  if (post && card) {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = renderPostCard(post);
+    card.replaceWith(wrap.firstChild);
+  }
+}
+
+function renderPostCard(p){
+  const canDel = ME && (ME.role==='admin' || p.user_id==ME?.id);
+  let mediaHtml = '';
+  if (p.video && Number(p.is_reel) === 1) {
+    mediaHtml = `<div class="reel-card" onclick="location.href='/short?id=${p.id}'">
+      <video class="reel-thumb-video" muted playsinline preload="metadata"><source src="${esc(p.video)}#t=0.1" type="video/mp4"></video>
+      <div class="reel-play-badge">${SVG.reel}</div>
+      <div class="reel-tag">ريلز</div>
+    </div>`;
+  } else if (p.video) {
+    mediaHtml = `<video class="card-video" controls><source src="${esc(p.video)}" type="video/mp4"></video>`;
+  } else if (p.image) {
+    mediaHtml = `<img class="card-img" src="${esc(p.image)}" loading="lazy" onerror="this.style.display='none'">`;
+  }
+
+  const totalReactions = (p.reactions||[]).reduce((s,r)=>s+(r.count||0),0);
+  const userR = p.userReaction;
+  const activeReact = userR ? REACTIONS.find(r=>r.emoji===userR) : null;
+  const reactionHtml = `<div class="react-wrap">
+    <button class="react-main-btn ${userR?'reacted':''}" onclick="toggleReactMenu(${p.id})">
+      ${activeReact ? activeReact.icon : SVG.like}
+      <span>${totalReactions||'تفاعل'}</span>
+    </button>
+    <div class="react-menu" id="rmenu-${p.id}">
+      ${REACTIONS.map(r=>`<button class="react-emoji-btn ${p.userReaction===r.emoji?'active':''}" onclick="toggleReact(${p.id},'${r.emoji}')" title="${r.label}">${r.icon}</button>`).join('')}
+    </div>
+  </div>`;
+
+  const allComments = p.comments || [];
+  const topComments = allComments.filter(c => !c.parent_id);
+  function repliesOf(cid){ return allComments.filter(c => Number(c.parent_id) === Number(cid)); }
+  function oneCommentHtml(c, postId){
+    const ca = c.avatar ? `<img src="${esc(c.avatar)}" alt="">` : esc((c.display_name||c.username||'?').charAt(0).toUpperCase());
+    const canDelC = ME && (ME.role==='admin' || c.user_id==ME?.id);
+    const cleanContent = linkifyContent(stripEmojis(esc(c.content)));
+    const replies = repliesOf(c.id);
+    const repliesHtml = replies.length ? `<div class="replies-list">${replies.map(r=>oneCommentHtml(r, postId)).join('')}</div>` : '';
+    return `<div class="comment" id="cmt-${c.id}">
+      <div class="c-avatar">${ca}</div>
+      <div class="c-bubble">
+        <div class="c-name">${esc(c.display_name||c.username)}
+          ${ME ? `<button class="reply-btn" onclick="toggleReplyInput(${postId},${c.id})">رد</button>` : ''}
+          ${canDelC?`<button class="c-del" onclick="delComment(${c.id},${postId})">${SVG.delete}</button>`:''}
+        </div>
+        <div class="c-text">${cleanContent}</div>
+      </div>
+    </div>
+    <div class="reply-input-row" id="replyRow-${c.id}" style="display:none;">
+      <input class="comment-input" type="text" placeholder="رد @${esc(c.username||'')}" id="ri-${c.id}" onkeydown="if(event.key==='Enter')sendComment(${postId},${c.id})">
+      <button class="btn-send-comment" onclick="sendComment(${postId},${c.id})">${SVG.send}</button>
+    </div>
+    ${repliesHtml}`;
+  }
+  const commentsHtml = topComments.map(c => oneCommentHtml(c, p.id)).join('');
+  const commentInputHtml = ME ? `<div class="comment-input-row">
+    <input class="comment-input" type="text" placeholder="اكتب تعليقاً..." id="ci-${p.id}" onkeydown="if(event.key==='Enter')sendComment(${p.id})">
+    <button class="btn-send-comment" onclick="sendComment(${p.id})">${SVG.send}</button>
+  </div>` : '';
+
+  return `<div class="post-card" id="post-${p.id}">
+    ${mediaHtml}
+    <div class="card-body">
+      <div class="pub-row">
+        <div class="pub-info">
+          <div class="pub-name" style="cursor:pointer;" onclick="goPublisher('${esc(p.publisher)}')">
+            ${esc(p.publisher_name || p.publisher)}
+            ${(p.publisher_verified||p.user_verified) ? verifiedBadge() : ''}
+            ${postStatusBadge(p)}
+          </div>
+        </div>
+        <div class="pub-actions">
+          <button class="btn-icon save-btn ${p.is_saved?'saved':''}" onclick="toggleSaveItem(${p.id})" title="${p.is_saved?'إلغاء الحفظ':'حفظ'}">${p.is_saved?SVG.bookmarkFilled:SVG.bookmark}</button>
+          <button class="btn-icon" onclick="sharePost(${p.id})" title="مشاركة">${SVG.share}</button>
+          ${canDel ? `<button class="btn-icon" onclick="deletePostItem(${p.id})" title="حذف">${SVG.delete}</button>` : ''}
+        </div>
+      </div>
+      <div class="pub-date">${fmtDate(p.created_at)}</div>
+      <div class="post-text post-html">${linkifyContent(p.content||'')}</div>
+      <div class="reactions-row">
+        ${reactionHtml}
+        <button class="react-btn" onclick="toggleComments(${p.id})" id="cmtToggle-${p.id}">
+          ${SVG.comment}<span>${allComments.length} تعليق</span>
+        </button>
+      </div>
+      <div class="comments-section" id="cmtSec-${p.id}" style="display:none;">
+        <div class="comments-list" id="cmtList-${p.id}">${commentsHtml}</div>
+        ${commentInputHtml}
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleReactMenu(id){
+  const menu = document.getElementById('rmenu-'+id);
+  if (!menu) return;
+  document.querySelectorAll('.react-menu.show').forEach(m => { if (m !== menu) m.classList.remove('show'); });
+  menu.classList.toggle('show');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.react-wrap')) document.querySelectorAll('.react-menu.show').forEach(m => m.classList.remove('show'));
+});
+
+async function toggleReact(id, emoji){
+  if(!ME) return;
+  document.querySelectorAll('.react-menu.show').forEach(m => m.classList.remove('show'));
+  const d = await apiFetch('/api/records/'+id+'/react', 'POST', { emoji });
+  if(!d.success) return;
+  const post = findPostItem(id);
+  if(post){ post.reactions = d.reactions; post.userReaction = d.userReaction; }
+  rerenderPostItem(id);
+}
+
+function toggleComments(id){
+  const sec=document.getElementById('cmtSec-'+id);
+  const toggle=document.getElementById('cmtToggle-'+id);
+  if(sec){
+    const showing = sec.style.display==='none';
+    sec.style.display = showing ? 'block' : 'none';
+    if(toggle) toggle.classList.toggle('expanded', showing);
+  }
+}
+function toggleReplyInput(postId, commentId){
+  const row = document.getElementById('replyRow-'+commentId);
+  if(!row) return;
+  const showing = row.style.display === 'none';
+  row.style.display = showing ? 'flex' : 'none';
+  if(showing) document.getElementById('ri-'+commentId)?.focus();
+}
+async function sendComment(postId, parentId){
+  if(!ME) return;
+  const input = parentId ? document.getElementById('ri-'+parentId) : document.getElementById('ci-'+postId);
+  if(!input||!input.value.trim()) return;
+  const content=input.value.trim(); input.value='';
+  const d=await apiFetch('/api/records/'+postId+'/comments','POST',{content, parent_id: parentId||null});
+  if(!d.success) return;
+  const comments=await apiFetch('/api/records/'+postId+'/comments');
+  const post=findPostItem(postId);
+  if(post){ post.comments=comments; }
+  rerenderPostItem(postId);
+  document.getElementById('cmtSec-'+postId).style.display='block';
+  document.getElementById('cmtToggle-'+postId)?.classList.add('expanded');
+}
+async function delComment(commentId, postId){
+  if(!confirm('حذف هذا التعليق؟')) return;
+  await apiFetch('/api/comments/'+commentId,'DELETE');
+  document.getElementById('cmt-'+commentId)?.remove();
+}
+
+async function toggleSaveItem(id){
+  if(!ME) return;
+  const d = await apiFetch('/api/records/'+id+'/save', 'POST');
+  if(!d.success) return;
+  const post = findPostItem(id);
+  if(post) post.is_saved = d.saved;
+  rerenderPostItem(id);
+  showToast(d.saved ? 'تم حفظ المنشور' : 'تم إلغاء حفظ المنشور');
+}
+
+async function deletePostItem(id){
+  if(!confirm('حذف هذا المنشور نهائياً؟')) return;
+  const d = await apiFetch('/api/records/'+id, 'DELETE');
+  if(d.success){ showToast('تم الحذف'); setTimeout(()=>{ location.href='/'; }, 800); }
+  else showToast(d.error||'تعذر الحذف', 'error');
+}
+
+function renderEmpty(msg){
+  document.getElementById('wrap').innerHTML = `
+    <div class="post-empty" style="margin-top:60px;">${SVG.share}<div>${msg || 'هذا المنشور غير متاح'}</div></div>
+  `;
+}
+
+async function loadSinglePost(){
+  const id = new URLSearchParams(location.search).get('id');
+  if(!id){ renderEmpty('لم يتم تحديد منشور'); return; }
+  try{ ME = await apiFetch('/api/me'); }catch(e){ ME = null; }
+  try{
+    const post = await apiFetch('/api/records/'+id+'/single');
+    if(post.error){ renderEmpty(post.error); return; }
+    postList = [post];
+    document.getElementById('wrap').innerHTML = `
+      <div class="page-title">منشور</div>
+      <div id="postSingle">${renderPostCard(post)}</div>
+    `;
+  }catch(e){ renderEmpty(); }
+}
+
+loadSinglePost();
+
+try { window.setTheme = setTheme; } catch(e) {}
+try { window.toggleTheme = toggleTheme; } catch(e) {}
+try { window.goPublisher = goPublisher; } catch(e) {}
+try { window.sharePost = sharePost; } catch(e) {}
+try { window.toggleReactMenu = toggleReactMenu; } catch(e) {}
+try { window.toggleReact = toggleReact; } catch(e) {}
+try { window.toggleComments = toggleComments; } catch(e) {}
+try { window.toggleReplyInput = toggleReplyInput; } catch(e) {}
+try { window.sendComment = sendComment; } catch(e) {}
+try { window.delComment = delComment; } catch(e) {}
+try { window.toggleSaveItem = toggleSaveItem; } catch(e) {}
+try { window.deletePostItem = deletePostItem; } catch(e) {}
 }

@@ -30,9 +30,11 @@
     <div class="field"><label>الفئة</label><input type="text" id="epCategory" maxlength="40" placeholder="ألعاب، تقنية، فن...‎"></div>
     <div class="field"><label>نبذة</label><textarea id="epBio" maxlength="300"></textarea></div>
     <input type="file" id="epAvatarFile" accept="image/*" style="display:none;" onchange="onEditAvatar(event)">
+    <input type="file" id="epCoverFile" accept="image/*" style="display:none;" onchange="onEditCover(event)">
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeEditPage()">إلغاء</button>
       <button class="btn btn-ghost" onclick="document.getElementById('epAvatarFile').click()">تغيير الصورة</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('epCoverFile').click()">تغيير الغلاف</button>
       <button class="btn btn-primary" id="epSaveBtn" onclick="savePageEdit()">حفظ</button>
     </div>
   </div>
