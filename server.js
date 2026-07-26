@@ -1818,7 +1818,10 @@ app.put('/api/account/birthdate', requireAuth, async (req, res) => {
 // ============================================================
 
 function timeAgoAr(dateStr) {
-  const ms = Date.now() - parseSqliteUTC(dateStr).getTime();
+  if (!dateStr) return 'غير معروف';
+  const t = parseSqliteUTC(dateStr).getTime();
+  if (Number.isNaN(t)) return 'غير معروف';
+  const ms = Date.now() - t;
   const mins = Math.floor(ms / 60000);
   if (mins < 1) return 'الآن';
   if (mins < 60) return `منذ ${mins} دقيقة`;
@@ -1856,6 +1859,7 @@ app.post('/api/account/sessions/:id/revoke', requireAuth, async (req, res) => {
     await q.logSecurityEvent(req.user.id, 'session_revoked', 'تم إنهاء جلسة تسجيل دخول من جهاز آخر', getClientIp(req), parseUserAgent(req.headers['user-agent']).device);
     res.json({ success:true });
   } catch(e) {
+    console.error('❌ sessions/:id/revoke error:', e.message || e);
     res.status(500).json({ error:'خطأ في الخادم' });
   }
 });
@@ -1867,6 +1871,7 @@ app.post('/api/account/sessions/revoke-all', requireAuth, async (req, res) => {
     await q.logSecurityEvent(req.user.id, 'sessions_revoked_all', 'تم تسجيل الخروج من جميع الأجهزة الأخرى', getClientIp(req), parseUserAgent(req.headers['user-agent']).device);
     res.json({ success:true });
   } catch(e) {
+    console.error('❌ sessions/revoke-all error:', e.message || e);
     res.status(500).json({ error:'خطأ في الخادم' });
   }
 });

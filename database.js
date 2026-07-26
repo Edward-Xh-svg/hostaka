@@ -335,22 +335,9 @@ async function initDB() {
     "CREATE INDEX IF NOT EXISTS idx_saved_posts_user ON saved_posts(user_id, created_at DESC)",
     "ALTER TABLE records ADD COLUMN pinned INTEGER DEFAULT 0",       // ✅ تثبيت المنشور في الملف الشخصي
     "ALTER TABLE records ADD COLUMN pinned_at TEXT DEFAULT ''",
-    "CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, jti TEXT NOT NULL UNIQUE, username TEXT DEFAULT '', device TEXT DEFAULT '', browser TEXT DEFAULT '', os TEXT DEFAULT '', ip TEXT DEFAULT '', location TEXT DEFAULT '', user_agent TEXT DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')), last_active TEXT NOT NULL DEFAULT (datetime('now')), revoked INTEGER DEFAULT 0)",  // ✅ إدارة الجلسات/الأجهزة
-    // 🩹 إصلاح احتياطي: لو جدول sessions كان موجوداً مسبقاً بشكل مختلف (بدون بعض الأعمدة)، نضيف الأعمدة الناقصة يدوياً
-    "ALTER TABLE sessions ADD COLUMN jti TEXT DEFAULT ''",
-    "ALTER TABLE sessions ADD COLUMN device TEXT DEFAULT ''",
-    "ALTER TABLE sessions ADD COLUMN browser TEXT DEFAULT ''",
-    "ALTER TABLE sessions ADD COLUMN os TEXT DEFAULT ''",
-    "ALTER TABLE sessions ADD COLUMN ip TEXT DEFAULT ''",
-    "ALTER TABLE sessions ADD COLUMN location TEXT DEFAULT ''",
-    "ALTER TABLE sessions ADD COLUMN user_agent TEXT DEFAULT ''",
-    "ALTER TABLE sessions ADD COLUMN created_at TEXT DEFAULT ''",
-    "ALTER TABLE sessions ADD COLUMN last_active TEXT DEFAULT ''",
-    "ALTER TABLE sessions ADD COLUMN revoked INTEGER DEFAULT 0",
-    "ALTER TABLE sessions ADD COLUMN user_id INTEGER DEFAULT 0",
-    "ALTER TABLE sessions ADD COLUMN username TEXT DEFAULT ''",
-    "CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id, revoked)",
-    "CREATE INDEX IF NOT EXISTS idx_sessions_jti ON sessions(jti)",
+    "CREATE TABLE IF NOT EXISTS user_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, jti TEXT NOT NULL UNIQUE, username TEXT DEFAULT '', device TEXT DEFAULT '', browser TEXT DEFAULT '', os TEXT DEFAULT '', ip TEXT DEFAULT '', location TEXT DEFAULT '', user_agent TEXT DEFAULT '', created_at TEXT DEFAULT '', last_active TEXT DEFAULT '', revoked INTEGER DEFAULT 0)",  // ✅ إدارة الجلسات/الأجهزة (جدول جديد كلياً لتفادي تعارض جدول sessions القديم غير المعروف البنية)
+    "CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id, revoked)",
+    "CREATE INDEX IF NOT EXISTS idx_user_sessions_jti ON user_sessions(jti)",
     "CREATE TABLE IF NOT EXISTS security_events (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, type TEXT NOT NULL, description TEXT DEFAULT '', ip TEXT DEFAULT '', device TEXT DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')))",  // ✅ تنبيهات الأمان
     "ALTER TABLE security_events ADD COLUMN type TEXT DEFAULT ''",
     "ALTER TABLE security_events ADD COLUMN description TEXT DEFAULT ''",
@@ -445,14 +432,14 @@ const q = {
 
   // ── الجلسات/الأجهزة ──
   createSession: (userId, jti, device, browser, os, ip, location, userAgent, username) => db.execute({
-    sql:`INSERT INTO sessions (user_id, jti, device, browser, os, ip, location, user_agent, username) VALUES (?,?,?,?,?,?,?,?,?)`,
+    sql:`INSERT INTO user_sessions (user_id, jti, device, browser, os, ip, location, user_agent, username, created_at, last_active) VALUES (?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))`,
     args:[userId, jti, device||'', browser||'', os||'', ip||'', location||'', userAgent||'', username||'']
   }),
-  getSessionByJti: (jti) => db.execute({ sql:'SELECT * FROM sessions WHERE jti=?', args:[jti] }).then(first),
-  touchSession: (jti) => db.execute({ sql:"UPDATE sessions SET last_active=datetime('now') WHERE jti=?", args:[jti] }),
-  getUserSessions: (userId) => db.execute({ sql:'SELECT * FROM sessions WHERE user_id=? AND revoked=0 ORDER BY last_active DESC', args:[userId] }).then(rows),
-  revokeSession: (userId, sessionId) => db.execute({ sql:'UPDATE sessions SET revoked=1 WHERE id=? AND user_id=?', args:[sessionId, userId] }),
-  revokeAllSessions: (userId, exceptJti) => db.execute({ sql:'UPDATE sessions SET revoked=1 WHERE user_id=? AND jti!=?', args:[userId, exceptJti||''] }),
+  getSessionByJti: (jti) => db.execute({ sql:'SELECT * FROM user_sessions WHERE jti=?', args:[jti] }).then(first),
+  touchSession: (jti) => db.execute({ sql:"UPDATE user_sessions SET last_active=datetime('now') WHERE jti=?", args:[jti] }),
+  getUserSessions: (userId) => db.execute({ sql:'SELECT * FROM user_sessions WHERE user_id=? AND revoked=0 ORDER BY last_active DESC', args:[userId] }).then(rows),
+  revokeSession: (userId, sessionId) => db.execute({ sql:'UPDATE user_sessions SET revoked=1 WHERE id=? AND user_id=?', args:[sessionId, userId] }),
+  revokeAllSessions: (userId, exceptJti) => db.execute({ sql:'UPDATE user_sessions SET revoked=1 WHERE user_id=? AND jti!=?', args:[userId, exceptJti||''] }),
 
   // ── تنبيهات الأمان ──
   logSecurityEvent: (userId, type, description, ip, device) => db.execute({
