@@ -359,6 +359,14 @@ async function initDB() {
     "ALTER TABLE record_comments ADD COLUMN parent_id INTEGER DEFAULT NULL", // الرد على تعليق
     "ALTER TABLE messages ADD COLUMN reply_to INTEGER DEFAULT NULL",         // الرد على رسالة (دردشة خاصة)
     "ALTER TABLE group_messages ADD COLUMN reply_to INTEGER DEFAULT NULL",  // الرد على رسالة (مجموعة)
+
+    // ✅ تحديث الرسائل: مؤشرات القراءة + الكنى + مؤشر الكتابة + حذف/وسائط المحادثة
+    "ALTER TABLE messages ADD COLUMN read_at TEXT DEFAULT NULL",             // وقت قراءة الرسالة (لمؤشر القراءة)
+    "ALTER TABLE users ADD COLUMN read_receipts INTEGER DEFAULT 1",         // تفعيل/تعطيل مؤشر القراءة
+    "CREATE TABLE IF NOT EXISTS dm_nicknames (id INTEGER PRIMARY KEY AUTOINCREMENT, owner_id INTEGER NOT NULL, target_id INTEGER NOT NULL, nickname TEXT DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(owner_id, target_id))",
+    "ALTER TABLE group_members ADD COLUMN last_read_message_id INTEGER DEFAULT 0", // آخر رسالة قرأها العضو في المجموعة
+    "CREATE TABLE IF NOT EXISTS typing_status (id INTEGER PRIMARY KEY AUTOINCREMENT, chat_key TEXT NOT NULL, user_id INTEGER NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(chat_key, user_id))",
+    "CREATE INDEX IF NOT EXISTS idx_typing_chat ON typing_status(chat_key)",
   ];
   for (const sql of migrations) {
     try { await db.execute(sql); } catch(e) { /* column/table already exists */ }
@@ -401,7 +409,7 @@ async function initDB() {
 const q = {
   // ── Users ──
   getUserByEmail:   (email)    => db.execute({ sql:'SELECT * FROM users WHERE email=?', args:[email] }).then(first),
-  getUserById:      (id)       => db.execute({ sql:'SELECT id,username,email,role,avatar,bio,game_id,display_name,cover,verified,suspended,suspend_reason,birth_date,totp_enabled,is_private,message_privacy,country,favorite_song,school,certificates,last_seen,created_at FROM users WHERE id=?', args:[id] }).then(first),
+  getUserById:      (id)       => db.execute({ sql:'SELECT id,username,email,role,avatar,bio,game_id,display_name,cover,verified,suspended,suspend_reason,birth_date,totp_enabled,is_private,message_privacy,country,favorite_song,school,certificates,last_seen,read_receipts,created_at FROM users WHERE id=?', args:[id] }).then(first),
   getUserByIdFull:  (id)       => db.execute({ sql:'SELECT * FROM users WHERE id=?', args:[id] }).then(first),
   touchLastSeen: (id) => db.execute({ sql:"UPDATE users SET last_seen=datetime('now') WHERE id=?", args:[id] }).catch(()=>{}),
   getUserStatus: async (username) => {
@@ -414,7 +422,7 @@ const q = {
       sql: `
         SELECT 
           u.id, u.username, u.display_name, u.avatar, u.bio, u.game_id, u.role, u.verified, u.cover, u.created_at,
-          u.is_private, u.message_privacy, u.country, u.favorite_song, u.school, u.certificates,
+          u.is_private, u.message_privacy, u.country, u.favorite_song, u.school, u.certificates, u.read_receipts,
           (SELECT COUNT(*) FROM follows WHERE followed_id = u.id) AS followers_count,
           (SELECT COUNT(*) FROM follows WHERE follower_id = u.id) AS following_count,
           EXISTS (SELECT 1 FROM follows WHERE follower_id = ? AND followed_id = u.id) AS is_following
@@ -658,8 +666,23 @@ const q = {
   getMessage:   (id) => db.execute({ sql:'SELECT * FROM messages WHERE id=?', args:[id] }).then(first),
   updateMessage:(id,content) => db.execute({ sql:'UPDATE messages SET content=?, edited=1 WHERE id=?', args:[content,id] }),
   deleteMessage:(id) => db.execute({ sql:'DELETE FROM messages WHERE id=?', args:[id] }),
-  markRead:     (fid,tid) => db.execute({ sql:'UPDATE messages SET read=1 WHERE from_id=? AND to_id=?', args:[fid,tid] }),
+  markRead:     (fid,tid) => db.execute({ sql:"UPDATE messages SET read=1, read_at=datetime('now') WHERE from_id=? AND to_id=? AND read=0", args:[fid,tid] }),
   unreadCount:  (uid) => db.execute({ sql:'SELECT COUNT(*) as count FROM messages WHERE to_id=? AND read=0', args:[uid] }).then(first),
+  deleteConversation: (uid,oid) => db.execute({ sql:'DELETE FROM messages WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?)', args:[uid,oid,oid,uid] }),
+  getConversationMedia: (uid,oid) => db.execute({ sql:"SELECT id,from_id,image,created_at FROM messages WHERE ((from_id=? AND to_id=?) OR (from_id=? AND to_id=?)) AND image IS NOT NULL AND image!='' ORDER BY created_at DESC", args:[uid,oid,oid,uid] }).then(rows),
+
+  // ── الكنى في المحادثات الخاصة ──
+  getDmNickname:  (ownerId,targetId) => db.execute({ sql:'SELECT nickname FROM dm_nicknames WHERE owner_id=? AND target_id=?', args:[ownerId,targetId] }).then(first),
+  setDmNickname:  (ownerId,targetId,nickname) => db.execute({ sql:'INSERT INTO dm_nicknames (owner_id,target_id,nickname) VALUES (?,?,?) ON CONFLICT(owner_id,target_id) DO UPDATE SET nickname=excluded.nickname', args:[ownerId,targetId,nickname||''] }),
+  getDmNicknamesFor: (ownerId) => db.execute({ sql:'SELECT target_id,nickname FROM dm_nicknames WHERE owner_id=?', args:[ownerId] }).then(rows),
+
+  // ── إعدادات مؤشر القراءة ──
+  setReadReceipts: (uid,enabled) => db.execute({ sql:'UPDATE users SET read_receipts=? WHERE id=?', args:[enabled?1:0,uid] }),
+
+  // ── مؤشر الكتابة "يكتب..." ──
+  setTyping:    (chatKey,uid) => db.execute({ sql:"INSERT INTO typing_status (chat_key,user_id,updated_at) VALUES (?,?,datetime('now')) ON CONFLICT(chat_key,user_id) DO UPDATE SET updated_at=datetime('now')", args:[chatKey,uid] }),
+  clearTyping:  (chatKey,uid) => db.execute({ sql:'DELETE FROM typing_status WHERE chat_key=? AND user_id=?', args:[chatKey,uid] }),
+  getTypingUsers: (chatKey,excludeUid) => db.execute({ sql:"SELECT ts.user_id,u.username,u.display_name FROM typing_status ts JOIN users u ON u.id=ts.user_id WHERE ts.chat_key=? AND ts.user_id!=? AND ts.updated_at > datetime('now','-6 seconds')", args:[chatKey,excludeUid] }).then(rows),
 
   // ── Message Reactions ──
   getMsgReactions:    (mid) => db.execute({ sql:'SELECT emoji,COUNT(*) as count FROM message_reactions WHERE message_id=? GROUP BY emoji', args:[mid] }).then(rows),
@@ -679,6 +702,8 @@ const q = {
   updateMemberRole:  (gid,uid,role) => db.execute({ sql:'UPDATE group_members SET role=? WHERE group_id=? AND user_id=?', args:[role,gid,uid] }),
   updateMemberNick:  (gid,uid,nick) => db.execute({ sql:'UPDATE group_members SET nickname=? WHERE group_id=? AND user_id=?', args:[nick,gid,uid] }),
   isMember:          (gid,uid) => db.execute({ sql:'SELECT role FROM group_members WHERE group_id=? AND user_id=?', args:[gid,uid] }).then(first),
+  getGroupMedia:     (gid) => db.execute({ sql:"SELECT id,user_id,image,created_at,from_name FROM group_messages WHERE group_id=? AND image IS NOT NULL AND image!='' ORDER BY created_at DESC", args:[gid] }).then(rows),
+  markGroupRead:     (gid,uid,msgId) => db.execute({ sql:'UPDATE group_members SET last_read_message_id=? WHERE group_id=? AND user_id=? AND last_read_message_id<?', args:[msgId,gid,uid,msgId] }),
 
   // ── Group Messages ──
   getGroupMessages:       (gid) => db.execute({ sql:'SELECT * FROM group_messages WHERE group_id=? ORDER BY created_at ASC', args:[gid] }).then(rows),

@@ -2312,6 +2312,90 @@ app.get('/api/messages/:username', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'خطأ في الخادم' });
   }
 });
+
+// حذف المحادثة بالكامل
+app.delete('/api/messages/:username', requireAuth, async (req, res) => {
+  try {
+    const other = await q.getPublicProfile(req.params.username);
+    if (!other) return res.status(404).json({ error: 'غير موجود' });
+    await q.deleteConversation(req.user.id, other.id);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+// وسائط المحادثة (الصور المتبادلة)
+app.get('/api/messages/:username/media', requireAuth, async (req, res) => {
+  try {
+    const other = await q.getPublicProfile(req.params.username);
+    if (!other) return res.status(404).json({ error: 'غير موجود' });
+    res.json(await q.getConversationMedia(req.user.id, other.id));
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+// الكنية الخاصة (اسم يظهر لك فقط بدلاً من اسم الحساب)
+app.get('/api/messages/:username/nickname', requireAuth, async (req, res) => {
+  try {
+    const other = await q.getPublicProfile(req.params.username);
+    if (!other) return res.status(404).json({ error: 'غير موجود' });
+    const row = await q.getDmNickname(req.user.id, other.id);
+    res.json({ nickname: row?.nickname || '' });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+app.put('/api/messages/:username/nickname', requireAuth, async (req, res) => {
+  try {
+    const other = await q.getPublicProfile(req.params.username);
+    if (!other) return res.status(404).json({ error: 'غير موجود' });
+    await q.setDmNickname(req.user.id, other.id, (req.body?.nickname || '').trim().slice(0, 40));
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+// تفعيل/تعطيل مؤشر قراءة الرسائل (خاص وعام)
+app.get('/api/settings/read-receipts', requireAuth, async (req, res) => {
+  try {
+    const user = await q.getUserById(req.user.id);
+    res.json({ enabled: user?.read_receipts !== 0 });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+app.put('/api/settings/read-receipts', requireAuth, async (req, res) => {
+  try {
+    await q.setReadReceipts(req.user.id, !!req.body?.enabled);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+// مؤشر الكتابة "يكتب..." (خاص بالدردشة الفردية والجماعية معاً عبر chat_key)
+app.post('/api/typing', requireAuth, async (req, res) => {
+  try {
+    const chatKey = (req.body?.chat_key || '').trim();
+    if (!chatKey) return res.status(400).json({ error: 'chat_key مطلوب' });
+    if (req.body?.stop) await q.clearTyping(chatKey, req.user.id);
+    else await q.setTyping(chatKey, req.user.id);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+app.get('/api/typing/:chatKey', requireAuth, async (req, res) => {
+  try {
+    const users = await q.getTypingUsers(req.params.chatKey, req.user.id);
+    res.json({ typing: users });
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
 app.post('/api/messages/:username', requireAuth, async (req, res) => {
   try {
     const { content, image, reply_to } = req.body || {};
@@ -2520,6 +2604,8 @@ app.put('/api/groups/:id/members/:uid/role', requireAuth, async (req, res) => {
 });
 app.put('/api/groups/:id/members/:uid/nickname', requireAuth, async (req, res) => {
   try {
+    const m = await q.isMember(req.params.id, req.user.id);
+    if (!m) return res.status(403).json({ error: 'لست عضواً' });
     await q.updateMemberNick(req.params.id, req.params.uid, req.body?.nickname || '');
     res.json({ success: true });
   } catch(e) {
@@ -2531,6 +2617,30 @@ app.get('/api/groups/:id/messages', requireAuth, async (req, res) => {
     const m = await q.isMember(req.params.id, req.user.id);
     if (!m) return res.status(403).json({ error: 'لست عضواً' });
     res.json(await q.getGroupMessages(req.params.id));
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+// وسائط المجموعة
+app.get('/api/groups/:id/media', requireAuth, async (req, res) => {
+  try {
+    const m = await q.isMember(req.params.id, req.user.id);
+    if (!m) return res.status(403).json({ error: 'لست عضواً' });
+    res.json(await q.getGroupMedia(req.params.id));
+  } catch(e) {
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
+// تعليم آخر رسالة مقروءة في المجموعة (لمؤشر القراءة الجماعي)
+app.post('/api/groups/:id/read', requireAuth, async (req, res) => {
+  try {
+    const m = await q.isMember(req.params.id, req.user.id);
+    if (!m) return res.status(403).json({ error: 'لست عضواً' });
+    const msgId = Number(req.body?.message_id) || 0;
+    if (msgId > 0) await q.markGroupRead(req.params.id, req.user.id, msgId);
+    res.json({ success: true });
   } catch(e) {
     res.status(500).json({ error: 'خطأ في الخادم' });
   }
