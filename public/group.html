@@ -108,8 +108,47 @@
       <button class="btn-confirm" id="gsSaveBtn" onclick="saveGroupSettings()"><span id="gsSaveText">حفظ</span></button>
     </div>
     <div style="border-top:1px solid var(--border);margin-top:18px;padding-top:14px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
+      <label class="cs-toggle-row" style="flex:1 1 100%;">
+        <span>إظهار مؤشر قراءة الرسائل</span>
+        <input type="checkbox" id="gsReadReceipts" onchange="toggleGroupReadReceipts(this.checked)">
+      </label>
+      <button class="btn-confirm" onclick="openGroupMedia()" style="background:rgba(128,128,128,0.12);color:var(--text);" id="gsMediaBtn">عرض وسائط المحادثة</button>
+      <button class="btn-confirm" onclick="openReportGroupModal()" style="background:rgba(128,128,128,0.12);color:var(--text);" id="gsReportBtn">الإبلاغ عن الدردشة الجماعية</button>
       <button class="btn-confirm" onclick="leaveGroup()" id="leaveGroupBtn" style="background:rgba(128,128,128,0.12);color:var(--text);">مغادرة المجموعة</button>
       <button class="btn-confirm btn-danger" onclick="deleteGroupConfirm()" id="deleteGroupBtn" style="display:none;">حذف المجموعة</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="mediaViewModal">
+  <div class="modal-box cs-box">
+    <div class="modal-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+      <span>وسائط المحادثة</span>
+    </div>
+    <div class="media-grid" id="mediaGrid"></div>
+    <div class="m-footer">
+      <button class="btn-cancel" onclick="closeModal('mediaViewModal')">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="reportGroupModal">
+  <div class="modal-box">
+    <div class="modal-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2-3 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>الإبلاغ عن الدردشة الجماعية</span>
+    </div>
+    <select id="reportGroupReason" class="m-input" style="margin-bottom:10px;">
+      <option value="abuse">إساءة أو تنمر</option>
+      <option value="spam">رسائل مزعجة</option>
+      <option value="nudity">محتوى غير لائق</option>
+      <option value="other">سبب آخر</option>
+    </select>
+    <textarea id="reportGroupDetails" class="m-input" placeholder="تفاصيل إضافية (اختياري)" style="min-height:90px;resize:vertical;"></textarea>
+    <div class="m-footer">
+      <button class="btn-cancel" onclick="closeModal('reportGroupModal')">إلغاء</button>
+      <button class="btn-confirm" id="reportGroupBtn" onclick="submitReportGroup()"><span>إرسال البلاغ</span></button>
     </div>
   </div>
 </div>

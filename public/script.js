@@ -403,7 +403,12 @@ const LANG = {
     sendPlaceholder: 'اكتب رسالة...', attach: 'إرفاق صورة JPG', imageAttached: 'صورة مرفقة',
     loginRequired: 'يجب تسجيل الدخول', home: 'الرئيسية',
     groupCreated: 'تم إنشاء المجموعة', error: 'فشل',
-    noMessages: 'ابدأ المحادثة', today: 'اليوم', yesterday: 'أمس'
+    noMessages: 'ابدأ المحادثة', today: 'اليوم', yesterday: 'أمس',
+    setNicknamePlaceholder: 'كنية تظهر لك فقط بدلاً من الاسم', viewProfile: 'عرض الملف الشخصي',
+    viewMedia: 'عرض وسائط المحادثة', readReceiptsToggle: 'إظهار مؤشر قراءة الرسائل',
+    reportUser: 'الإبلاغ عن المستخدم', blockUser: 'حظر المستخدم', deleteConversation: 'حذف المحادثة',
+    noMedia: 'لا توجد وسائط', confirmDeleteConversation: 'سيتم حذف كل الرسائل في هذه المحادثة نهائياً. متابعة؟',
+    conversationDeleted: 'تم حذف المحادثة', selectChat: 'اختر محادثة من القائمة', seenAt: 'شوهدت'
   },
   en: {
     back: 'Hostaka', title: 'Messages', sidebarTitle: 'Messages',
@@ -422,7 +427,12 @@ const LANG = {
     sendPlaceholder: 'Type a message...', attach: 'Attach JPG image', imageAttached: 'Image attached',
     loginRequired: 'Please login', home: 'Home',
     groupCreated: 'Group created', error: 'Failed',
-    noMessages: 'Start the conversation', today: 'Today', yesterday: 'Yesterday'
+    noMessages: 'Start the conversation', today: 'Today', yesterday: 'Yesterday',
+    setNicknamePlaceholder: 'A nickname only you see instead of the name', viewProfile: 'View profile',
+    viewMedia: 'View shared media', readReceiptsToggle: 'Show read receipts',
+    reportUser: 'Report user', blockUser: 'Block user', deleteConversation: 'Delete conversation',
+    noMedia: 'No media yet', confirmDeleteConversation: 'All messages in this conversation will be permanently deleted. Continue?',
+    conversationDeleted: 'Conversation deleted', selectChat: 'Select a conversation from the list', seenAt: 'Seen'
   },
   fr: {
     back: 'Hostaka', title: 'Messages', sidebarTitle: 'Messages',
@@ -991,14 +1001,18 @@ function userItemHtml(u, conv) {
   </div>`;
 }
 
+let currentPeerObj = null;
+let currentDmNickname = '';
 function updateTopbarPeer(peer) {
+  currentPeerObj = peer;
   const av = peer.avatar ? `<img src="${esc(peer.avatar)}" alt="">` : (peer.display_name || peer.username || '?').charAt(0).toUpperCase();
   const role = peer.role === 'admin' ? t('admin') : t('member');
+  const shownName = currentDmNickname || peer.display_name || peer.username;
   document.getElementById('topbarTitle').innerHTML = `
-    <div class="topbar-peer" onclick="window.location='/profile?u='+encodeURIComponent('${esc(peer.username)}')">
+    <div class="topbar-peer" onclick="openChatSettings()">
       <div class="topbar-peer-av">${av}</div>
       <div>
-        <div class="topbar-peer-name">${esc(peer.display_name || peer.username)}</div>
+        <div class="topbar-peer-name" id="topbarPeerNameEl">${esc(shownName)}</div>
         <div class="topbar-peer-role"><span id="peerStatusDot" class="status-dot"></span><span id="peerStatusText">${role}</span></div>
       </div>
     </div>`;
@@ -1006,8 +1020,34 @@ function updateTopbarPeer(peer) {
   document.getElementById('peerOptsWrap').style.display = 'block';
   checkPeerBlockStatus();
   refreshPeerStatus();
+  loadDmNickname();
+  loadPeerProfileForReceipts();
   if (peerStatusInterval) clearInterval(peerStatusInterval);
   peerStatusInterval = setInterval(refreshPeerStatus, 25000);
+}
+
+let peerReadReceiptsEnabled = true;
+let myReadReceiptsEnabled = true;
+async function loadPeerProfileForReceipts(){
+  if (!currentPeerUsername) return;
+  try {
+    const p = await apiFetch('/api/profile/' + encodeURIComponent(currentPeerUsername));
+    peerReadReceiptsEnabled = p?.read_receipts !== 0;
+  } catch(e) { peerReadReceiptsEnabled = true; }
+  try {
+    const s = await apiFetch('/api/settings/read-receipts');
+    myReadReceiptsEnabled = s?.enabled !== false;
+  } catch(e) { myReadReceiptsEnabled = true; }
+}
+
+async function loadDmNickname(){
+  if (!currentPeerUsername) return;
+  try {
+    const d = await apiFetch('/api/messages/' + encodeURIComponent(currentPeerUsername) + '/nickname');
+    currentDmNickname = d?.nickname || '';
+    const nameEl = document.getElementById('topbarPeerNameEl');
+    if (nameEl && currentPeerObj) nameEl.textContent = currentDmNickname || currentPeerObj.display_name || currentPeerObj.username;
+  } catch(e) { currentDmNickname = ''; }
 }
 
 let peerStatusInterval = null;
@@ -1041,6 +1081,12 @@ function fmtRelativeShort(s){
 // ----- خيارات المحادثة: الإبلاغ والحظر -----
 let currentPeerUsername = null;
 function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+function openModal(id){ document.getElementById(id).classList.add('show'); }
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.modal-bg').forEach(m => {
+    m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); });
+  });
+});
 function togglePeerOpts(){ document.getElementById('peerOptsMenu')?.classList.toggle('show'); }
 document.addEventListener('click', e=>{
   if(!e.target.closest('.peer-opts-wrap') && !e.target.closest('#peerOptsWrap')) document.getElementById('peerOptsMenu')?.classList.remove('show');
@@ -1050,15 +1096,18 @@ async function checkPeerBlockStatus(){
   if(!currentPeerUsername) return;
   try{
     const d = await apiFetch('/api/block/status/' + encodeURIComponent(currentPeerUsername));
+    const label = d.blocked ? 'إلغاء حظر المستخدم' : 'حظر المستخدم';
     const txt = document.getElementById('peerBlockText');
-    if(txt) txt.textContent = d.blocked ? 'إلغاء حظر المستخدم' : 'حظر المستخدم';
+    if(txt) txt.textContent = label;
+    const csTxt = document.getElementById('csBlockText');
+    if(csTxt) csTxt.textContent = label;
   }catch(e){}
 }
 
 async function togglePeerBlock(){
   document.getElementById('peerOptsMenu')?.classList.remove('show');
   if(!currentPeerUsername) return;
-  const txt = document.getElementById('peerBlockText');
+  const txt = document.getElementById('peerBlockText') || document.getElementById('csBlockText');
   const isBlocked = txt && txt.textContent.includes('إلغاء');
   try{
     const d = isBlocked
@@ -1073,6 +1122,96 @@ async function togglePeerBlock(){
 
 let reportMode = 'user'; // 'user' | 'message'
 let reportMsgTargetId = null;
+// ============================================================
+//  صفحة إعدادات المحادثة (تظهر عند الضغط على الطرف الآخر)
+// ============================================================
+function openChatSettings(){
+  if (!currentPeerUsername || !currentPeerObj) return;
+  const box = document.getElementById('chatSettingsBody');
+  if (!box) return;
+  const p = currentPeerObj;
+  const av = p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : (p.display_name || p.username || '?').charAt(0).toUpperCase();
+  box.innerHTML = `
+    <div class="cs-head" onclick="viewPeerProfile()">
+      <div class="cs-av">${av}</div>
+      <div class="cs-headname">${esc(currentDmNickname || p.display_name || p.username)}</div>
+      <div class="cs-headuser">@${esc(p.username)}</div>
+    </div>
+    <div class="cs-nick-row">
+      <input class="m-input" id="csNickInput" placeholder="${t('setNicknamePlaceholder')}" value="${esc(currentDmNickname)}">
+      <button class="btn-confirm" onclick="saveDmNickname()">${t('save')}</button>
+    </div>
+    <div class="cs-actions">
+      <button onclick="viewPeerProfile()">${SVG.user || ''}<span>${t('viewProfile')}</span></button>
+      <button onclick="openConversationMedia()">${SVG.imageIc || ''}<span>${t('viewMedia')}</span></button>
+      <label class="cs-toggle-row">
+        <span>${t('readReceiptsToggle')}</span>
+        <input type="checkbox" id="csReadReceipts" ${myReadReceiptsEnabled ? 'checked' : ''} onchange="toggleMyReadReceipts(this.checked)">
+      </label>
+      <button onclick="openReportPeerModal()">${SVG.flagIc || ''}<span id="csReportText">${t('reportUser')}</span></button>
+      <button class="danger" id="csBlockBtn" onclick="togglePeerBlock()"><span id="csBlockText">${t('blockUser')}</span></button>
+      <button class="danger" onclick="deleteConversationConfirm()">${SVG.deleteIc || ''}<span>${t('deleteConversation')}</span></button>
+    </div>`;
+  openModal('chatSettingsModal');
+}
+function closeChatSettings(){ closeModal('chatSettingsModal'); }
+function viewPeerProfile(){
+  if (!currentPeerUsername) return;
+  window.location = '/profile?u=' + encodeURIComponent(currentPeerUsername);
+}
+async function saveDmNickname(){
+  const input = document.getElementById('csNickInput');
+  if (!input || !currentPeerUsername) return;
+  const val = input.value.trim();
+  try {
+    await apiFetch('/api/messages/' + encodeURIComponent(currentPeerUsername) + '/nickname', 'PUT', { nickname: val });
+    currentDmNickname = val;
+    const nameEl = document.getElementById('topbarPeerNameEl');
+    if (nameEl && currentPeerObj) nameEl.textContent = val || currentPeerObj.display_name || currentPeerObj.username;
+    showToast(t('settingsSaved'));
+  } catch(e) { showToast(t('error'), 'error'); }
+}
+async function toggleMyReadReceipts(enabled){
+  try {
+    await apiFetch('/api/settings/read-receipts', 'PUT', { enabled });
+    myReadReceiptsEnabled = enabled;
+    if (currentPeer) loadMsgs(currentPeer, false);
+  } catch(e) { showToast(t('error'), 'error'); }
+}
+async function openConversationMedia(){
+  if (!currentPeerUsername) return;
+  closeModal('chatSettingsModal');
+  const grid = document.getElementById('mediaGrid');
+  if (!grid) return;
+  grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:20px;">${t('loading')}</div>`;
+  openModal('mediaViewModal');
+  try {
+    const items = await apiFetch('/api/messages/' + encodeURIComponent(currentPeerUsername) + '/media');
+    renderMediaGrid(items);
+  } catch(e) { grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:20px;">${t('error')}</div>`; }
+}
+function renderMediaGrid(items){
+  const grid = document.getElementById('mediaGrid');
+  if (!grid) return;
+  if (!items || !items.length){
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:30px;">${t('noMedia')}</div>`;
+    return;
+  }
+  grid.innerHTML = items.map(m => `<div class="media-grid-item" onclick="openImgViewer('${esc(m.image)}')"><img src="${esc(m.image)}" loading="lazy"></div>`).join('');
+}
+async function deleteConversationConfirm(){
+  if (!currentPeerUsername) return;
+  if (!confirm(t('confirmDeleteConversation'))) return;
+  try {
+    await apiFetch('/api/messages/' + encodeURIComponent(currentPeerUsername), 'DELETE');
+    closeModal('chatSettingsModal');
+    showToast(t('conversationDeleted'));
+    document.getElementById('chatMain').innerHTML = `<div class="empty-state" id="emptyState"><span>${t('selectChat')}</span></div>`;
+    currentPeer = null;
+    loadSidebar();
+  } catch(e) { showToast(t('error'), 'error'); }
+}
+
 function openReportPeerModal(){
   document.getElementById('peerOptsMenu')?.classList.remove('show');
   reportMode = 'user';
@@ -1123,6 +1262,9 @@ async function openChat(username) {
 
   // Clear any existing poll timer
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  if (typingPollTimer) { clearInterval(typingPollTimer); typingPollTimer = null; }
+  stopTyping();
+  dmChatKey = 'dm:' + [ME.username, username].sort().join('|');
 
   // إنشاء واجهة المحادثة (بها msgsArea)
   document.getElementById('chatMain').innerHTML = `
@@ -1137,7 +1279,7 @@ async function openChat(username) {
     <div class="input-area">
       <button class="btn-attach" onclick="document.getElementById('chatImgFile').click()" title="${t('attach')}">${SVG.attach}</button>
       <input type="file" id="chatImgFile" accept=".jpg,.jpeg,image/jpeg" style="display:none;" onchange="onChatImg(event)">
-      <textarea class="msg-input" id="msgInput" placeholder="${t('sendPlaceholder')}" rows="1" onkeydown="onKey(event)" oninput="autoResize(this)"></textarea>
+      <textarea class="msg-input" id="msgInput" placeholder="${t('sendPlaceholder')}" rows="1" onkeydown="onKey(event)" oninput="autoResize(this);pingTyping()"></textarea>
       <button class="send-btn" id="sendBtn" onclick="sendMsg()">${SVG.send}</button>
     </div>`;
 
@@ -1149,6 +1291,59 @@ async function openChat(username) {
       loadMsgs(username, false);
     }
   }, 4000);
+  typingPollTimer = setInterval(pollTyping, 2500);
+}
+
+// ============================================================
+//  مؤشر الكتابة "يكتب..."
+// ============================================================
+let dmChatKey = null;
+let typingPingTimer = null;
+let typingPollTimer = null;
+let lastTypingPingAt = 0;
+let peerIsTyping = false;
+function pingTyping(){
+  if (!dmChatKey) return;
+  const now = Date.now();
+  if (now - lastTypingPingAt < 2000) return;
+  lastTypingPingAt = now;
+  apiFetch('/api/typing', 'POST', { chat_key: dmChatKey }).catch(()=>{});
+  if (typingPingTimer) clearTimeout(typingPingTimer);
+  typingPingTimer = setTimeout(stopTyping, 4000);
+}
+function stopTyping(){
+  if (typingPingTimer) { clearTimeout(typingPingTimer); typingPingTimer = null; }
+  if (dmChatKey) apiFetch('/api/typing', 'POST', { chat_key: dmChatKey, stop: true }).catch(()=>{});
+}
+async function pollTyping(){
+  if (!dmChatKey) return;
+  try {
+    const d = await apiFetch('/api/typing/' + encodeURIComponent(dmChatKey));
+    const typing = Array.isArray(d?.typing) && d.typing.length > 0;
+    if (typing !== peerIsTyping) {
+      peerIsTyping = typing;
+      renderTypingRow(typing);
+    }
+  } catch(e) { /* تجاهل */ }
+}
+function renderTypingRow(show){
+  const area = document.getElementById('msgsArea');
+  if (!area) return;
+  let row = document.getElementById('typingRow');
+  if (show) {
+    if (!row) {
+      const av = currentPeerObj?.avatar ? `<img src="${esc(currentPeerObj.avatar)}" alt="">` : (currentPeerObj?.display_name || currentPeerObj?.username || '?').charAt(0).toUpperCase();
+      const wasAtBottom = area.scrollTop + area.clientHeight >= area.scrollHeight - 40;
+      const div = document.createElement('div');
+      div.id = 'typingRow';
+      div.className = 'typing-row';
+      div.innerHTML = `<div class="msg-av">${av}</div><div class="typing-bubble"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>`;
+      area.appendChild(div);
+      if (wasAtBottom) area.scrollTop = area.scrollHeight;
+    }
+  } else if (row) {
+    row.remove();
+  }
 }
 
 // ============================================================
@@ -1193,6 +1388,13 @@ function renderMsgs(msgs, scroll = true) {
     return;
   }
   let html = '', lastDay = '';
+  const showReceipts = myReadReceiptsEnabled && peerReadReceiptsEnabled;
+  let lastReadMineId = null;
+  if (showReceipts) {
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].from_id == ME?.id && Number(msgs[i].read) === 1) { lastReadMineId = msgs[i].id; break; }
+    }
+  }
   msgs.forEach((m, i) => {
     const isMine = m.from_id == ME?.id;
     const day = fmtDay(m.created_at);
@@ -1236,6 +1438,7 @@ function renderMsgs(msgs, scroll = true) {
         </div>` : ''}
         ${reactionHtml}
         <div class="msg-time">${fmtTime(m.created_at)}${Number(m.edited) === 1 ? ' · <span class="msg-edited-tag">' + esc(t('msgEdited')) + '</span>' : ''}</div>
+        ${(showReceipts && isMine && m.id === lastReadMineId) ? `<div class="seen-receipt" title="${t('seenAt')} ${fmtTime(m.read_at || m.created_at)}"><div class="seen-av">${currentPeerObj?.avatar ? `<img src="${esc(currentPeerObj.avatar)}" alt="">` : (currentPeerObj?.display_name||currentPeerObj?.username||'?').charAt(0).toUpperCase()}</div></div>` : ''}
       </div>
       ${isMine ? `<div class="msg-av ${isLast ? '' : 'invisible'}">${av}</div>` : ''}
     </div>`;
@@ -1243,6 +1446,7 @@ function renderMsgs(msgs, scroll = true) {
   area.innerHTML = html;
   if (scroll) area.scrollTop = area.scrollHeight;
   loadLinkPreviews(area);
+  if (peerIsTyping) renderTypingRow(true);
 }
 
 // ============================================================
@@ -1374,6 +1578,7 @@ async function sendMsg() {
   const input = document.getElementById('msgInput');
   const content = input?.value.trim() || '';
   if (!content && !chatImgBase64) return;
+  stopTyping();
 
   if (editingMsgId) {
     const mid = editingMsgId;
@@ -1591,7 +1796,12 @@ const LANG = {
     settingsSaved:'تم الحفظ', leftGroup:'تمت مغادرة المجموعة', groupDeleted:'تم حذف المجموعة',
     confirmLeave:'هل أنت متأكد من مغادرة المجموعة؟', confirmDelete:'هل أنت متأكد من حذف المجموعة؟ لا يمكن التراجع',
     error:'فشل', membersAdded:'تمت الإضافة', noOthers:'لا يوجد مستخدمون آخرون',
-    promote:'ترقية لمدير', demote:'تنزيل لعضو', remove:'إزالة من المجموعة'
+    promote:'ترقية لمدير', demote:'تنزيل لعضو', remove:'إزالة من المجموعة',
+    setNickname:'تعيين كنية', setNicknamePromptTitle:'اكتب الكنية التي ستظهر لهذا العضو داخل المجموعة',
+    blockUser:'حظر العضو', confirmBlockMember:'سيتم حظر هذا العضو من مراسلتك. متابعة؟',
+    viewMedia:'عرض وسائط المحادثة', noMedia:'لا توجد وسائط', reportGroupChat:'الإبلاغ عن الدردشة الجماعية',
+    reportGroupTitle:'الإبلاغ عن المجموعة', reportGroupSent:'تم إرسال البلاغ، شكراً لك',
+    readReceiptsToggle:'إظهار مؤشر قراءة الرسائل', seenBy:'شاهدها'
   },
   en: {
     title:'Group', back:'Messages', members:'Members', add:'Add',
@@ -1608,7 +1818,12 @@ const LANG = {
     settingsSaved:'Saved', leftGroup:'Left the group', groupDeleted:'Group deleted',
     confirmLeave:'Are you sure you want to leave?', confirmDelete:'Are you sure? This cannot be undone',
     error:'Failed', membersAdded:'Added', noOthers:'No other users',
-    promote:'Promote to admin', demote:'Demote to member', remove:'Remove from group'
+    promote:'Promote to admin', demote:'Demote to member', remove:'Remove from group',
+    setNickname:'Set nickname', setNicknamePromptTitle:'Enter the nickname shown for this member in the group',
+    blockUser:'Block member', confirmBlockMember:'This member will be blocked from messaging you. Continue?',
+    viewMedia:'View shared media', noMedia:'No media yet', reportGroupChat:'Report group chat',
+    reportGroupTitle:'Report group', reportGroupSent:'Report sent, thank you',
+    readReceiptsToggle:'Show read receipts', seenBy:'Seen by'
   },
   fr: {
     title:'Groupe', back:'Messages', members:'Membres', add:'Ajouter',
@@ -2110,14 +2325,21 @@ async function init(){
   renderTopbar();
   renderMembers();
   loadMemberStatuses();
+  try {
+    const s = await apiFetch('/api/settings/read-receipts');
+    groupReadReceiptsEnabled = s?.enabled !== false;
+  } catch(e) { groupReadReceiptsEnabled = true; }
   if (memberStatusInterval) clearInterval(memberStatusInterval);
   memberStatusInterval = setInterval(loadMemberStatuses, 25000);
   document.getElementById('addMemberBtn').style.display = (myRole !== 'member') ? 'flex' : 'none';
   document.getElementById('deleteGroupBtn').style.display = (myRole === 'admin') ? 'inline-flex' : 'none';
 
   buildChatUI();
+  groupChatKey = 'group:' + GROUP_ID;
   await loadMsgs(true);
   pollTimer = setInterval(() => loadMsgs(false), 4000);
+  if (groupTypingPollTimer) clearInterval(groupTypingPollTimer);
+  groupTypingPollTimer = setInterval(pollGroupTyping, 2500);
 }
 
 function renderTopbar(){
@@ -2138,19 +2360,22 @@ function renderMembers(){
     const st = memberStatus[m.username];
     const isOnline = !!(st && st.online);
     let menu = '';
-    if (canManage){
-      const roleBtn = myRole === 'admin'
+    if (!isMe){
+      const roleBtn = canManage && myRole === 'admin'
         ? (m.role === 'admin'
             ? `<button onclick="changeRole(${m.user_id},'member')">${t('demote')}</button>`
             : `<button onclick="changeRole(${m.user_id},'admin')">${t('promote')}</button>`)
         : '';
+      const removeBtn = canManage ? `<button class="danger" onclick="removeMember(${m.user_id})">${t('remove')}</button>` : '';
       menu = `<div class="m-actions">
         <div class="m-more" onclick="toggleMemberMenu(event, ${m.user_id})">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
         </div>
         <div class="m-menu" id="mmenu-${m.user_id}">
+          <button onclick="setMemberNicknamePrompt(${m.user_id}, '${esc((m.nickname||'').replace(/'/g,"\\'"))}')">${t('setNickname')}</button>
           ${roleBtn}
-          <button class="danger" onclick="removeMember(${m.user_id})">${t('remove')}</button>
+          ${removeBtn}
+          <button class="danger" onclick="blockMemberConfirm('${esc(m.username)}')">${t('blockUser')}</button>
         </div>
       </div>`;
     }
@@ -2181,6 +2406,29 @@ function toggleMemberMenu(e, uid){
   const menu = document.getElementById('mmenu-'+uid);
   document.querySelectorAll('.m-menu.show').forEach(m => { if (m !== menu) m.classList.remove('show'); });
   menu.classList.toggle('show');
+}
+
+async function setMemberNicknamePrompt(uid, current){
+  document.getElementById('mmenu-'+uid)?.classList.remove('show');
+  const val = prompt(t('setNicknamePromptTitle'), current || '');
+  if (val === null) return;
+  try {
+    await apiFetch(`/api/groups/${GROUP_ID}/members/${uid}/nickname`, 'PUT', { nickname: val.trim() });
+    const g = await apiFetch('/api/groups/' + GROUP_ID);
+    members = g.members || [];
+    renderMembers();
+    showToast(t('settingsSaved'));
+  } catch(e){ showToast(e.message || t('error'), 'error'); }
+}
+
+async function blockMemberConfirm(username){
+  document.querySelectorAll('.m-menu.show').forEach(m => m.classList.remove('show'));
+  if (!confirm(t('confirmBlockMember'))) return;
+  try {
+    const d = await apiFetch('/api/block/' + encodeURIComponent(username), 'POST');
+    if (d.success) showToast(t('settingsSaved'));
+    else showToast(d.error || t('error'), 'error');
+  } catch(e){ showToast(t('error'), 'error'); }
 }
 
 async function changeRole(uid, role){
@@ -2231,6 +2479,43 @@ function onGroupAvatarFile(evt){
   evt.target.value = '';
 }
 
+async function openGroupMedia(){
+  closeModal('groupSettingsModal');
+  const grid = document.getElementById('mediaGrid');
+  if (!grid) return;
+  grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:20px;">${t('loading')}</div>`;
+  openModal('mediaViewModal');
+  try {
+    const items = await apiFetch(`/api/groups/${GROUP_ID}/media`);
+    if (!items || !items.length){
+      grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:30px;">${t('noMedia')}</div>`;
+      return;
+    }
+    grid.innerHTML = items.map(m => `<div class="media-grid-item" onclick="openImgViewer('${esc(m.image)}')"><img src="${esc(m.image)}" loading="lazy"></div>`).join('');
+  } catch(e) { grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:20px;">${t('error')}</div>`; }
+}
+
+function openReportGroupModal(){
+  closeModal('groupSettingsModal');
+  document.getElementById('reportGroupReason').value = 'abuse';
+  document.getElementById('reportGroupDetails').value = '';
+  openModal('reportGroupModal');
+}
+async function submitReportGroup(){
+  const reasonType = document.getElementById('reportGroupReason').value;
+  const details = document.getElementById('reportGroupDetails').value.trim();
+  const labels = { abuse:'إساءة أو تنمر', spam:'رسائل مزعجة', nudity:'محتوى غير لائق', other:'سبب آخر' };
+  const reason = (labels[reasonType]||reasonType) + (details ? ' — ' + details : '');
+  const btn = document.getElementById('reportGroupBtn');
+  btn.disabled = true;
+  try {
+    const d = await apiFetch('/api/reports', 'POST', { type:'group', target_id: GROUP_ID, subject: t('reportGroupTitle') + ' — ' + (group?.name||''), reason });
+    if (d.success){ showToast(t('reportGroupSent')); closeModal('reportGroupModal'); }
+    else { showToast(d.error || t('error'), 'error'); }
+  } catch(e){ showToast(t('error'), 'error'); }
+  btn.disabled = false;
+}
+
 function openGroupSettings(){
   document.getElementById('gsName').value = group.name || '';
   document.getElementById('gsDesc').value = group.description || '';
@@ -2240,6 +2525,8 @@ function openGroupSettings(){
   pendingGroupAvatar = '';
   renderGsAvatarPreview(group.avatar || '');
   document.getElementById('gsAvatarFile').disabled = myRole === 'member';
+  const rr = document.getElementById('gsReadReceipts');
+  if (rr) rr.checked = groupReadReceiptsEnabled;
   openModal('groupSettingsModal');
 }
 
@@ -2337,7 +2624,7 @@ function buildChatUI(){
     <div class="input-area">
       <button class="btn-attach" onclick="document.getElementById('chatImgFile').click()" title="${t('attach')}">${SVG.attach}</button>
       <input type="file" id="chatImgFile" accept=".jpg,.jpeg,image/jpeg" style="display:none;" onchange="onChatImg(event)">
-      <textarea class="msg-input" id="msgInput" placeholder="${t('sendPlaceholder')}" rows="1" onkeydown="onKey(event)" oninput="autoResize(this)"></textarea>
+      <textarea class="msg-input" id="msgInput" placeholder="${t('sendPlaceholder')}" rows="1" onkeydown="onKey(event)" oninput="autoResize(this);pingGroupTyping()"></textarea>
       <button class="send-btn" id="sendBtn" onclick="sendMsg()">${SVG.send}</button>
     </div>`;
 }
@@ -2351,9 +2638,76 @@ async function loadMsgs(scroll){
     _lastMsgs = msgs;
     await loadMsgReactions(msgs);
     renderMsgs(msgs, scroll);
+    if (msgs.length) {
+      const lastId = msgs[msgs.length - 1].id;
+      apiFetch(`/api/groups/${GROUP_ID}/read`, 'POST', { message_id: lastId }).catch(()=>{});
+    }
   } catch(e){
     console.error('loadMsgs failed:', e);
     if (area) area.innerHTML = `<div style="text-align:center;color:var(--muted);padding:30px;font-size:0.85rem;font-weight:600;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-left:4px;"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg> ${e.message || t('error')}</div>`;
+  }
+}
+
+// ============================================================
+//  مؤشر الكتابة "يكتب..." للمجموعة
+// ============================================================
+let groupChatKey = null;
+let groupReadReceiptsEnabled = true;
+async function toggleGroupReadReceipts(enabled){
+  try {
+    await apiFetch('/api/settings/read-receipts', 'PUT', { enabled });
+    groupReadReceiptsEnabled = enabled;
+    renderMsgs(_lastMsgs, false);
+  } catch(e) { showToast(t('error'), 'error'); }
+}
+let groupTypingPingTimer = null;
+let groupTypingPollTimer = null;
+let lastGroupTypingPingAt = 0;
+let groupTypingUsers = [];
+function pingGroupTyping(){
+  if (!groupChatKey) return;
+  const now = Date.now();
+  if (now - lastGroupTypingPingAt < 2000) return;
+  lastGroupTypingPingAt = now;
+  apiFetch('/api/typing', 'POST', { chat_key: groupChatKey }).catch(()=>{});
+  if (groupTypingPingTimer) clearTimeout(groupTypingPingTimer);
+  groupTypingPingTimer = setTimeout(stopGroupTyping, 4000);
+}
+function stopGroupTyping(){
+  if (groupTypingPingTimer) { clearTimeout(groupTypingPingTimer); groupTypingPingTimer = null; }
+  if (groupChatKey) apiFetch('/api/typing', 'POST', { chat_key: groupChatKey, stop: true }).catch(()=>{});
+}
+async function pollGroupTyping(){
+  if (!groupChatKey) return;
+  try {
+    const d = await apiFetch('/api/typing/' + encodeURIComponent(groupChatKey));
+    groupTypingUsers = Array.isArray(d?.typing) ? d.typing : [];
+    renderGroupTypingRow();
+  } catch(e) { /* تجاهل */ }
+}
+function renderGroupTypingRow(){
+  const area = document.getElementById('msgsArea');
+  if (!area) return;
+  let row = document.getElementById('typingRow');
+  if (groupTypingUsers.length) {
+    const names = groupTypingUsers.map(u => {
+      const mem = members.find(m => m.user_id == u.user_id);
+      return esc(mem?.nickname || u.display_name || u.username);
+    }).join('، ');
+    if (!row) {
+      const wasAtBottom = area.scrollTop + area.clientHeight >= area.scrollHeight - 40;
+      const div = document.createElement('div');
+      div.id = 'typingRow';
+      div.className = 'typing-row';
+      div.innerHTML = `<div class="msg-av">${SVG.user || '?'}</div><div class="typing-bubble"><span class="typing-name">${names}</span><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>`;
+      area.appendChild(div);
+      if (wasAtBottom) area.scrollTop = area.scrollHeight;
+    } else {
+      const nameEl = row.querySelector('.typing-name');
+      if (nameEl) nameEl.textContent = names;
+    }
+  } else if (row) {
+    row.remove();
   }
 }
 
@@ -2376,6 +2730,19 @@ function renderMsgs(msgs, scroll = true){
     return;
   }
   let html = '', lastDay = '';
+  const receiptsByMsgId = {};
+  if (groupReadReceiptsEnabled) {
+    members.forEach(mem => {
+      if (mem.user_id == ME?.id) return;
+      const lr = Number(mem.last_read_message_id || 0);
+      if (!lr) return;
+      let candidate = null;
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (Number(msgs[i].id) <= lr) { candidate = msgs[i]; break; }
+      }
+      if (candidate) (receiptsByMsgId[candidate.id] = receiptsByMsgId[candidate.id] || []).push(mem);
+    });
+  }
   msgs.forEach((m, i) => {
     const isMine = m.user_id == ME?.id;
     const canManageMsg = isMine || myRole !== 'member';
@@ -2420,6 +2787,7 @@ function renderMsgs(msgs, scroll = true){
         </div>` : ''}
         ${reactionHtml}
         <div class="msg-time">${fmtTime(m.created_at)}${Number(m.edited)===1 ? ' · <span class="msg-edited-tag">'+esc(t('msgEdited'))+'</span>' : ''}</div>
+        ${receiptsByMsgId[m.id] ? `<div class="seen-receipt" title="${t('seenBy')}: ${receiptsByMsgId[m.id].map(x=>esc(x.nickname||x.display_name||x.username)).join('، ')}">${receiptsByMsgId[m.id].slice(0,3).map(x => `<div class="seen-av">${x.avatar ? `<img src="${esc(x.avatar)}" alt="">` : (x.display_name||x.username||'?').charAt(0).toUpperCase()}</div>`).join('')}</div>` : ''}
       </div>
       ${isMine ? `<div class="msg-av ${isLast?'':'invisible'}">${av}</div>` : ''}
     </div>`;
@@ -2427,6 +2795,7 @@ function renderMsgs(msgs, scroll = true){
   area.innerHTML = html;
   if (scroll) area.scrollTop = area.scrollHeight;
   loadLinkPreviews(area);
+  if (groupTypingUsers.length) renderGroupTypingRow();
 }
 
 let replyingToMsgId = null;
@@ -2573,6 +2942,7 @@ async function sendMsg(){
   const input = document.getElementById('msgInput');
   const content = input?.value.trim() || '';
   if (!content && !chatImgBase64) return;
+  stopGroupTyping();
 
   if (editingMsgId) {
     const mid = editingMsgId;
